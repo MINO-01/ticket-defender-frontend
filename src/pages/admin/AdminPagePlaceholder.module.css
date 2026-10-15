@@ -1,0 +1,7 @@
+.page { display: grid; gap: var(--space-5); }
+.panel { display: flex; align-items: flex-start; gap: var(--space-5); min-height: 280px; padding: var(--space-6); }
+.icon { display: grid; flex: 0 0 52px; place-items: center; height: 52px; border-radius: 14px; background: #e8f3ff; color: var(--color-primary-700); font-size: 28px; }
+.kicker { margin: 2px 0 var(--space-2); color: var(--color-primary-700); font-size: 13px; font-weight: 800; }
+.panel h2 { margin: 0; color: var(--color-navy-900); font-size: clamp(19px, 2vw, 23px); }
+.panel p:last-child { max-width: 56ch; margin: var(--space-3) 0 0; color: var(--color-text-secondary); }
+@media (max-width: 640px) { .panel { display: grid; padding: var(--space-5); } }

@@ -1,0 +1,17 @@
+.field { display: grid; gap: var(--space-2); min-width: 0; }
+.label { color: var(--color-text); font-size: 14px; font-weight: 700; }
+.required, .error { color: var(--color-critical); }
+.control {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: white;
+  color: var(--color-text);
+}
+.control::placeholder { color: var(--color-text-secondary); opacity: 0.8; }
+.control:disabled { background: var(--color-subtle); opacity: 0.7; }
+.control[aria-invalid='true'] { border-color: var(--color-critical); }
+.textarea { min-height: 120px; resize: vertical; }
+.error { margin: 0; font-size: 13px; }

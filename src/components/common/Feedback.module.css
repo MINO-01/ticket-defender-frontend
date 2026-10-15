@@ -1,0 +1,11 @@
+.state { display: grid; justify-items: center; gap: var(--space-2); padding: var(--space-7) var(--space-4); text-align: center; }
+.state h2 { margin: 0; font-size: 18px; }
+.state p { margin: 0; color: var(--color-text-secondary); }
+.state button { margin-top: var(--space-3); padding: 8px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: white; color: var(--color-primary-700); font-weight: 700; }
+.symbol { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #e8f3ff; color: var(--color-primary-700); font-size: 24px; font-weight: 700; }
+.skeleton { display: grid; gap: var(--space-3); padding: var(--space-4); }
+.skeleton span { height: 20px; border-radius: var(--radius-control); background: linear-gradient(90deg, #e8edf4 25%, #f4f6fa 50%, #e8edf4 75%); background-size: 200% 100%; animation: shimmer 1.5s linear infinite; }
+.skeleton span:nth-child(2) { width: 86%; }
+.skeleton span:nth-child(3) { width: 60%; }
+@keyframes shimmer { to { background-position-x: -200%; } }
+@media (prefers-reduced-motion: reduce) { .skeleton span { animation: none; } }
