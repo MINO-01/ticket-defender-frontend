@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ticket Defender">
+  <rect width="64" height="64" rx="14" fill="#0B1D30"/>
+  <rect x="8" y="8" width="48" height="48" rx="10" fill="#2785E6"/>
+  <path d="M18 23h28v6H35v18h-6V29H18z" fill="#fff"/>
+</svg>
