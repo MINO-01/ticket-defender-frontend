@@ -1,15 +1,21 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
 import type { ReactNode } from 'react'
 import { adminPages, fanPages } from './app/router/navigation'
 import { AdminLayout } from './layouts/admin/AdminLayout'
 import { FanLayout } from './layouts/fan/FanLayout'
 import { AdminPagePlaceholder } from './pages/admin/AdminPagePlaceholder'
+import { LoadingSkeleton } from './components/common/Feedback'
+import { AdminRouteErrorBoundary } from './features/admin-track1/AdminRouteErrorBoundary'
 import { GuidePage } from './features/fan-report/GuidePage'
 import { WritePage } from './features/fan-report/WritePage'
 import { ReviewPage } from './features/fan-report/ReviewPage'
 import { LookupPage } from './features/fan-report/LookupPage'
 import { CompletePage, DemoCompletePage, DemoStatusPage, StatusPage } from './features/fan-report/OutcomePages'
 import styles from './App.module.css'
+
+const ClusterListPage = lazy(() => import('./features/admin-track1/ClusterListPage').then((module) => ({ default: module.ClusterListPage })))
+const ClusterDetailPage = lazy(() => import('./features/admin-track1/ClusterDetailPage').then((module) => ({ default: module.ClusterDetailPage })))
 
 const fanPageElements = {
   guide: <GuidePage />,
@@ -37,7 +43,9 @@ export default function App() {
     <Route path="/" element={<Home />} />
     <Route path="/app" element={<AdminLayout />}>
       <Route index element={<Navigate to="overview" replace />} />
-      {adminPages.map((page) => <Route key={page.path} path={page.path} element={<AdminPagePlaceholder title={page.label} description={page.description} reportCenter={page.path === 'report-center'} />} />)}
+      <Route path="analysis/findings" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 목록을 여는 중" />}><ClusterListPage /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="analysis/findings/:clusterId" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><ClusterDetailPage /></Suspense></AdminRouteErrorBoundary>} />
+      {adminPages.filter((page) => page.path !== 'analysis/findings').map((page) => <Route key={page.path} path={page.path} element={<AdminPagePlaceholder title={page.label} description={page.description} reportCenter={page.path === 'report-center'} />} />)}
     </Route>
     <Route path="/fan" element={<FanLayout />}>
       <Route index element={<Navigate to="guide" replace />} />
