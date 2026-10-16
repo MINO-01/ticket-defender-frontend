@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 700" role="img" aria-labelledby="title desc">
+  <title id="title">합성 게시글 화면 예시</title>
+  <desc id="desc">실제 판매 글이나 이용자 정보가 없는 화면 검토용 그림</desc>
+  <rect width="560" height="700" fill="#e9eff8"/>
+  <rect x="38" y="38" width="484" height="624" rx="24" fill="#fff" stroke="#cbd9e9" stroke-width="3"/>
+  <rect x="38" y="38" width="484" height="92" rx="24" fill="#155496"/>
+  <path d="M38 105h484v25H38z" fill="#155496"/>
+  <text x="72" y="94" fill="#fff" font-family="system-ui,sans-serif" font-size="27" font-weight="700">합성 게시글 예시</text>
+  <rect x="72" y="165" width="416" height="70" rx="12" fill="#edf5ff"/>
+  <text x="96" y="207" fill="#102a45" font-family="system-ui,sans-serif" font-size="23" font-weight="700">공연 티켓 거래 글</text>
+  <text x="72" y="291" fill="#475569" font-family="system-ui,sans-serif" font-size="18">공연</text>
+  <text x="72" y="330" fill="#102a45" font-family="system-ui,sans-serif" font-size="22">2026 Autumn Live</text>
+  <path d="M72 355h416" stroke="#e2e8f0" stroke-width="2"/>
+  <text x="72" y="400" fill="#475569" font-family="system-ui,sans-serif" font-size="18">좌석 표시</text>
+  <text x="72" y="439" fill="#102a45" font-family="system-ui,sans-serif" font-size="22">VIP A구역 · 일부 가림</text>
+  <path d="M72 464h416" stroke="#e2e8f0" stroke-width="2"/>
+  <text x="72" y="510" fill="#475569" font-family="system-ui,sans-serif" font-size="18">이 그림에는 판매자 정보가 없습니다.</text>
+  <rect x="72" y="550" width="416" height="70" rx="12" fill="#fff5e8"/>
+  <text x="96" y="592" fill="#804700" font-family="system-ui,sans-serif" font-size="17" font-weight="700">실제 첨부 파일 아님 · 합성 시연 자료</text>
+</svg>

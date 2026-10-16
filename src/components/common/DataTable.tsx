@@ -17,7 +17,7 @@ type DataTableProps<T> = {
 
 export function DataTable<T>({ caption, columns, rows, getRowKey, emptyMessage = '표시할 항목이 없습니다.' }: DataTableProps<T>) {
   return (
-    <div className={styles.scroll}>
+    <div className={styles.scroll} role="region" aria-label={`${caption} 가로 스크롤 영역`} tabIndex={0}>
       <table className={styles.table}>
         <caption className={styles.caption}>{caption}</caption>
         <thead><tr>{columns.map((column) => <th key={column.key} scope="col">{column.header}</th>)}</tr></thead>
