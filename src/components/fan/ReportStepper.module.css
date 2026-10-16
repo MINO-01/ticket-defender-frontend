@@ -1,7 +1,7 @@
-.stepper { overflow-x: auto; }
-.stepper ol { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; min-width: 300px; margin: 0; padding: 0; list-style: none; }
-.stepper li { display: grid; justify-items: center; gap: 6px; color: var(--color-text-secondary); font-size: 12px; font-weight: 700; text-align: center; }
-.number { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--color-border); border-radius: 50%; background: white; }
-.current { color: var(--color-primary-700) !important; }
+.stepper { padding: 16px; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: white; }
+.stepper ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.stepper li { display: grid; justify-items: center; align-content: center; gap: 6px; min-height: 68px; padding: 6px; border-radius: 10px; background: #f1f5ff; color: var(--color-text-secondary); font-size: 12px; font-weight: 700; text-align: center; word-break: keep-all; }
+.number { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--color-border); border-radius: 50%; background: var(--color-subtle); }
+.current { background: #e2edff !important; color: var(--color-primary-700) !important; }
 .current .number { border-color: var(--color-primary-500); background: var(--color-primary-500); color: white; }
 .done .number { border-color: var(--color-primary-500); color: var(--color-primary-700); }
