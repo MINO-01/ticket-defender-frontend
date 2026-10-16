@@ -22,7 +22,9 @@
   .shell { display: block; }
   .sidebar { min-height: 0; padding: 14px 16px; }
   .brand { padding: 0 0 12px; }
-  .sidebar nav { display: flex; gap: 20px; overflow-x: auto; }
+  .sidebar nav { display: flex; gap: 20px; overflow-x: auto; scrollbar-color: #91a8bf transparent; scrollbar-width: thin; }
+  .sidebar nav::-webkit-scrollbar { height: 5px; }
+  .sidebar nav::-webkit-scrollbar-thumb { border-radius: 999px; background: #91a8bf; }
   .navGroup { display: flex; flex: 0 0 auto; gap: 4px; margin: 0; }
   .groupLabel, .sidebarNote { display: none; }
   .navLink { white-space: nowrap; }
