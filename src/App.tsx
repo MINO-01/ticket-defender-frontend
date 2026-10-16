@@ -1,10 +1,24 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { adminPages, fanPages } from './app/router/navigation'
 import { AdminLayout } from './layouts/admin/AdminLayout'
 import { FanLayout } from './layouts/fan/FanLayout'
 import { AdminPagePlaceholder } from './pages/admin/AdminPagePlaceholder'
-import { FanPagePlaceholder } from './pages/fan/FanPagePlaceholder'
+import { GuidePage } from './features/fan-report/GuidePage'
+import { WritePage } from './features/fan-report/WritePage'
+import { ReviewPage } from './features/fan-report/ReviewPage'
+import { LookupPage } from './features/fan-report/LookupPage'
+import { CompletePage, DemoCompletePage, DemoStatusPage, StatusPage } from './features/fan-report/OutcomePages'
 import styles from './App.module.css'
+
+const fanPageElements = {
+  guide: <GuidePage />,
+  write: <WritePage />,
+  review: <ReviewPage />,
+  complete: <CompletePage />,
+  lookup: <LookupPage />,
+  status: <StatusPage />,
+} satisfies Record<(typeof fanPages)[number]['path'], ReactNode>
 
 function Home() {
   return <main className={styles.home}>
@@ -27,7 +41,9 @@ export default function App() {
     </Route>
     <Route path="/fan" element={<FanLayout />}>
       <Route index element={<Navigate to="guide" replace />} />
-      {fanPages.map((page) => <Route key={page.path} path={page.path} element={<FanPagePlaceholder title={page.label} description={page.description} step={page.step} />} />)}
+      {fanPages.map((page) => <Route key={page.path} path={page.path} element={fanPageElements[page.path]} />)}
+      {import.meta.env.DEV && <Route path="demo/complete" element={<DemoCompletePage />} />}
+      {import.meta.env.DEV && <Route path="demo/status" element={<DemoStatusPage />} />}
     </Route>
     <Route path="*" element={<main className={styles.notFound}><h1>페이지를 찾을 수 없습니다</h1><Link to="/">첫 화면으로 이동</Link></main>} />
   </Routes>
