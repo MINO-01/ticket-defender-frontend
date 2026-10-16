@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 700" role="img" aria-labelledby="title desc">
+  <title id="title">합성 티켓 화면 예시</title>
+  <desc id="desc">실제 티켓이나 접수 증거가 아닌 화면 검토용 그림</desc>
+  <rect width="560" height="700" fill="#e9eff8"/>
+  <rect x="38" y="38" width="484" height="624" rx="24" fill="#ffffff" stroke="#cbd9e9" stroke-width="3"/>
+  <rect x="38" y="38" width="484" height="106" rx="24" fill="#155496"/>
+  <path d="M38 120h484v24H38z" fill="#155496"/>
+  <text x="72" y="93" fill="#fff" font-family="system-ui,sans-serif" font-size="29" font-weight="700">Ticket Defender</text>
+  <text x="72" y="126" fill="#d9ebff" font-family="system-ui,sans-serif" font-size="17">합성 증거 화면 예시</text>
+  <text x="72" y="210" fill="#102a45" font-family="system-ui,sans-serif" font-size="32" font-weight="700">2026 Autumn Live</text>
+  <text x="72" y="252" fill="#475569" font-family="system-ui,sans-serif" font-size="20">2026.10.15 (목) 18:00</text>
+  <rect x="72" y="289" width="416" height="160" rx="14" fill="#edf5ff"/>
+  <text x="96" y="338" fill="#475569" font-family="system-ui,sans-serif" font-size="19">좌석 정보</text>
+  <text x="96" y="390" fill="#102a45" font-family="system-ui,sans-serif" font-size="31" font-weight="700">VIP A구역 · 12열</text>
+  <rect x="364" y="351" width="96" height="58" rx="10" fill="#d6e9ff"/>
+  <text x="382" y="389" fill="#155496" font-family="system-ui,sans-serif" font-size="23" font-weight="700">14번</text>
+  <path d="M72 504h416" stroke="#e2e8f0" stroke-width="2"/>
+  <text x="72" y="548" fill="#475569" font-family="system-ui,sans-serif" font-size="18">개인 정보와 실제 거래 내역은 포함되지 않습니다.</text>
+  <text x="72" y="590" fill="#155496" font-family="system-ui,sans-serif" font-size="17" font-weight="700">실제 첨부 파일 아님 · 합성 시연 자료</text>
+</svg>
