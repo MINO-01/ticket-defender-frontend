@@ -18,6 +18,8 @@ const ClusterListPage = lazy(() => import('./features/admin-track1/ClusterListPa
 const ClusterDetailPage = lazy(() => import('./features/admin-track1/ClusterDetailPage').then((module) => ({ default: module.ClusterDetailPage })))
 const FanReportListPage = lazy(() => import('./features/admin-track2/FanReportListPage').then((module) => ({ default: module.FanReportListPage })))
 const FanReportDetailPage = lazy(() => import('./features/admin-track2/FanReportDetailPage').then((module) => ({ default: module.FanReportDetailPage })))
+const CaseListPage = lazy(() => import('./features/admin-cases/CaseListPage').then((module) => ({ default: module.CaseListPage })))
+const CaseDetailPage = lazy(() => import('./features/admin-cases/CaseDetailPage').then((module) => ({ default: module.CaseDetailPage })))
 
 const fanPageElements = {
   guide: <GuidePage />,
@@ -49,7 +51,9 @@ export default function App() {
       <Route path="analysis/findings/:clusterId" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><ClusterDetailPage /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="fan-reports" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="팬 제보 목록을 여는 중" />}><FanReportListPage /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="fan-reports/:reportId" element={<AdminRouteErrorBoundary backTo="/app/fan-reports" backLabel="제보 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="제보 상세를 여는 중" />}><FanReportDetailPage /></Suspense></AdminRouteErrorBoundary>} />
-      {adminPages.filter((page) => page.path !== 'analysis/findings' && page.path !== 'fan-reports').map((page) => <Route key={page.path} path={page.path} element={<AdminPagePlaceholder title={page.label} description={page.description} reportCenter={page.path === 'report-center'} />} />)}
+      <Route path="cases" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="사건 목록을 여는 중" />}><CaseListPage /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="cases/:caseId" element={<AdminRouteErrorBoundary backTo="/app/cases" backLabel="사건 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="사건 상세를 여는 중" />}><CaseDetailPage /></Suspense></AdminRouteErrorBoundary>} />
+      {adminPages.filter((page) => page.path !== 'analysis/findings' && page.path !== 'fan-reports' && page.path !== 'cases').map((page) => <Route key={page.path} path={page.path} element={<AdminPagePlaceholder title={page.label} description={page.description} reportCenter={page.path === 'report-center'} />} />)}
     </Route>
     <Route path="/fan" element={<FanLayout />}>
       <Route index element={<Navigate to="guide" replace />} />
