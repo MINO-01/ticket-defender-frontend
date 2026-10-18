@@ -5,6 +5,7 @@ export const adminPages = [
   { path: 'analysis/findings', label: '연관 예매 분석', group: '조사', description: '연관 예매 조사 결과를 살펴보는 화면입니다.' },
   { path: 'fan-reports', label: '팬 제보 검토', group: '조사', description: '팬 제보를 검토하는 화면입니다.' },
   { path: 'cases', label: '사건 관리', group: '조사', description: '사건 검토와 상태 관리를 위한 화면입니다.' },
+  { path: 'approvals', label: '승인 검토', group: '조사', description: '사건의 승인 검토 후보와 근거를 확인하는 화면입니다.' },
   { path: 'report-center', label: '보고서 센터', group: '관리', description: '보고서 관련 화면입니다.' },
   { path: 'audit', label: '감사 이력', group: '관리', description: '작업 이력을 확인하는 화면입니다.' },
   { path: 'settings', label: '설정', group: '관리', description: '서비스 설정 화면입니다.' },
