@@ -7,6 +7,7 @@ import { ReportStepper } from '../../components/fan/ReportStepper'
 import { useFanReport } from './FanReportState'
 import { EvidencePreview, formatFileSize } from './EvidencePreview'
 import { demoEvent, evidencePolicy, reportTypes } from './reportModel'
+import { getIntakeEvent } from './intakeConfig'
 import type { ReportDraft } from './reportModel'
 import styles from './FanReport.module.css'
 
@@ -14,7 +15,7 @@ export function EvidenceAttachments() {
   const { evidence, fileError, addEvidence, removeEvidence } = useFanReport()
   return <Card className={styles.evidenceCard}>
     <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>자료 선택</span><h2>증거 자료 첨부</h2></div><span className={styles.count}>{evidence.length}/{evidencePolicy.maxFiles}</span></div>
-    <p>관련 게시글이나 대화 화면 등 확인에 도움이 되는 자료가 있다면 첨부해 주세요. 실제 서버 업로드는 아직 지원하지 않습니다.</p>
+    <p>관련 게시글이나 대화 화면 등 확인에 도움이 되는 자료가 있다면 첨부해 주세요. 선택한 파일은 최종 확인 화면에서 제출할 때만 서버로 전송됩니다.</p>
     <div className={styles.filePicker}>
       <span aria-hidden="true" className={styles.fileSymbol}>＋</span>
       <label htmlFor="evidence-files" className={styles.fileLabel}>사진 선택하기</label>
@@ -33,7 +34,8 @@ export function EvidenceAttachments() {
 
 export function WritePage() {
   const navigate = useNavigate()
-  const { setReviewReady } = useFanReport()
+  const { setReviewReady, pendingRequest } = useFanReport()
+  const intakeEvent = getIntakeEvent()
   const { register, handleSubmit, control, formState: { errors } } = useFormContext<ReportDraft>()
   const selectedType = useWatch({ control, name: 'reportType' })
 
@@ -43,15 +45,16 @@ export function WritePage() {
   }
 
   return <div className={styles.page}>
-    <div className={styles.pageHeading}><span className={styles.eyebrow}>팬 제보 · 2단계</span><h1>제보 내용 작성</h1><p>확인한 사실을 입력해 주세요. 관련 이미지가 있다면 함께 선택할 수 있습니다. 이 화면에서는 아직 제보가 접수되지 않습니다.</p></div>
+    <div className={styles.pageHeading}><span className={styles.eyebrow}>팬 제보 2단계</span><h1>제보 내용 작성</h1><p>확인한 사실을 입력해 주세요. 관련 이미지가 있다면 함께 선택할 수 있습니다. 이 화면에서는 아직 제보가 전송되지 않으며, 최종 확인 화면에서 제출해야 접수됩니다.</p></div>
     <ReportStepper currentStep={1} />
     <p className={styles.note}>입력 내용과 파일은 현재 탭의 메모리에만 유지됩니다. 새로고침하거나 탭을 닫으면 사라지며 자동 저장되지 않습니다.</p>
+    {pendingRequest && <p role="alert" className={styles.infoStrip}>이전 제출의 접수 결과를 아직 확인하지 못했습니다. 중복 접수를 막기 위해 최종 확인 화면에서 처음 제출한 내용 그대로 다시 시도해 주세요. 지금 수정하는 내용은 그 요청에 반영되지 않습니다. <Link to="/fan/review">최종 확인으로 이동</Link></p>}
     <form noValidate onSubmit={handleSubmit(continueToReview)} onChange={() => setReviewReady(false)}>
       <div className={styles.formGrid}>
         <div className={styles.stack}>
           <Card><div className={styles.sectionHeading}><h2>대상 공연 정보</h2></div><div className={styles.fields}>
-            <Select label="공연 선택" required error={errors.eventId?.message} {...register('eventId')}><option value="">공연을 선택해 주세요</option><option value={demoEvent.value}>{demoEvent.label}</option></Select>
-            <p className={styles.fieldHint}>공연 목록 API 연결 전이므로 시연용 공연만 제공됩니다.</p>
+            <Select label="공연 선택" required error={errors.eventId?.message} {...register('eventId')}><option value="">공연을 선택해 주세요</option>{intakeEvent ? <option value={intakeEvent.eventId}>{intakeEvent.label}</option> : <option value={demoEvent.value}>{demoEvent.label}</option>}</Select>
+            <p className={styles.fieldHint}>{intakeEvent ? '공개 공연 목록 API가 아직 없어 시연 환경에 등록된 공연만 제공됩니다. 접수 가능 여부는 서버가 최종 확인합니다.' : '실제 접수 가능한 공연이 설정되지 않아 시연용 공연만 제공됩니다. 시연용 공연은 제출할 수 없습니다.'}</p>
             <Input label="공연 일시 또는 회차" type="datetime-local" required error={errors.performanceAt?.message} {...register('performanceAt')} />
             <Input label="좌석 구역·등급 (선택)" placeholder="알고 있다면 입력해 주세요" error={errors.seatArea?.message} {...register('seatArea')} />
           </div></Card>
