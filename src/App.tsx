@@ -7,6 +7,9 @@ import { FanLayout } from './layouts/fan/FanLayout'
 import { AdminPagePlaceholder } from './pages/admin/AdminPagePlaceholder'
 import { LoadingSkeleton } from './components/common/Feedback'
 import { AdminRouteErrorBoundary } from './features/admin-track1/AdminRouteErrorBoundary'
+import { AdminAuthProvider } from './features/admin-auth/AdminAuthProvider'
+import { RequireAdminAuth } from './features/admin-auth/RequireAdminAuth'
+import type { AdminAuthAdapter } from './features/admin-auth/authAdapter'
 import { GuidePage } from './features/fan-report/GuidePage'
 import { WritePage } from './features/fan-report/WritePage'
 import { ReviewPage } from './features/fan-report/ReviewPage'
@@ -44,10 +47,10 @@ function Home() {
   </main>
 }
 
-export default function App() {
-  return <Routes>
+export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuthAdapter }) {
+  return <AdminAuthProvider adapter={adminAuthAdapter}><Routes>
     <Route path="/" element={<Home />} />
-    <Route path="/app" element={<AdminLayout />}>
+    <Route path="/app" element={<RequireAdminAuth><AdminLayout /></RequireAdminAuth>}>
       <Route index element={<Navigate to="overview" replace />} />
       <Route path="analysis/findings" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 목록을 여는 중" />}><ClusterListPage /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings/:clusterId" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><ClusterDetailPage /></Suspense></AdminRouteErrorBoundary>} />
@@ -66,5 +69,5 @@ export default function App() {
       {import.meta.env.DEV && <Route path="demo/status" element={<DemoStatusPage />} />}
     </Route>
     <Route path="*" element={<main className={styles.notFound}><h1>페이지를 찾을 수 없습니다</h1><Link to="/">첫 화면으로 이동</Link></main>} />
-  </Routes>
+  </Routes></AdminAuthProvider>
 }

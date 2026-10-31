@@ -10,6 +10,9 @@ import { isValidCaseDataset } from '../features/admin-cases/caseModel'
 import { demoCaseData } from '../features/admin-cases/demoData'
 import { demoTrack1Data } from '../features/admin-track1/demoData'
 import { demoTrack2Data } from '../features/admin-track2/demoData'
+import { enableAdminDemoPreview } from './adminPreview'
+
+enableAdminDemoPreview()
 
 function renderList(data: CaseDataset = demoCaseData, state: 'ready' | 'loading' | 'failed' | 'forbidden' = 'ready') {
   return render(<MemoryRouter><ApprovalListPage data={data} state={state} /></MemoryRouter>)
