@@ -55,7 +55,7 @@ describe('팬 제보 UI', () => {
     fireEvent.click(screen.getByRole('button', { name: '다음 단계: 최종 확인' }))
     expect(await screen.findByRole('heading', { name: '제보 내용 요약' })).toBeInTheDocument()
     expect(screen.getByText(/선택한 파일이 없습니다/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '제보 제출 준비 중' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '실제 접수 미설정' })).toBeDisabled()
   })
 
   it('확인 화면에서 돌아와도 입력과 파일이 유지되며 접수는 되지 않는다', async () => {
@@ -68,7 +68,7 @@ describe('팬 제보 UI', () => {
     expect(screen.getByText('evidence.png')).toBeInTheDocument()
     expect(screen.getByAltText('evidence.png 미리보기')).toBeInTheDocument()
     expect(screen.getByText('5 B')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '제보 제출 준비 중' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '실제 접수 미설정' })).toBeDisabled()
     fireEvent.click(screen.getByRole('link', { name: '내용 수정하기' }))
     expect(screen.getByRole('combobox', { name: /공연 선택/ })).toHaveValue('DEMO_AUTUMN_LIVE')
     expect(screen.getByRole('textbox', { name: /의심 거래 설명/ })).toHaveValue('공연 티켓을 정가보다 높은 가격에 판매한다는 게시글을 보았습니다.')
@@ -131,15 +131,20 @@ describe('팬 제보 UI', () => {
   })
 
   it('조회 필수값을 검증하고 인증 전 상세 내용을 보여주지 않는다', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: 404, code: 'REPORT_NOT_FOUND', detail: 'internal detail' }), { status: 404, headers: { 'Content-Type': 'application/problem+json' } }))
+    vi.stubGlobal('fetch', fetchMock)
     renderRoute('/fan/lookup')
-    fireEvent.click(screen.getByRole('button', { name: '입력 내용 확인' }))
+    fireEvent.click(screen.getByRole('button', { name: '접수 상태 조회' }))
     expect(await screen.findByText('접수번호를 입력해 주세요.')).toBeInTheDocument()
     expect(screen.getByText('조회 코드를 입력해 주세요.')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
     fireEvent.change(screen.getByRole('textbox', { name: /접수번호/ }), { target: { value: 'UNVERIFIED' } })
     fireEvent.change(screen.getByLabelText(/비밀 조회 코드/), { target: { value: 'arbitrary-code' } })
-    fireEvent.click(screen.getByRole('button', { name: '입력 내용 확인' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('인증 API가 연결되지 않았습니다')
+    fireEvent.click(screen.getByRole('button', { name: '접수 상태 조회' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('일치하는 제보를 찾을 수 없습니다')
+    expect(screen.queryByText(/internal detail/)).not.toBeInTheDocument()
     expect(screen.queryByText('DEMO-ONLY-0001')).not.toBeInTheDocument()
+    vi.unstubAllGlobals()
   })
 
   it('일반 완료·상태 경로는 성공 또는 상세 데이터를 표시하지 않는다', () => {
