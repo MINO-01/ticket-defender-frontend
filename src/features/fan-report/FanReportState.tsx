@@ -33,7 +33,7 @@ type FanReportState = {
   setLookupResult: (result: FanReportLookupResult | null) => void
 }
 
-type Attempt = { request: SubmissionRequest; retried: boolean }
+type Attempt = { request: SubmissionRequest }
 
 const StateContext = createContext<FanReportState | null>(null)
 
@@ -119,7 +119,7 @@ export function FanReportProvider({ children }: { children: ReactNode }) {
         if (!(await form.trigger())) return fail({ category: 'rejected', title: '입력 내용을 확인해 주세요', description: '필수 항목을 확인한 뒤 다시 제출해 주세요. 제보가 전송되지 않았습니다.' })
         const report = toSubmission(form.getValues(), intakeEvent.eventId)
         if (!report) return fail({ category: 'rejected', title: '실제 접수 가능한 공연이 아닙니다', description: '시연용 공연은 실제로 접수할 수 없습니다. 작성 화면에서 접수 가능한 공연을 선택해 주세요.' })
-        current = { request: createSubmissionRequest(report, evidence.map((item) => item.file)), retried: false }
+        current = { request: createSubmissionRequest(report, evidence.map((item) => item.file)) }
         attempt.current = current
         setPendingRequest(current.request)
       }
@@ -135,12 +135,11 @@ export function FanReportProvider({ children }: { children: ReactNode }) {
         return true
       }
 
-      const failure = describeSubmitFailure(result, current.retried)
+      const failure = describeSubmitFailure(result)
+      // 서버가 실패를 확정한 경우에만 시도를 폐기한다. 입력과 첨부는 유지해 사용자가 직접 새 요청을 시작할 수 있다.
       if (failure.category === 'rejected') {
         attempt.current = null
         setPendingRequest(null)
-      } else {
-        current.retried = true
       }
       return fail(failure)
     } finally {

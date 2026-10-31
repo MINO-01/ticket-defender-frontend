@@ -70,7 +70,7 @@ export type FailureView = { category: FailureCategory; title: string; descriptio
 const uncertainNote = '같은 내용과 같은 요청 정보로 다시 시도하면 중복 접수 없이 결과를 확인할 수 있습니다. 이 탭을 닫거나 새로고침하면 재시도 정보가 사라져 결과를 복구할 수 없습니다.'
 
 /** 서버 응답을 사용자 안내로 변환한다. 서버의 상세 메시지는 사용하지 않는다. */
-export function describeSubmitFailure(failure: ApiFailure, retried: boolean): FailureView {
+export function describeSubmitFailure(failure: ApiFailure): FailureView {
   if (failure.kind === 'network') return { category: 'uncertain', title: '접수 결과를 확인하지 못했습니다', description: `네트워크 문제로 서버 응답을 받지 못했습니다. 제보가 접수되었는지 아직 알 수 없습니다. ${uncertainNote}` }
   if (failure.kind === 'invalidResponse') return { category: 'uncertain', title: '접수 결과를 확인하지 못했습니다', description: `서버 응답을 확인할 수 없습니다. 제보가 접수되었는지 아직 알 수 없습니다. ${uncertainNote}` }
 
@@ -82,8 +82,10 @@ export function describeSubmitFailure(failure: ApiFailure, retried: boolean): Fa
   if (status === 413) return { category: 'rejected', title: '첨부 용량이 너무 큽니다', description: '파일 또는 전체 요청 용량이 제한을 넘어 접수되지 않았습니다. 파일 수나 크기를 줄여 주세요.' }
   if (status === 415) return { category: 'rejected', title: '지원하지 않는 파일입니다', description: 'JPEG 또는 PNG 이미지만 첨부할 수 있습니다. 파일 형식을 확인해 주세요.' }
   if (status === 429) return { category: 'uncertain', title: '요청이 너무 많습니다', description: `잠시 후 같은 요청으로 다시 시도해 주세요. ${uncertainNote}` }
-  if (status === 503 && code === 'INTAKE_STORAGE_UNAVAILABLE' && !retried) return { category: 'rejected', title: '지금은 접수할 수 없습니다', description: '접수 기능 또는 저장소를 사용할 수 없어 접수되지 않았습니다. 잠시 후 다시 제출해 주세요.' }
-  // 응답 유실 뒤 재시도에서 받은 503은 원래 요청의 접수 여부를 확정하지 못하므로 같은 시도를 유지한다.
+  // 계약상 INTAKE_STORAGE_UNAVAILABLE은 첫 전송이든 재시도든 서버가 확정한 실패이며 새 키가 필요하다.
+  // 같은 실패 요청을 반복하지 않도록 시도를 종료하고, 새 요청은 사용자가 직접 제출할 때만 만든다.
+  if (status === 503 && code === 'INTAKE_STORAGE_UNAVAILABLE') return { category: 'rejected', title: '지금은 접수할 수 없습니다', description: '서버가 저장에 실패해 접수되지 않았습니다. 입력한 내용은 유지됩니다. 잠시 후 다시 제출하면 새 요청으로 접수합니다.' }
+  // INTAKE_BUSY와 알 수 없는 5xx는 원래 요청의 접수 여부를 확정하지 못하므로 같은 시도를 유지한다.
   if (status >= 500) return { category: 'uncertain', title: '지금은 접수 결과를 확인할 수 없습니다', description: `접수 기능 또는 저장소를 일시적으로 사용할 수 없습니다. ${uncertainNote}` }
   return { category: 'rejected', title: '지금은 접수할 수 없습니다', description: '접수 기능을 사용할 수 없어 접수되지 않았습니다.' }
 }
