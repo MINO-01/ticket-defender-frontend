@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { readProblemCode } from '../../api/problemDetails'
 
 // Backend W02 fan-report-intake-v1.yaml 계약을 따르는 요청과 응답 처리만 담당한다.
 // 비밀값, 조회 코드, 입력 내용은 로그나 URL에 남기지 않는다.
@@ -54,19 +55,6 @@ export type SubmitResult = { kind: 'success'; status: 200 | 201; receipt: FanRep
 export type LookupResult = { kind: 'success'; result: FanReportLookupResult } | ApiFailure
 
 type FetchLike = typeof fetch
-
-const problemCodePattern = /^[A-Z][A-Z0-9_]{0,63}$/
-
-/** problem+json 응답에서 code만 읽는다. 서버의 상세 메시지는 화면에 노출하지 않는다. */
-async function readProblemCode(response: Response) {
-  try {
-    const body: unknown = await response.json()
-    const code = typeof body === 'object' && body !== null ? (body as { code?: unknown }).code : undefined
-    return typeof code === 'string' && problemCodePattern.test(code) ? code : 'UNKNOWN'
-  } catch {
-    return 'UNKNOWN'
-  }
-}
 
 export async function submitFanReport(request: SubmissionRequest, fetchImpl: FetchLike = fetch): Promise<SubmitResult> {
   const body = new FormData()
