@@ -1,8 +1,9 @@
 import { readAdminAuthConfig } from './authConfig'
 import type { AdminAuthConfig } from './authConfig'
+import { createKeycloakAdminAuthAdapter } from './keycloakAdapter'
 
-// 실제 인증 제공자(OIDC 또는 기업 SSO)는 아직 확정되지 않았다.
-// 제공자가 확정되면 이 인터페이스를 구현하는 Authorization Code + PKCE 어댑터를 추가한다.
+// 운영 인증 제공자(OIDC 또는 기업 SSO)는 아직 확정되지 않았다. 캡스톤 검증에는 격리 Keycloak 어댑터를 사용한다.
+// 다른 제공자가 확정되면 이 인터페이스를 구현하는 Authorization Code + PKCE 어댑터를 추가한다.
 // 프런트엔드는 토큰을 발급하거나 역할, tenant를 부여하지 않고 제공자가 발급한 액세스 토큰만 전달한다.
 
 /** 제공자가 발급한 액세스 토큰. expiresAt은 epoch 밀리초다. */
@@ -46,9 +47,10 @@ export function createUnavailableAdminAuthAdapter(reason: AdminAuthUnavailableRe
   }
 }
 
-/** 설정을 확인해 사용할 어댑터를 고른다. 제공자가 미확정이므로 설정이 올바르더라도 로그인은 비활성이다. */
+/** 설정을 확인해 사용할 어댑터를 고른다. 제공자가 지정되지 않으면 설정이 올바르더라도 로그인은 비활성이다. */
 export function createDefaultAdminAuthAdapter(config: AdminAuthConfig = readAdminAuthConfig()): AdminAuthAdapter {
   if (config.status === 'missing') return createUnavailableAdminAuthAdapter('configMissing')
   if (config.status === 'invalid') return createUnavailableAdminAuthAdapter('configInvalid')
+  if (config.provider === 'keycloak') return createKeycloakAdminAuthAdapter(config)
   return createUnavailableAdminAuthAdapter('providerUndecided')
 }

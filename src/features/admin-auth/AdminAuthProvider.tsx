@@ -25,6 +25,7 @@ type AdminAuthContextValue = {
   signOut: () => void
   getAccessToken: () => string | null
   handleUnauthorized: () => void
+  requestInitialization: () => void
 }
 
 const AdminAuthContext = createContext<AdminAuthContextValue | null>(null)
@@ -46,8 +47,12 @@ export function AdminAuthProvider({ adapter: adapterProp, children }: { adapter?
     setState((current) => (current.status === 'authenticated' ? { status: next } : current))
   }, [])
 
+  // 관리자 보호 라우트가 처음 열릴 때만 제공자를 초기화해 팬 제보 화면에서는 인증 서버에 접속하지 않는다.
+  const [initializationRequested, setInitializationRequested] = useState(false)
+  const requestInitialization = useCallback(() => setInitializationRequested(true), [])
+
   useEffect(() => {
-    if (adapter.availability.status !== 'ready') return
+    if (!initializationRequested || adapter.availability.status !== 'ready') return
     let active = true
     // 제공자가 돌려준 토큰도 형식과 만료 시각을 확인한 뒤에만 인증 상태로 전환한다.
     adapter.initialize().then((token) => {
@@ -62,7 +67,7 @@ export function AdminAuthProvider({ adapter: adapterProp, children }: { adapter?
       if (active) setState({ status: 'signedOut' })
     })
     return () => { active = false }
-  }, [adapter])
+  }, [adapter, initializationRequested])
 
   const expiresAt = state.status === 'authenticated' ? state.expiresAt : null
   useEffect(() => {
@@ -91,7 +96,7 @@ export function AdminAuthProvider({ adapter: adapterProp, children }: { adapter?
     void adapter.signOut().catch(() => undefined)
   }, [adapter, endSession])
 
-  const value = useMemo(() => ({ state, signIn, signOut, getAccessToken, handleUnauthorized }), [state, signIn, signOut, getAccessToken, handleUnauthorized])
+  const value = useMemo(() => ({ state, signIn, signOut, getAccessToken, handleUnauthorized, requestInitialization }), [state, signIn, signOut, getAccessToken, handleUnauthorized, requestInitialization])
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>
 }
 

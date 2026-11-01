@@ -65,11 +65,11 @@ describe('관리자 인증 설정', () => {
     expect(readAdminAuthConfig({ VITE_ADMIN_AUTH_ISSUER: 'https://idp.example.test' })).toEqual({ status: 'invalid' })
     expect(readAdminAuthConfig({ VITE_ADMIN_AUTH_ISSUER: 'http://idp.example.test', VITE_ADMIN_AUTH_CLIENT_ID: 'td-admin', VITE_ADMIN_AUTH_AUDIENCE: 'td-admin-api' })).toEqual({ status: 'invalid' })
     expect(readAdminAuthConfig({ VITE_ADMIN_AUTH_ISSUER: 'https://user:pw@idp.example.test', VITE_ADMIN_AUTH_CLIENT_ID: 'td-admin', VITE_ADMIN_AUTH_AUDIENCE: 'td-admin-api' })).toEqual({ status: 'invalid' })
-    expect(readAdminAuthConfig({ VITE_ADMIN_AUTH_ISSUER: 'https://idp.example.test', VITE_ADMIN_AUTH_CLIENT_ID: 'td-admin', VITE_ADMIN_AUTH_AUDIENCE: 'td-admin-api' })).toEqual({ status: 'configured', issuer: 'https://idp.example.test', clientId: 'td-admin', audience: 'td-admin-api' })
+    expect(readAdminAuthConfig({ VITE_ADMIN_AUTH_ISSUER: 'https://idp.example.test', VITE_ADMIN_AUTH_CLIENT_ID: 'td-admin', VITE_ADMIN_AUTH_AUDIENCE: 'td-admin-api' })).toEqual({ status: 'configured', provider: null, issuer: 'https://idp.example.test', clientId: 'td-admin', audience: 'td-admin-api' })
   })
 
-  it('제공자가 미확정이므로 설정이 올바르더라도 기본 어댑터는 로그인을 제공하지 않는다', async () => {
-    const adapter = createDefaultAdminAuthAdapter({ status: 'configured', issuer: 'https://idp.example.test', clientId: 'td-admin', audience: 'td-admin-api' })
+  it('제공자가 지정되지 않으면 설정이 올바르더라도 기본 어댑터는 로그인을 제공하지 않는다', async () => {
+    const adapter = createDefaultAdminAuthAdapter({ status: 'configured', provider: null, issuer: 'https://idp.example.test', clientId: 'td-admin', audience: 'td-admin-api' })
     expect(adapter.availability).toEqual({ status: 'unavailable', reason: 'providerUndecided' })
     await expect(adapter.initialize()).resolves.toBeNull()
   })

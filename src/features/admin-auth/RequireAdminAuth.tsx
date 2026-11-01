@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '../../components/common/Button'
@@ -26,7 +27,9 @@ function AuthGate({ title, description, action }: { title: string; description: 
 }
 
 export function RequireAdminAuth({ children }: { children: ReactNode }) {
-  const { state, signIn } = useAdminAuth()
+  const { state, signIn, requestInitialization } = useAdminAuth()
+  // 콜백 fragment를 SDK가 먼저 처리하도록 초기화가 끝날 때까지 하위 라우트(Navigate 포함)를 렌더링하지 않는다.
+  useEffect(() => requestInitialization(), [requestInitialization])
   switch (state.status) {
     case 'authenticated':
     case 'preview':
