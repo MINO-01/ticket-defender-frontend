@@ -1,0 +1,5 @@
+.selector { display: grid; gap: 10px; padding: 20px; min-width: 0; }
+.controls { display: grid; grid-template-columns: minmax(220px, 420px) auto; align-items: end; gap: 12px; }
+.help { margin: 0; color: var(--color-text-secondary); font-size: 13px; }
+.error { margin: 0; color: #b42318; font-size: 13px; font-weight: 600; }
+@media (max-width: 700px) { .controls { grid-template-columns: minmax(0, 1fr); } }

@@ -58,6 +58,17 @@ export function isAllowedAdminApiPath(path: string) {
   return !blockedPathPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
 }
 
+/** 쿼리 값을 RFC 3986 비예약 문자 외에는 모두 퍼센트 인코딩한다. 슬래시가 포함된 분석 ID도 경로가 아닌 쿼리 값으로 전달된다. */
+function encodeQueryComponent(value: string) {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+}
+
+/** 고정 경로와 쿼리 값으로 관리자 API 경로를 만든다. 결과는 isAllowedAdminApiPath 검사를 통과하는 형식이다. */
+export function adminApiPath(pathname: string, params: Record<string, string | number>) {
+  const query = Object.entries(params).map(([key, value]) => `${encodeQueryComponent(key)}=${encodeQueryComponent(String(value))}`).join('&')
+  return query ? `${pathname}?${query}` : pathname
+}
+
 export function createAdminApiClient({ getAccessToken, onUnauthorized, fetchImpl }: AdminApiClientOptions): AdminApiClient {
   return {
     async request<T>(path: string, { method = 'GET', body, schema, signal }: AdminApiRequestOptions<T>): Promise<AdminApiResult<T>> {
