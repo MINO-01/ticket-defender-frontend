@@ -38,14 +38,23 @@ export type AdminApiClient = {
   request<T>(path: string, options: AdminApiRequestOptions<T>): Promise<AdminApiResult<T>>
 }
 
-const adminPathPattern = /^\/api\/v1\/[A-Za-z0-9\-._~%/]+(\?[A-Za-z0-9\-._~%&=+]*)?$/
+// pathname에는 퍼센트 인코딩을 전부 허용하지 않는다. 브라우저와 서버가 %2e, %2f, %5c 등을 다르게 정규화하면
+// 원문 검사를 통과한 경로가 공개 API로 바뀔 수 있기 때문이다. 관리자 API 식별자는 UUID와 영문 식별자라 인코딩이 필요 없다.
+const adminPathnamePattern = /^\/api\/v1\/[A-Za-z0-9\-._~/]+$/
+// 쿼리는 경로 해석에 영향을 주지 않으므로 검색어, 정렬 등에 필요한 올바른 퍼센트 인코딩만 허용한다.
+const adminQueryPattern = /^(?:[A-Za-z0-9\-._~&=+]|%[0-9A-Fa-f]{2})*$/
 // 공개 팬 제보 API와 Track 1 반입 API는 관리자 토큰을 받지 않는 별도 보안 경계다.
 const blockedPathPrefixes = ['/api/v1/fan-reports', '/api/v1/audits/analyze']
 
 /** 동일 출처 관리자 API 경로만 허용해 토큰이 다른 출처나 공개 API로 전달되지 않게 한다. */
 export function isAllowedAdminApiPath(path: string) {
-  if (!adminPathPattern.test(path) || path.includes('//') || path.split(/[/?]/).some((segment) => segment === '..' || segment === '.')) return false
-  const pathname = path.split('?')[0]
+  const queryIndex = path.indexOf('?')
+  const pathname = queryIndex === -1 ? path : path.slice(0, queryIndex)
+  const query = queryIndex === -1 ? '' : path.slice(queryIndex + 1)
+  if (!adminPathnamePattern.test(pathname) || !adminQueryPattern.test(query) || pathname.includes('//')) return false
+  if (pathname.split('/').some((segment) => segment === '..' || segment === '.')) return false
+  // 브라우저 URL 정규화 결과가 원문과 다르면 실제 요청 대상이 달라질 수 있으므로 차단한다.
+  if (new URL(pathname, 'https://admin-api.invalid').pathname !== pathname) return false
   return !blockedPathPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
 }
 

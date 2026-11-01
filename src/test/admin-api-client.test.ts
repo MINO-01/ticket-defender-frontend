@@ -82,4 +82,54 @@ describe('관리자 공통 API 클라이언트', () => {
     }
     expect(isAllowedAdminApiPath('/api/v1/admin/fan-reports/r-1/evidence/e-1/listing-analyses')).toBe(true)
   })
+
+  it('퍼센트 인코딩으로 경로 정규화를 우회하는 요청에는 토큰을 보내지 않는다', async () => {
+    const blocked = [
+      '/api/v1/cases/%2e%2e/fan-reports',
+      '/api/v1/cases/%2E%2E/fan-reports/lookup',
+      '/api/v1/cases/%2e%2e/audits/analyze',
+      '/api/v1/cases/.%2e/fan-reports',
+      '/api/v1/cases/%2e./fan-reports',
+      '/api/v1/cases/%2e/x',
+      '/api/v1/cases/%2e%2e%2ffan-reports',
+      '/api/v1/cases%2f..%2ffan-reports',
+      '/api/v1/cases/%5c..%5cfan-reports',
+      '/api/v1/%66an-reports',
+      '/api/v1/fan-reports%2flookup',
+      '/api/v1/cases/%252e%252e/fan-reports',
+      '/api/v1/cases/c-1%3fx=1',
+      '/api/v1/cases/c-1%23frag',
+      '/api/v1/cases/%zz',
+      '/api/v1/cases\\..\\fan-reports',
+      '/api/v1/cases/c-1?q=%zz',
+      '/api/v1/cases/c-1?q=%2',
+    ]
+    for (const path of blocked) {
+      expect(isAllowedAdminApiPath(path), path).toBe(false)
+      const { client, fetchImpl } = setup(jsonResponse(200, { id: 'x' }))
+      await expect(client.request(path, { method: 'POST', body: {}, schema: itemSchema }), path).rejects.toThrow(TypeError)
+      expect(fetchImpl, path).not.toHaveBeenCalled()
+    }
+  })
+
+  it('정상 관리자 경로와 페이지, 필터 쿼리는 그대로 허용한다', async () => {
+    const allowed = [
+      '/api/v1/cases',
+      '/api/v1/cases?page=0&size=20',
+      '/api/v1/cases?status=OPEN&eventId=3f1c2b4a-5d6e-4f70-8a9b-0c1d2e3f4a5b',
+      '/api/v1/cases?keyword=%ED%85%8C%EC%8A%A4%ED%8A%B8&sort=createdAt%2Cdesc',
+      '/api/v1/admin/track1/clusters/detail?clusterId=cl-1',
+      '/api/v1/cases/c-1/report-versions',
+      '/api/v1/approval-requests/a-1/decision',
+      '/api/v1/cases/c-1/assignee',
+    ]
+    for (const path of allowed) expect(isAllowedAdminApiPath(path), path).toBe(true)
+
+    for (const [path, method] of [['/api/v1/cases?page=1&size=20', 'GET'], ['/api/v1/approval-requests/a-1/decision', 'POST'], ['/api/v1/cases/c-1/assignee', 'PUT']] as const) {
+      const { client, fetchImpl } = setup(jsonResponse(200, { id: 'ok' }))
+      await expect(client.request(path, { method, body: method === 'GET' ? undefined : { value: 'synthetic' }, schema: itemSchema })).resolves.toEqual({ kind: 'success', status: 200, data: { id: 'ok' } })
+      expect(fetchImpl.mock.calls[0][0]).toBe(path)
+      expect(fetchImpl.mock.calls[0][1]).toMatchObject({ method, redirect: 'error', credentials: 'omit' })
+    }
+  })
 })
