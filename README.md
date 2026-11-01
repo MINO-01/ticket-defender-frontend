@@ -15,7 +15,7 @@ npm run test
 npm run build
 ```
 
-관리자 화면은 `/app/overview`, 팬 제보 화면은 `/fan/guide`에서 시작합니다. 관리자 화면은 공통 레이아웃과 라우팅 미리보기이며, 팬 제보 화면은 Backend W02 팬 제보 접수와 접수 상태 조회 API에 연결됩니다. 관리자 화면은 인증된 관리자 세션에서만 열리며, 실제 인증 제공자가 확정되지 않아 현재 관리자 로그인은 비활성입니다(아래 관리자 인증 참고). 공식 PDF 발급도 비활성화 상태입니다.
+관리자 화면은 `/app/overview`, 팬 제보 화면은 `/fan/guide`에서 시작합니다. 관리자 화면은 공통 레이아웃과 라우팅 미리보기이며, 팬 제보 화면은 Backend W02 팬 제보 접수와 접수 상태 조회 API에 연결됩니다. 관리자 화면은 인증된 관리자 세션에서만 열립니다. 운영 인증 제공자는 미확정이며, 캡스톤 격리 Keycloak 설정이 있을 때만 관리자 로그인이 동작합니다(아래 관리자 인증 참고). 공식 PDF 발급도 비활성화 상태입니다.
 
 FE-02 팬 제보 화면은 브라우저 메모리에서 입력과 JPEG·PNG 첨부파일을 유지하고, 제출 전 확인까지만 지원합니다. 현재 프런트엔드에서는 첨부 없이도 확인 단계로 이동할 수 있습니다. 이는 임시 UI 정책이며 최종 접수 계약은 아닙니다. 후속 Backend 계약에서는 이미지 없는 제보의 일반 검토 접수 가능 여부를 검토하고, 이미지가 없을 때 VLM 분석을 자동 실행하지 않도록 정해야 합니다. 첨부 필수 여부와 증거 충분성 판단은 별도 정책으로 확정해야 합니다.
 
@@ -38,8 +38,9 @@ Backend는 Spring Security OAuth2 Resource Server로 외부 발급자의 RS256 J
 
 ### 현재 상태
 
-- 실제 인증 제공자(OIDC 또는 기업 SSO)는 미확정입니다. 그래서 프런트엔드는 로그인 흐름을 구현하지 않고 `AdminAuthAdapter` 인터페이스만 제공합니다. 기본 어댑터는 설정이 없거나 잘못되었거나 제공자가 미확정이면 로그인을 제공하지 않고 관리자 화면을 차단합니다. 가짜 로그인, 임의 JWT 발급, 클라이언트 측 역할 부여는 하지 않습니다.
-- 제공자가 확정되면 Authorization Code + PKCE 어댑터를 `src/features/admin-auth/authAdapter.ts` 인터페이스로 구현해 연결합니다. 실제 로그인 E2E는 그 이후에 검증합니다.
+- 운영 인증 제공자(OIDC 또는 기업 SSO)는 미확정입니다. 캡스톤 합성 데이터 검증에는 격리 Keycloak과 공식 `keycloak-js` SDK로 Authorization Code + PKCE(S256) 로그인을 연결했습니다(`docs/keycloak/README.md`). 이는 운영 제공자 선정이 아닙니다.
+- `VITE_ADMIN_AUTH_PROVIDER=keycloak`과 올바른 HTTPS realm issuer가 있을 때만 로그인합니다. 설정이 없거나 잘못되었거나 제공자가 비어 있으면 로그인을 제공하지 않고 관리자 화면을 차단합니다. 가짜 로그인, 임의 JWT 발급, 클라이언트 측 역할 부여는 하지 않습니다.
+- 다른 제공자가 확정되면 같은 `AdminAuthAdapter` 인터페이스로 어댑터를 추가합니다. 인증 SDK는 관리자 보호 라우트가 처음 열릴 때만 초기화해 팬 제보 화면에서는 인증 서버에 접속하지 않습니다.
 - `/app` 아래 모든 화면은 `RequireAdminAuth`로 보호됩니다. 인증 전에는 관리자 레이아웃과 업무 화면을 렌더링하지 않습니다.
 - 액세스 토큰은 현재 탭 메모리(ref)에만 보관합니다. URL, 로그, localStorage, sessionStorage에 저장하지 않으며 새로고침하면 다시 로그인해야 합니다. 만료 30초 전부터는 토큰을 사용하지 않고, 만료 시각이 지나거나 서버가 401을 반환하면 세션을 정리하고 재인증 화면을 표시합니다.
 - `VITE_ADMIN_DEMO_PREVIEW=true`는 `npm run dev`에서만 기존 합성 데이터 관리자 화면을 보여 주는 미리보기입니다. 인증 세션이 아니며 관리자 API에 토큰을 보내지 않고, 운영 빌드에서는 무시됩니다. demoData는 실제 업무 데이터가 아닙니다.
@@ -59,9 +60,13 @@ const result = await client.request('/api/v1/cases/{caseId}', { schema: caseSche
 - tenant/event 범위는 클라이언트가 확정하지 않습니다. 요청 범위를 좁히는 값만 보낼 수 있고 최종 판단은 서버가 합니다.
 - 팬 제보 공개 API는 이 클라이언트를 쓰지 않고 기존 `fanReportApi`로 무인증 호출합니다.
 
+### 백엔드 인증 연결 확인
+
+`/app/settings`의 점검 패널은 입력한 공연 UUID로 기존 `GET /api/v1/admin/fan-reports`를 호출해 인증과 membership 권한 결과(성공 건수, 401, 403, 404)만 표시합니다. 제보 내용은 표시하지 않습니다.
+
 ### Backend 연동에 필요한 설정
 
-- Frontend: `VITE_ADMIN_AUTH_ISSUER`, `VITE_ADMIN_AUTH_CLIENT_ID`, `VITE_ADMIN_AUTH_AUDIENCE`(공개 값만), 개발 서버 프록시 `TD_DEV_API_PROXY_TARGET`
+- Frontend: `VITE_ADMIN_AUTH_PROVIDER`, `VITE_ADMIN_AUTH_ISSUER`, `VITE_ADMIN_AUTH_CLIENT_ID`, `VITE_ADMIN_AUTH_AUDIENCE`(공개 값만), 개발 서버 프록시 `TD_DEV_API_PROXY_TARGET`
 - Backend: 같은 발급자의 `ticket-defender.security.admin.issuer`, `jwk-set-uri`, `audience`와 관리자 membership 데이터
 - 운영 CORS 정책은 변경하지 않으며 동일 출처 배포 또는 개발 서버 프록시를 전제로 합니다.
 
