@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/common/Button'
 import { LoadingSkeleton } from '../../components/common/Feedback'
 import { useAdminAuth } from './AdminAuthProvider'
 import type { AdminAuthUnavailableReason } from './authAdapter'
+import { rememberAdminReturnPath, takeAdminReturnPath } from './returnPath'
 import styles from './AdminAuth.module.css'
 
 // 인증되지 않은 상태에서는 관리자 레이아웃과 업무 화면을 렌더링하지 않아 관리자 정보 요청 자체가 일어나지 않게 한다.
@@ -27,9 +28,24 @@ function AuthGate({ title, description, action }: { title: string; description: 
 }
 
 export function RequireAdminAuth({ children }: { children: ReactNode }) {
-  const { state, signIn, requestInitialization } = useAdminAuth()
+  const { state, signIn: providerSignIn, requestInitialization } = useAdminAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   // 콜백 fragment를 SDK가 먼저 처리하도록 초기화가 끝날 때까지 하위 라우트(Navigate 포함)를 렌더링하지 않는다.
   useEffect(() => requestInitialization(), [requestInitialization])
+
+  // 로그인 콜백은 고정 주소로 돌아오므로 로그인 직전 주소를 보관했다가 인증된 뒤 한 번만 복원한다.
+  const signIn = () => {
+    rememberAdminReturnPath(`${location.pathname}${location.search}`)
+    providerSignIn()
+  }
+  const restoreReturnPath = useEffectEvent(() => {
+    const path = takeAdminReturnPath()
+    if (path !== null && path !== `${location.pathname}${location.search}`) navigate(path, { replace: true })
+  })
+  useEffect(() => {
+    if (state.status === 'authenticated') restoreReturnPath()
+  }, [state.status])
   switch (state.status) {
     case 'authenticated':
     case 'preview':
