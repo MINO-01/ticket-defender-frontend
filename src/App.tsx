@@ -18,8 +18,9 @@ import { LookupPage } from './features/fan-report/LookupPage'
 import { CompletePage, DemoCompletePage, DemoStatusPage, StatusPage } from './features/fan-report/OutcomePages'
 import styles from './App.module.css'
 
-const ClusterListPage = lazy(() => import('./features/admin-track1/ClusterListPage').then((module) => ({ default: module.ClusterListPage })))
-const ClusterDetailPage = lazy(() => import('./features/admin-track1/ClusterDetailPage').then((module) => ({ default: module.ClusterDetailPage })))
+const Track1ListRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1ListRoute })))
+const Track1DetailRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1DetailRoute })))
+const Track1DemoDetailRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1DemoDetailRoute })))
 const FanReportListPage = lazy(() => import('./features/admin-track2/FanReportListPage').then((module) => ({ default: module.FanReportListPage })))
 const FanReportDetailPage = lazy(() => import('./features/admin-track2/FanReportDetailPage').then((module) => ({ default: module.FanReportDetailPage })))
 const CaseListPage = lazy(() => import('./features/admin-cases/CaseListPage').then((module) => ({ default: module.CaseListPage })))
@@ -53,8 +54,9 @@ export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuth
     <Route path="/" element={<Home />} />
     <Route path="/app" element={<RequireAdminAuth><AdminLayout /></RequireAdminAuth>}>
       <Route index element={<Navigate to="overview" replace />} />
-      <Route path="analysis/findings" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 목록을 여는 중" />}><ClusterListPage /></Suspense></AdminRouteErrorBoundary>} />
-      <Route path="analysis/findings/:clusterId" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><ClusterDetailPage /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="analysis/findings" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 목록을 여는 중" />}><Track1ListRoute /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="analysis/findings/detail" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DetailRoute /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="analysis/findings/:clusterId" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DemoDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="fan-reports" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="팬 제보 목록을 여는 중" />}><FanReportListPage /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="fan-reports/:reportId" element={<AdminRouteErrorBoundary backTo="/app/fan-reports" backLabel="제보 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="제보 상세를 여는 중" />}><FanReportDetailPage /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="cases" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="사건 목록을 여는 중" />}><CaseListPage /></Suspense></AdminRouteErrorBoundary>} />
