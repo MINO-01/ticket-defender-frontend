@@ -10,6 +10,7 @@ import { AdminRouteErrorBoundary } from './features/admin-track1/AdminRouteError
 import { AdminAuthProvider } from './features/admin-auth/AdminAuthProvider'
 import { RequireAdminAuth } from './features/admin-auth/RequireAdminAuth'
 import type { AdminAuthAdapter } from './features/admin-auth/authAdapter'
+import { BackendAuthCheckPanel } from './features/admin-settings/BackendAuthCheckPanel'
 import { GuidePage } from './features/fan-report/GuidePage'
 import { WritePage } from './features/fan-report/WritePage'
 import { ReviewPage } from './features/fan-report/ReviewPage'
@@ -60,7 +61,7 @@ export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuth
       <Route path="cases/:caseId" element={<AdminRouteErrorBoundary backTo="/app/cases" backLabel="사건 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="사건 상세를 여는 중" />}><CaseDetailPage /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="approvals" element={<AdminRouteErrorBoundary backTo="/app/cases" backLabel="사건 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="승인 검토 후보를 여는 중" />}><ApprovalListPage /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="approvals/:caseId" element={<AdminRouteErrorBoundary backTo="/app/approvals" backLabel="승인 검토 후보 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="승인 검토 근거를 여는 중" />}><ApprovalDetailPage /></Suspense></AdminRouteErrorBoundary>} />
-      {adminPages.filter((page) => page.path !== 'analysis/findings' && page.path !== 'fan-reports' && page.path !== 'cases' && page.path !== 'approvals').map((page) => <Route key={page.path} path={page.path} element={<AdminPagePlaceholder title={page.label} description={page.description} reportCenter={page.path === 'report-center'} />} />)}
+      {adminPages.filter((page) => page.path !== 'analysis/findings' && page.path !== 'fan-reports' && page.path !== 'cases' && page.path !== 'approvals').map((page) => <Route key={page.path} path={page.path} element={<><AdminPagePlaceholder title={page.label} description={page.description} reportCenter={page.path === 'report-center'} />{page.path === 'settings' && <BackendAuthCheckPanel />}</>} />)}
     </Route>
     <Route path="/fan" element={<FanLayout />}>
       <Route index element={<Navigate to="guide" replace />} />

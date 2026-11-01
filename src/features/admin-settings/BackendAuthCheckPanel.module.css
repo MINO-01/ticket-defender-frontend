@@ -1,0 +1,7 @@
+.panel { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
+.panel h2 { margin: 0; color: var(--color-navy-900); font-size: 18px; }
+.panel p { margin: 0; color: var(--color-text-secondary); line-height: 1.6; }
+.form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); }
+.form > div { flex: 1 1 320px; }
+.success { color: var(--color-success) !important; font-weight: 600; }
+.error { color: var(--color-critical) !important; font-weight: 600; }
