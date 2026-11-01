@@ -305,10 +305,10 @@ describe('Track 1 군집 상세 실제 API', () => {
   }
 
   it('직접 URL의 세 식별자로 상세를 조회하고 저장된 구성원과 분석 정보만 표시한다', async () => {
-    const fetchMock = stubFetch((url) => url === detailApi ? json(200, detailBody) : undefined)
+    const fetchMock = stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, detailBody) : undefined)
     renderApp(detailRoute)
     expect(await screen.findByRole('heading', { name: '군집 cluster-1' })).toBeInTheDocument()
-    expect(requestedUrls(fetchMock)).toEqual([detailApi])
+    expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH, detailApi])
     const members = screen.getByRole('table', { name: '저장된 군집 구성원' })
     expect(within(members).getAllByRole('row')).toHaveLength(3)
     expect(within(members).getByText('account-2')).toBeInTheDocument()
@@ -337,6 +337,22 @@ describe('Track 1 군집 상세 실제 API', () => {
     expect(requestedUrls(fetchMock).at(-1)).toBe(detailApi)
   })
 
+  // 실제 E2E에서 Backend Track 1 API는 다중 고객사 계정을 409로 막지 않아, 상세 직접 주소도 공연 접근 검증을 먼저 거쳐야 한다.
+  it('다중 고객사 계정(공연 목록 409)은 상세 직접 주소에서도 Track 1을 호출하지 않는다', async () => {
+    const fetchMock = stubFetch((url) => url === EVENTS_PATH ? problem(409, 'TENANT_SELECTION_REQUIRED') : url === detailApi ? json(200, detailBody) : undefined)
+    renderApp(detailRoute)
+    expect(await screen.findByRole('alert')).toHaveTextContent('여러 고객사 소속 계정은 아직 지원하지 않습니다')
+    expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH])
+    expect(screen.queryByText('account-1')).not.toBeInTheDocument()
+  })
+
+  it('접근 가능 공연 목록에 없는 공연의 상세 주소는 Track 1을 호출하지 않는다', async () => {
+    const fetchMock = stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage([eventB])) : url === detailApi ? json(200, detailBody) : undefined)
+    renderApp(detailRoute)
+    expect(await screen.findByRole('alert')).toHaveTextContent('선택한 공연에 접근할 수 없습니다')
+    expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH])
+  })
+
   it.each([
     ['eventId 누락', '/app/analysis/findings/detail?analysisRequestId=run-1&clusterId=cluster-1'],
     ['UUID가 아닌 eventId', '/app/analysis/findings/detail?eventId=abc&analysisRequestId=run-1&clusterId=cluster-1'],
@@ -358,7 +374,7 @@ describe('Track 1 군집 상세 실제 API', () => {
     ['다른 군집 응답', () => json(200, { ...detailBody, cluster: summary({ analysisRequestId: 'run/1', clusterId: 'cluster-9' }) }), '서버 응답 형식이 계약과 다릅니다'],
     ['구성원 형식 오류', () => json(200, { ...detailBody, members: [{ auditId: '123', accountId: 'account-1' }] }), '서버 응답 형식이 계약과 다릅니다'],
   ])('상세 %s 응답을 구분해 표시한다', async (_label, respond, message) => {
-    stubFetch((url) => url === detailApi ? respond() : undefined)
+    stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? respond() : undefined)
     renderApp(detailRoute)
     expect(await screen.findByRole('alert')).toHaveTextContent(message)
     expect(screen.queryByRole('table', { name: '저장된 군집 구성원' })).not.toBeInTheDocument()

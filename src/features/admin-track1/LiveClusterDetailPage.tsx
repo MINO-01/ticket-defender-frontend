@@ -6,6 +6,7 @@ import { DataTable } from '../../components/common/DataTable'
 import { EmptyState, ErrorState, LoadingSkeleton } from '../../components/common/Feedback'
 import { PageHeader } from '../../components/common/PageHeader'
 import { useAdminQuery } from '../admin-auth/useAdminQuery'
+import { useAccessibleEvents } from '../admin-events/useAccessibleEvents'
 import {
   formatAlgorithm, formatAnalyzedAt, formatRiskScore, readTrack1ClusterKey, track1ClusterDetailPath, track1ClusterDetailSchema, track1ListRoute,
 } from './track1Api'
@@ -13,6 +14,7 @@ import type { Track1ClusterDetail, Track1ClusterKey } from './track1Api'
 import styles from './Track1.module.css'
 
 // 인증된 관리자의 Track 1 군집 상세다. eventId, analysisRequestId, clusterId를 주소에서 읽어 함께 조회하므로 직접 주소로 접근해도 같은 군집을 연다.
+// 공연은 접근 가능 공연 목록에서 확인된 뒤에만 상세를 조회한다.
 // 현재 응답은 저장된 구성원 식별자와 분석 메타데이터뿐이므로 공유 신호와 그래프 간선을 만들지 않고 미지원으로 표시한다.
 
 type Member = Track1ClusterDetail['members'][number]
@@ -28,7 +30,23 @@ export function LiveClusterDetailPage() {
   const [searchParams] = useSearchParams()
   const key = readTrack1ClusterKey(searchParams)
   if (!key) return <InvalidClusterAddress />
-  return <ClusterDetail key={JSON.stringify(key)} clusterKey={key} />
+  return <VerifiedClusterDetail key={JSON.stringify(key)} clusterKey={key} />
+}
+
+// 상세 직접 주소도 목록과 같이 접근 가능 공연 목록에서 공연을 먼저 확인한다.
+// Backend Track 1 API는 다중 고객사 계정을 409로 막지 않으므로, 공연 목록의 409 차단(DEC-02)을 상세에서도 유지하기 위해서다.
+function VerifiedClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey }) {
+  const { state, retry } = useAccessibleEvents(clusterKey.eventId)
+  const backLink = <Link className={styles.backLink} to={track1ListRoute(clusterKey.eventId)}>← 군집 목록</Link>
+  if (state.status === 'loading') return <div className={styles.page}>{backLink}<LoadingSkeleton label="공연 접근 권한을 확인하는 중" /></div>
+  if (state.status === 'failed') {
+    const message = describeAdminApiFailure(state.failure, '공연 목록을 찾을 수 없습니다')
+    return <div className={styles.page}>{backLink}<ErrorState title={message.title} description={message.description} onRetry={retry} /></div>
+  }
+  if (!state.events.some((event) => event.id === clusterKey.eventId)) {
+    return <div className={styles.page}>{backLink}<ErrorState title="선택한 공연에 접근할 수 없습니다" description="접근 가능한 공연 목록에서 확인되지 않은 공연입니다. 군집 목록에서 공연을 다시 선택해 주세요." /></div>
+  }
+  return <ClusterDetail clusterKey={clusterKey} />
 }
 
 function ClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey }) {
