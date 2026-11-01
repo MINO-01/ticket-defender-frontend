@@ -8,6 +8,9 @@ import { FanReportListPage } from '../features/admin-track2/FanReportListPage'
 import { ReservationComparisonPanel } from '../features/admin-track2/ReservationComparisonPanel'
 import { defaultReportFilters, filterReports, isValidTrack2Dataset, reportPageSize } from '../features/admin-track2/track2Model'
 import type { Track2Dataset } from '../features/admin-track2/track2Model'
+import { enableAdminDemoPreview } from './adminPreview'
+
+enableAdminDemoPreview()
 
 function renderApp(path: string) { return render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>) }
 function renderList(data: Track2Dataset = demoTrack2Data, state: 'ready' | 'loading' | 'failed' | 'forbidden' = 'ready') {

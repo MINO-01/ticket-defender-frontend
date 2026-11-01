@@ -5,6 +5,9 @@ import App from '../App'
 import { Button } from '../components/common/Button'
 import { Input } from '../components/common/FormControls'
 import { StatusBadge } from '../components/common/StatusBadge'
+import { enableAdminDemoPreview } from './adminPreview'
+
+enableAdminDemoPreview()
 
 function renderRoute(path: string) {
   return render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>)

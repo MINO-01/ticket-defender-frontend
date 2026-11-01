@@ -9,6 +9,9 @@ import { ClusterGraph } from '../features/admin-track1/ClusterGraph'
 import { AdminRouteErrorBoundary } from '../features/admin-track1/AdminRouteErrorBoundary'
 import { demoTrack1Data } from '../features/admin-track1/demoData'
 import { buildGraph, filterClusters, defaultFilters, isValidDataset } from '../features/admin-track1/track1Model'
+import { enableAdminDemoPreview } from './adminPreview'
+
+enableAdminDemoPreview()
 
 const graphMock = vi.hoisted(() => ({
   created: 0,

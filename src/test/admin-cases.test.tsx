@@ -9,6 +9,9 @@ import { CaseListPage } from '../features/admin-cases/CaseListPage'
 import { caseEvents, casePageSize, defaultCaseFilters, filterCases, isValidCaseDataset, summarizeCaseEvidence } from '../features/admin-cases/caseModel'
 import type { CaseDataset } from '../features/admin-cases/caseModel'
 import { demoCaseData } from '../features/admin-cases/demoData'
+import { enableAdminDemoPreview } from './adminPreview'
+
+enableAdminDemoPreview()
 
 function renderList(data: CaseDataset = demoCaseData, state: 'ready' | 'loading' | 'failed' | 'forbidden' = 'ready') {
   return render(<MemoryRouter><CaseListPage data={data} state={state} /></MemoryRouter>)
