@@ -93,7 +93,7 @@ describe('관리자 로그인 후 원래 주소 복원', () => {
     renderApp('/app/overview', adapterWith(validToken()))
     expect(await screen.findByRole('heading', { name: '전체 현황' })).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/app\/overview$/)
-    expect(sessionStorage.getItem(adminReturnPathStorageKey)).toBeNull()
+    await waitFor(() => expect(sessionStorage.getItem(adminReturnPathStorageKey)).toBeNull())
   })
 
   it('오래된 저장값과 형식이 잘못된 저장값은 복원하지 않는다', async () => {
@@ -101,14 +101,14 @@ describe('관리자 로그인 후 원래 주소 복원', () => {
     const view = renderApp('/app/overview', adapterWith(validToken()))
     expect(await screen.findByRole('heading', { name: '전체 현황' })).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/app\/overview$/)
-    expect(sessionStorage.getItem(adminReturnPathStorageKey)).toBeNull()
+    await waitFor(() => expect(sessionStorage.getItem(adminReturnPathStorageKey)).toBeNull())
     view.unmount()
 
     sessionStorage.setItem(adminReturnPathStorageKey, 'not-json')
     renderApp('/app/overview', adapterWith(validToken()))
     expect(await screen.findByRole('heading', { name: '전체 현황' })).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/app\/overview$/)
-    expect(sessionStorage.getItem(adminReturnPathStorageKey)).toBeNull()
+    await waitFor(() => expect(sessionStorage.getItem(adminReturnPathStorageKey)).toBeNull())
   })
 
   it('로그인에 실패하면 저장한 주소로 이동하지 않는다', async () => {
