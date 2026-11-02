@@ -21,8 +21,8 @@ import styles from './App.module.css'
 const Track1ListRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1ListRoute })))
 const Track1DetailRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1DetailRoute })))
 const Track1DemoDetailRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1DemoDetailRoute })))
-const FanReportListPage = lazy(() => import('./features/admin-track2/FanReportListPage').then((module) => ({ default: module.FanReportListPage })))
-const FanReportDetailPage = lazy(() => import('./features/admin-track2/FanReportDetailPage').then((module) => ({ default: module.FanReportDetailPage })))
+const Track2ListRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.Track2ListRoute })))
+const Track2DetailRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.Track2DetailRoute })))
 const CaseListPage = lazy(() => import('./features/admin-cases/CaseListPage').then((module) => ({ default: module.CaseListPage })))
 const CaseDetailPage = lazy(() => import('./features/admin-cases/CaseDetailPage').then((module) => ({ default: module.CaseDetailPage })))
 const ApprovalListPage = lazy(() => import('./features/admin-approvals/ApprovalListPage').then((module) => ({ default: module.ApprovalListPage })))
@@ -57,8 +57,8 @@ export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuth
       <Route path="analysis/findings" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 목록을 여는 중" />}><Track1ListRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings/detail" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings/:clusterId" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DemoDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
-      <Route path="fan-reports" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="팬 제보 목록을 여는 중" />}><FanReportListPage /></Suspense></AdminRouteErrorBoundary>} />
-      <Route path="fan-reports/:reportId" element={<AdminRouteErrorBoundary backTo="/app/fan-reports" backLabel="제보 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="제보 상세를 여는 중" />}><FanReportDetailPage /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="fan-reports" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="팬 제보 목록을 여는 중" />}><Track2ListRoute /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="fan-reports/:reportId" element={<AdminRouteErrorBoundary backTo="/app/fan-reports" backLabel="제보 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="제보 상세를 여는 중" />}><Track2DetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="cases" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="사건 목록을 여는 중" />}><CaseListPage /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="cases/:caseId" element={<AdminRouteErrorBoundary backTo="/app/cases" backLabel="사건 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="사건 상세를 여는 중" />}><CaseDetailPage /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="approvals" element={<AdminRouteErrorBoundary backTo="/app/cases" backLabel="사건 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="승인 검토 후보를 여는 중" />}><ApprovalListPage /></Suspense></AdminRouteErrorBoundary>} />
