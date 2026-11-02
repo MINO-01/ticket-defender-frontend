@@ -38,6 +38,17 @@ function problem(status: number, code: string) {
   return new Response(JSON.stringify({ status, code, requestId: '00000000-0000-4000-8000-000000000000', detail: '내부 고객사 정보' }), { status, headers: { 'Content-Type': 'application/problem+json' } })
 }
 
+// Backend main 7c772ac의 ProblemDetail 형식(title, status, instance, code, requestId)이다.
+// 계약에는 detail이 없지만 내부 정보가 섞여 와도 화면에 노출하지 않는지 확인하려고 넣는다.
+function problemDetail(status: number, title: string, code: string, instance: string) {
+  return new Response(JSON.stringify({ title, status, instance, code, requestId: '00000000-0000-4000-8000-000000000001', detail: '내부 고객사 정보' }), { status, headers: { 'Content-Type': 'application/problem+json' } })
+}
+
+// Track 1 API는 CaseErrorHandler 범위 밖이라 DB 장애 시 Spring 기본 500 본문을 반환한다(Backend main 7c772ac 기준).
+function springDefault500(path: string) {
+  return new Response(JSON.stringify({ timestamp: '2026-11-01T23:50:03.313Z', status: 500, error: 'Internal Server Error', path }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+}
+
 const eventA = { id: EVENT_A, externalEventId: 'synthetic-a', name: '합성 공연 A' }
 const eventB = { id: EVENT_B, externalEventId: 'synthetic-b', name: '합성 공연 B' }
 function eventPage(items = [eventA, eventB], extra: Partial<{ page: number; hasNext: boolean; totalItems: number }> = {}) {
@@ -125,6 +136,27 @@ describe('관리자 공연 선택', () => {
     renderApp('/app/analysis/findings')
     expect(await screen.findByRole('alert')).toHaveTextContent(message)
     expect(screen.queryByRole('heading', { name: '접근 가능한 공연이 없습니다' })).not.toBeInTheDocument()
+  })
+
+  it('공연 목록 503 이후 다시 시도하면 같은 요청으로 복구하고 장애 중에는 Track 1을 호출하지 않는다', async () => {
+    let calls = 0
+    const fetchMock = stubFetch((url) => {
+      if (url === EVENTS_PATH) { calls += 1; return calls === 1 ? problemDetail(503, 'Service Unavailable', 'DEPENDENCY_UNAVAILABLE', '/api/v1/admin/events') : json(200, eventPage()) }
+      if (url === clusterListPath(EVENT_A)) return json(200, clusterPage())
+      return undefined
+    })
+    renderApp(`/app/analysis/findings?eventId=${EVENT_A}`)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('서버가 일시적으로 응답할 수 없습니다')
+    expect(screen.queryByText(/내부 고객사 정보/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: '조회할 공연' })).not.toBeInTheDocument()
+    expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH])
+
+    fireEvent.click(within(alert).getByRole('button', { name: '다시 시도' }))
+    expect(await screen.findByRole('link', { name: 'cluster-1 상세 보기' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent(`/app/analysis/findings?eventId=${EVENT_A}`)
+    expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH, EVENTS_PATH, clusterListPath(EVENT_A)])
   })
 
   it('공연 목록 응답 계약이 다르면 오류로 처리한다', async () => {
@@ -234,6 +266,47 @@ describe('Track 1 군집 목록 실제 API', () => {
     expect(screen.getByRole('link', { name: 'cluster-b 상세 보기' })).toBeInTheDocument()
   })
 
+  it('이전 공연의 조회 오류는 다른 공연으로 바꾸면 남지 않고 새 공연 데이터만 표시한다', async () => {
+    stubFetch((url) => {
+      if (url === EVENTS_PATH) return json(200, eventPage())
+      if (url === clusterListPath(EVENT_A)) return springDefault500('/api/v1/admin/track1/clusters')
+      if (url === clusterListPath(EVENT_B)) return json(200, clusterPage(eventB, [summary({ clusterId: 'cluster-b' })]))
+      return undefined
+    })
+    renderApp(`/app/analysis/findings?eventId=${EVENT_A}&page=0`)
+    expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류로 조회하지 못했습니다')
+    fireEvent.change(screen.getByRole('combobox', { name: '조회할 공연' }), { target: { value: EVENT_B } })
+    expect(await screen.findByRole('link', { name: 'cluster-b 상세 보기' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText('cluster-1')).not.toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent(`/app/analysis/findings?eventId=${EVENT_B}`)
+  })
+
+  it('새로고침하면 주소의 page와 sort로 같은 서버 페이지를 다시 조회한다', async () => {
+    const page1 = clusterPage(eventA, [summary({ clusterId: 'cluster-asc-21' })], { page: 1, totalItems: 45, hasNext: true })
+    const fetchMock = stubFetch((url) => {
+      if (url === EVENTS_PATH) return json(200, eventPage())
+      if (url === clusterListPath(EVENT_A, 0, 'priority-asc')) return json(200, clusterPage(eventA, [summary({ clusterId: 'cluster-asc-1' })], { totalItems: 45, hasNext: true }))
+      if (url === clusterListPath(EVENT_A, 1, 'priority-asc')) return json(200, page1)
+      return undefined
+    })
+    const first = renderApp(`/app/analysis/findings?eventId=${EVENT_A}&sort=priority-asc`)
+    fireEvent.click(await screen.findByRole('button', { name: '다음' }))
+    expect(await screen.findByRole('link', { name: 'cluster-asc-21 상세 보기' })).toBeInTheDocument()
+    const restored = screen.getByTestId('location').textContent!
+    expect(new URLSearchParams(restored.split('?')[1]).get('sort')).toBe('priority-asc')
+    first.unmount()
+    fetchMock.mockClear()
+
+    // 새로고침은 화면 상태 없이 주소만으로 다시 시작한다.
+    renderApp(restored)
+    expect(await screen.findByRole('link', { name: 'cluster-asc-21 상세 보기' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '정렬' })).toHaveValue('priority-asc')
+    expect(screen.getByText('2 / 3 페이지')).toBeInTheDocument()
+    expect(screen.queryByText('cluster-asc-1')).not.toBeInTheDocument()
+    expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH, clusterListPath(EVENT_A, 1, 'priority-asc')])
+  })
+
   it('저장된 군집이 0건이면 장애와 구분된 빈 상태를 표시한다', async () => {
     stubFetch((url) => {
       if (url === EVENTS_PATH) return json(200, eventPage())
@@ -337,7 +410,7 @@ describe('Track 1 군집 상세 실제 API', () => {
     expect(requestedUrls(fetchMock).at(-1)).toBe(detailApi)
   })
 
-  // 실제 E2E에서 Backend Track 1 API는 다중 고객사 계정을 409로 막지 않아, 상세 직접 주소도 공연 접근 검증을 먼저 거쳐야 한다.
+  // Backend #58(main 7c772ac)부터 Track 1 API도 다중 고객사 계정을 409로 막는다. Frontend는 그와 별도로 상세 직접 주소에서도 공연 접근 검증을 먼저 거친다.
   it('다중 고객사 계정(공연 목록 409)은 상세 직접 주소에서도 Track 1을 호출하지 않는다', async () => {
     const fetchMock = stubFetch((url) => url === EVENTS_PATH ? problem(409, 'TENANT_SELECTION_REQUIRED') : url === detailApi ? json(200, detailBody) : undefined)
     renderApp(detailRoute)
@@ -378,5 +451,52 @@ describe('Track 1 군집 상세 실제 API', () => {
     renderApp(detailRoute)
     expect(await screen.findByRole('alert')).toHaveTextContent(message)
     expect(screen.queryByRole('table', { name: '저장된 군집 구성원' })).not.toBeInTheDocument()
+  })
+
+  // 공연 목록 확인을 통과한 뒤 상세 API가 막히는 경우다. 409는 Backend 7c772ac의 실제 응답 형식이다.
+  // Track 1의 실제 DB 장애 응답은 Spring 기본 500이며, 503은 현재 Track 1 계약이 아니라 방어적으로만 확인한다.
+  it.each([
+    ['409 TENANT_SELECTION_REQUIRED', () => problemDetail(409, 'Conflict', 'TENANT_SELECTION_REQUIRED', '/api/v1/admin/track1/clusters/detail'), '여러 고객사 소속 계정은 아직 지원하지 않습니다'],
+    ['DB 장애(실제 계약 500)', () => springDefault500('/api/v1/admin/track1/clusters/detail'), '서버 오류로 조회하지 못했습니다'],
+    ['503(현재 Track 1 계약 아님)', () => problemDetail(503, 'Service Unavailable', 'DEPENDENCY_UNAVAILABLE', '/api/v1/admin/track1/clusters/detail'), '서버가 일시적으로 응답할 수 없습니다'],
+  ])('공연 확인 이후 상세 %s 응답은 구성원을 표시하지 않고 내부 정보를 노출하지 않는다', async (_label, respond, message) => {
+    const fetchMock = stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? respond() : undefined)
+    renderApp(detailRoute)
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH, detailApi])
+    expect(screen.queryByRole('table', { name: '저장된 군집 구성원' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/내부 고객사 정보|Internal Server Error|DEPENDENCY_UNAVAILABLE|TENANT_SELECTION_REQUIRED/)).not.toBeInTheDocument()
+    expect(screen.queryByText('account-1')).not.toBeInTheDocument()
+  })
+
+  it('상세 조회 오류 이후 다시 시도하면 같은 식별자로 다시 조회해 복구한다', async () => {
+    let calls = 0
+    const fetchMock = stubFetch((url) => {
+      if (url === EVENTS_PATH) return json(200, eventPage())
+      if (url === detailApi) { calls += 1; return calls === 1 ? springDefault500('/api/v1/admin/track1/clusters/detail') : json(200, detailBody) }
+      return undefined
+    })
+    renderApp(detailRoute)
+    fireEvent.click(within(await screen.findByRole('alert')).getByRole('button', { name: '다시 시도' }))
+    expect(await screen.findByRole('heading', { name: '군집 cluster-1' })).toBeInTheDocument()
+    expect(within(screen.getByRole('table', { name: '저장된 군집 구성원' })).getAllByRole('row')).toHaveLength(3)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH, detailApi, detailApi])
+  })
+
+  it('상세 주소의 공연 확인이 503이면 상세를 호출하지 않고, 다시 시도해 공연이 확인된 뒤에만 상세를 조회한다', async () => {
+    let calls = 0
+    const fetchMock = stubFetch((url) => {
+      if (url === EVENTS_PATH) { calls += 1; return calls === 1 ? problemDetail(503, 'Service Unavailable', 'DEPENDENCY_UNAVAILABLE', '/api/v1/admin/events') : json(200, eventPage()) }
+      if (url === detailApi) return json(200, detailBody)
+      return undefined
+    })
+    renderApp(detailRoute)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('서버가 일시적으로 응답할 수 없습니다')
+    expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH])
+    fireEvent.click(within(alert).getByRole('button', { name: '다시 시도' }))
+    expect(await screen.findByRole('heading', { name: '군집 cluster-1' })).toBeInTheDocument()
+    expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH, EVENTS_PATH, detailApi])
   })
 })
