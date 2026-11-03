@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '../../components/common
 import { PageHeader } from '../../components/common/PageHeader'
 import { useAdminQuery } from '../admin-auth/useAdminQuery'
 import { EvidenceContentPreview } from './EvidenceContentPreview'
+import { ListingAnalysisRunPanel } from './ListingAnalysisRunPanel'
 import { StatusPill } from './StatusPill'
 import {
   analysisStatusLabels, candidateMatchReasonLabels, executionStatusLabels, fanReportDetailPath, fanReportDetailSchema, fanReportListRoute, fieldStateLabels,
@@ -16,10 +17,11 @@ import {
 import type { FanReportDetail, FanReportEvidence, ListingAnalysis, ListingField, ListingFieldName } from './track2Api'
 import { reportTypeLabels } from './track2Model'
 import styles from './Track2.module.css'
+import { useListingAnalysisRuns } from './useListingAnalysisRuns'
 
 // 인증된 관리자의 Track 2 팬 제보 상세다. 주소의 제보 ID로 조회하며 다른 고객사나 권한 없는 공연의 제보는 서버가 404로 숨긴다.
 // 팬 입력값은 검증되지 않은 문자열이므로 일반 텍스트로만 표시하고, listingUrl에 접속하거나 미리보기, 임베드를 만들지 않는다.
-// 분석 이력과 원본 미리보기는 상세 응답에 있는 증거 ID로만 조회한다. 원본 다운로드, 분석 실행, 예매 대조, 수동 교정은 제공하지 않는다.
+// 분석 이력, 원본 미리보기, 분석 실행은 상세 응답에 있는 증거 ID로만 요청한다. 원본 다운로드, 예매 대조, 수동 교정은 제공하지 않는다.
 
 const listLink = '/app/fan-reports'
 
@@ -68,12 +70,11 @@ function ReportDetail({ fanReportId }: { fanReportId: string }) {
     <Card className={styles.panel}>
       <h2>후속 기능</h2>
       <div className={styles.followUp}>
-        <Button disabled>이미지 분석 실행</Button>
         <Button disabled>예매 후보 대조</Button>
         <Button disabled>관찰값 수동 교정</Button>
         <Button disabled>Case 생성</Button>
       </div>
-      <p className={styles.subtleNote}>이번 화면은 조회 전용입니다. 분석 실행, 예매 후보 대조, 수동 교정, Case 생성, 승인과 공식 PDF 발급은 연결하지 않았습니다.</p>
+      <p className={styles.subtleNote}>이미지 분석 실행은 증거 영역에서 증거별로 요청합니다. 예매 후보 대조, 수동 교정, Case 생성, 승인과 공식 PDF 발급은 연결하지 않았습니다.</p>
     </Card>
   </div>
 }
@@ -106,6 +107,7 @@ function EvidencePanel({ fanReportId, evidence }: { fanReportId: string; evidenc
   const [selectedId, setSelectedId] = useState(evidence[0]?.evidenceId ?? null)
   const selectedIndex = evidence.findIndex((item) => item.evidenceId === selectedId)
   const selected = evidence[selectedIndex]
+  const runs = useListingAnalysisRuns(fanReportId)
   return <Card className={styles.panel}>
     <div className={styles.panelHeading}><h2>증거</h2><span>{evidence.length}개 접수, 원본 저장 확인 {evidence.filter((item) => item.originalStored).length}개</span></div>
     {selected ? <>
@@ -117,7 +119,10 @@ function EvidencePanel({ fanReportId, evidence }: { fanReportId: string; evidenc
       {/* 증거마다 새로 만들어 다른 증거로 바꾸면 이전 요청과 이미지가 정리되게 한다. */}
       <EvidenceContentPreview key={`preview:${selected.evidenceId}`} fanReportId={fanReportId} evidence={selected} evidenceLabel={`증거 ${selectedIndex + 1}`} />
       <EvidenceMetadata evidence={selected} />
-      <ListingAnalysisHistory key={selected.evidenceId} fanReportId={fanReportId} evidenceId={selected.evidenceId} originalStored={selected.originalStored} />
+      <ListingAnalysisRunPanel evidence={selected} attempt={runs.attempts[selected.evidenceId]}
+        onStart={() => runs.start(selected.evidenceId)} onReconfirm={() => runs.reconfirm(selected.evidenceId)} onRefreshHistory={() => runs.refreshHistory(selected.evidenceId)} />
+      {/* 분석 시도가 끝나거나 재조회를 누르면 새로 만들어 최신 첫 페이지를 다시 조회한다. */}
+      <ListingAnalysisHistory key={`${selected.evidenceId}:${runs.historyVersions[selected.evidenceId] ?? 0}`} fanReportId={fanReportId} evidenceId={selected.evidenceId} originalStored={selected.originalStored} />
     </> : <EmptyState title="접수된 증거가 없습니다" description="이 제보에는 증거 파일이 없어 이미지 분석 이력도 없습니다." />}
   </Card>
 }

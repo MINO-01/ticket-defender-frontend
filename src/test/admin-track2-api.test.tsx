@@ -438,12 +438,14 @@ describe('Track 2 팬 제보 상세 실제 API', () => {
     expect(requestedUrls(fetchMock)).toEqual([detailPath()])
   })
 
-  it('조회 전용 범위 밖 기능은 비활성화하고 데모 대조 결과를 만들지 않는다', async () => {
-    stubFetch(detailRoute())
+  it('범위 밖 기능은 비활성화하고 분석 실행은 클릭 전 요청하지 않으며 데모 대조 결과를 만들지 않는다', async () => {
+    const fetchMock = stubFetch(detailRoute())
     renderApp(`/app/fan-reports/${REPORT_1}`)
-    for (const name of ['이미지 분석 실행', '예매 후보 대조', '관찰값 수동 교정', 'Case 생성']) {
+    for (const name of ['예매 후보 대조', '관찰값 수동 교정', 'Case 생성']) {
       expect(await screen.findByRole('button', { name })).toBeDisabled()
     }
+    expect(within(screen.getByRole('region', { name: '이미지 분석 실행' })).getByRole('button', { name: '이미지 분석 실행' })).toBeEnabled()
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
     expect(screen.queryByText(/일치 후보|예매 후보 미발견|DEMO-RSV|합성 예매 후보/)).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: '분석관 수정 초안' })).not.toBeInTheDocument()
   })
