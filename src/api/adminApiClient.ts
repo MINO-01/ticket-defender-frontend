@@ -26,6 +26,10 @@ export type AdminApiRequestOptions<T> = {
   /** 성공 응답 검증 스키마. 검증에 실패한 응답은 성공으로 처리하지 않는다. */
   schema: z.ZodType<T>
   signal?: AbortSignal
+  /** 멱등 POST 키. UUID v4 형식만 Idempotency-Key 헤더로 보내며 임의 헤더는 받지 않는다. */
+  idempotencyKey?: string
+  /** 계약상 성공 상태. 지정하면 다른 2xx 응답은 계약 위반으로 처리한다. */
+  successStatus?: number
 }
 
 export type AdminImageRequestOptions = {
@@ -58,6 +62,12 @@ const adminPathnamePattern = /^\/api\/v1\/[A-Za-z0-9\-._~/]+$/
 const adminQueryPattern = /^(?:[A-Za-z0-9\-._~&=+]|%[0-9A-Fa-f]{2})*$/
 // 공개 팬 제보 API와 Track 1 반입 API는 관리자 토큰을 받지 않는 별도 보안 경계다.
 const blockedPathPrefixes = ['/api/v1/fan-reports', '/api/v1/audits/analyze']
+const idempotencyKeyPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** Backend가 받는 UUID v4 형식인지 확인한다. 줄바꿈 등 헤더 주입 문자가 섞인 값은 통과하지 않는다. */
+export function isIdempotencyKey(value: string) {
+  return idempotencyKeyPattern.test(value)
+}
 
 /** 동일 출처 관리자 API 경로만 허용해 토큰이 다른 출처나 공개 API로 전달되지 않게 한다. */
 export function isAllowedAdminApiPath(path: string) {
@@ -84,13 +94,15 @@ export function adminApiPath(pathname: string, params: Record<string, string | n
 
 export function createAdminApiClient({ getAccessToken, onUnauthorized, fetchImpl }: AdminApiClientOptions): AdminApiClient {
   /** JSON 요청과 이미지 요청이 같은 경로 검사, 토큰, 요청 옵션, 401 처리를 쓰도록 한 곳에서 보낸다. */
-  async function send(path: string, method: 'GET' | 'POST' | 'PUT', accept: string, body: unknown, signal: AbortSignal | undefined): Promise<{ kind: 'response'; response: Response } | AdminApiFailureResult> {
+  async function send(path: string, method: 'GET' | 'POST' | 'PUT', accept: string, body: unknown, signal: AbortSignal | undefined, idempotencyKey?: string): Promise<{ kind: 'response'; response: Response } | AdminApiFailureResult> {
     if (!isAllowedAdminApiPath(path)) throw new TypeError('허용되지 않은 관리자 API 경로입니다')
+    if (idempotencyKey !== undefined && (method !== 'POST' || !isIdempotencyKey(idempotencyKey))) throw new TypeError('허용되지 않은 멱등성 키입니다')
     const token = getAccessToken()
     if (!token) return { kind: 'unauthenticated' }
 
     const headers: Record<string, string> = { Accept: accept, Authorization: `Bearer ${token}` }
     if (body !== undefined) headers['Content-Type'] = 'application/json'
+    if (idempotencyKey !== undefined) headers['Idempotency-Key'] = idempotencyKey
 
     let response: Response
     try {
@@ -120,10 +132,14 @@ export function createAdminApiClient({ getAccessToken, onUnauthorized, fetchImpl
   }
 
   return {
-    async request<T>(path: string, { method = 'GET', body, schema, signal }: AdminApiRequestOptions<T>): Promise<AdminApiResult<T>> {
-      const sent = await send(path, method, 'application/json, application/problem+json', body, signal)
+    async request<T>(path: string, { method = 'GET', body, schema, signal, idempotencyKey, successStatus }: AdminApiRequestOptions<T>): Promise<AdminApiResult<T>> {
+      const sent = await send(path, method, 'application/json, application/problem+json', body, signal, idempotencyKey)
       if (sent.kind !== 'response') return sent
       const { response } = sent
+      if (successStatus !== undefined && response.status !== successStatus) {
+        await response.body?.cancel().catch(() => undefined)
+        return { kind: 'invalidResponse', status: response.status }
+      }
       try {
         const payload: unknown = response.status === 204 ? undefined : await response.json()
         const parsed = schema.safeParse(payload)
