@@ -82,7 +82,13 @@
 .fanText h3, .history h3 { margin: 0; font-size: 15px; }
 .fanText p { margin: 0; padding: 12px; border-radius: 8px; background: var(--color-subtle); font-size: 14px; line-height: 1.6; }
 .evidenceMeta { display: grid; gap: 12px; }
-.previewUnavailable { padding: 18px; border: 1px dashed var(--color-border); border-radius: 10px; background: #f6f8fb; color: var(--color-text-secondary); font-size: 13px; text-align: center; }
+.previewUnavailable { margin: 0; padding: 18px; border: 1px dashed var(--color-border); border-radius: 10px; background: #f6f8fb; color: var(--color-text-secondary); font-size: 13px; text-align: center; }
+.originalPreview { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--color-border); border-radius: 10px; }
+.originalPreview h3 { margin: 0; font-size: 15px; }
+.previewFrame { display: grid; gap: 6px; margin: 0; padding: 10px; border-radius: 10px; background: #edf3fc; }
+.previewFrame img { display: block; width: auto; max-width: 100%; height: auto; max-height: 70vh; margin: 0 auto; object-fit: contain; }
+.previewFrame figcaption { color: var(--color-text-secondary); font-size: 12px; text-align: center; }
+.previewActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .history { display: grid; gap: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); }
 .attempts { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
 .attempt { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--color-border); border-radius: 10px; }
