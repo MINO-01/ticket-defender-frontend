@@ -1,4 +1,6 @@
 import type { z } from 'zod'
+import { detectImageMediaType, readImageContentType, readLimitedBody } from './imageResponse'
+import type { EvidenceImageMediaType } from './imageResponse'
 import { readProblemCode } from './problemDetails'
 
 // 관리자 업무 API를 동일 출처로 호출하는 공통 클라이언트다.
@@ -26,6 +28,13 @@ export type AdminApiRequestOptions<T> = {
   signal?: AbortSignal
 }
 
+export type AdminImageRequestOptions = {
+  signal?: AbortSignal
+}
+
+/** 크기와 형식 검사를 통과한 이미지 바이트. 브라우저 저장소에 보관하지 않고 화면 표시에만 쓴다. */
+export type AdminImage = { blob: Blob; mediaType: EvidenceImageMediaType; byteSize: number }
+
 export type AdminApiClientOptions = {
   /** 만료되지 않은 액세스 토큰만 반환하고, 없으면 null을 반환한다. */
   getAccessToken: () => string | null
@@ -36,7 +45,11 @@ export type AdminApiClientOptions = {
 
 export type AdminApiClient = {
   request<T>(path: string, options: AdminApiRequestOptions<T>): Promise<AdminApiResult<T>>
+  /** PNG, JPEG 바이너리 GET 전용 요청. 성공 본문을 JSON으로 읽지 않는다. */
+  requestImage(path: string, options?: AdminImageRequestOptions): Promise<AdminApiResult<AdminImage>>
 }
+
+type AdminApiFailureResult = Exclude<AdminApiResult<never>, { kind: 'success' }>
 
 // pathname에는 퍼센트 인코딩을 전부 허용하지 않는다. 브라우저와 서버가 %2e, %2f, %5c 등을 다르게 정규화하면
 // 원문 검사를 통과한 경로가 공개 API로 바뀔 수 있기 때문이다. 관리자 API 식별자는 UUID와 영문 식별자라 인코딩이 필요 없다.
@@ -70,49 +83,70 @@ export function adminApiPath(pathname: string, params: Record<string, string | n
 }
 
 export function createAdminApiClient({ getAccessToken, onUnauthorized, fetchImpl }: AdminApiClientOptions): AdminApiClient {
+  /** JSON 요청과 이미지 요청이 같은 경로 검사, 토큰, 요청 옵션, 401 처리를 쓰도록 한 곳에서 보낸다. */
+  async function send(path: string, method: 'GET' | 'POST' | 'PUT', accept: string, body: unknown, signal: AbortSignal | undefined): Promise<{ kind: 'response'; response: Response } | AdminApiFailureResult> {
+    if (!isAllowedAdminApiPath(path)) throw new TypeError('허용되지 않은 관리자 API 경로입니다')
+    const token = getAccessToken()
+    if (!token) return { kind: 'unauthenticated' }
+
+    const headers: Record<string, string> = { Accept: accept, Authorization: `Bearer ${token}` }
+    if (body !== undefined) headers['Content-Type'] = 'application/json'
+
+    let response: Response
+    try {
+      // 리다이렉트를 따라가지 않아 Authorization 헤더가 다른 주소로 전달되지 않게 한다.
+      response = await (fetchImpl ?? fetch)(path, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        credentials: 'omit',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+        redirect: 'error',
+        signal,
+      })
+    } catch {
+      return { kind: 'network' }
+    }
+
+    if (response.status === 401) {
+      onUnauthorized()
+      return { kind: 'unauthenticated' }
+    }
+    if (response.status === 403) return { kind: 'forbidden' }
+    if (response.status === 404) return { kind: 'notFound' }
+    if (response.status >= 200 && response.status < 300) return { kind: 'response', response }
+    return { kind: 'problem', status: response.status, code: await readProblemCode(response) }
+  }
+
   return {
     async request<T>(path: string, { method = 'GET', body, schema, signal }: AdminApiRequestOptions<T>): Promise<AdminApiResult<T>> {
-      if (!isAllowedAdminApiPath(path)) throw new TypeError('허용되지 않은 관리자 API 경로입니다')
-      const token = getAccessToken()
-      if (!token) return { kind: 'unauthenticated' }
-
-      const headers: Record<string, string> = { Accept: 'application/json, application/problem+json', Authorization: `Bearer ${token}` }
-      if (body !== undefined) headers['Content-Type'] = 'application/json'
-
-      let response: Response
+      const sent = await send(path, method, 'application/json, application/problem+json', body, signal)
+      if (sent.kind !== 'response') return sent
+      const { response } = sent
       try {
-        // 리다이렉트를 따라가지 않아 Authorization 헤더가 다른 주소로 전달되지 않게 한다.
-        response = await (fetchImpl ?? fetch)(path, {
-          method,
-          headers,
-          body: body === undefined ? undefined : JSON.stringify(body),
-          credentials: 'omit',
-          cache: 'no-store',
-          referrerPolicy: 'no-referrer',
-          redirect: 'error',
-          signal,
-        })
+        const payload: unknown = response.status === 204 ? undefined : await response.json()
+        const parsed = schema.safeParse(payload)
+        if (parsed.success) return { kind: 'success', status: response.status, data: parsed.data }
       } catch {
-        return { kind: 'network' }
+        // 본문을 읽지 못한 응답은 성공으로 표시하지 않는다.
       }
+      return { kind: 'invalidResponse', status: response.status }
+    },
 
-      if (response.status === 401) {
-        onUnauthorized()
-        return { kind: 'unauthenticated' }
-      }
-      if (response.status === 403) return { kind: 'forbidden' }
-      if (response.status === 404) return { kind: 'notFound' }
-      if (response.status >= 200 && response.status < 300) {
-        try {
-          const payload: unknown = response.status === 204 ? undefined : await response.json()
-          const parsed = schema.safeParse(payload)
-          if (parsed.success) return { kind: 'success', status: response.status, data: parsed.data }
-        } catch {
-          // 본문을 읽지 못한 응답은 성공으로 표시하지 않는다.
-        }
+    async requestImage(path: string, { signal }: AdminImageRequestOptions = {}): Promise<AdminApiResult<AdminImage>> {
+      const sent = await send(path, 'GET', 'image/png, image/jpeg, application/problem+json', undefined, signal)
+      if (sent.kind !== 'response') return sent
+      const { response } = sent
+      // 200 HTML 로그인 화면이나 JSON 오류 본문을 이미지로 표시하지 않도록 상태, 선언 형식, 실제 바이트 형식을 모두 확인한다.
+      const declared = readImageContentType(response.headers.get('Content-Type'))
+      if (response.status !== 200 || declared === null) {
+        await response.body?.cancel().catch(() => undefined)
         return { kind: 'invalidResponse', status: response.status }
       }
-      return { kind: 'problem', status: response.status, code: await readProblemCode(response) }
+      const bytes = await readLimitedBody(response)
+      if (bytes === null || detectImageMediaType(bytes) !== declared) return { kind: 'invalidResponse', status: response.status }
+      return { kind: 'success', status: response.status, data: { blob: new Blob([bytes], { type: declared }), mediaType: declared, byteSize: bytes.byteLength } }
     },
   }
 }

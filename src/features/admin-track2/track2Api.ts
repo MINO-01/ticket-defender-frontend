@@ -175,6 +175,11 @@ export function listingAnalysesPath(fanReportId: string, evidenceId: string, pag
   return adminApiPath(`/api/v1/admin/fan-reports/${fanReportId}/evidence/${evidenceId}/listing-analyses`, { page, pageSize: listingAnalysisPageSize })
 }
 
+/** 관리자 증거 원본 이미지 경로. 저장소 주소, 객체 키, 사전 서명 URL이 아닌 Backend 프록시 API만 사용한다. */
+export function evidenceContentPath(fanReportId: string, evidenceId: string) {
+  return `/api/v1/admin/fan-reports/${fanReportId}/evidence/${evidenceId}/content`
+}
+
 export function fanReportListRoute(eventId: string) {
   return `/app/fan-reports?${new URLSearchParams({ eventId })}`
 }
