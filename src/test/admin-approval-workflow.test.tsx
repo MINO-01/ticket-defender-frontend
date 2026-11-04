@@ -634,6 +634,49 @@ describe('영수증 만료와 결정 결과 미확인', () => {
     expect(posts(calls, packagePath)).toHaveLength(2)
   })
 
+  it('영수증 발급 응답이 늦게 오면 요청 시작부터 지난 시간을 유효기간에서 빼고 남은 시간이 없으면 바로 폐기한다', async () => {
+    // 단조 시계만 앞당기고 타이머는 실제로 둔다. 브라우저 절대 시계(Date)는 쓰지 않는다.
+    let now = 1_000
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const late = deferred()
+    const calls = stubFetch(requestRoutes({ [`GET ${packagePath}`]: () => json(200, reviewPackage()), [`POST ${packagePath}`]: () => late.promise }))
+    renderApp(requestRoute)
+    const region = await openPackage()
+    fireEvent.click(within(region).getByRole('checkbox', { name: /봉인된 보고서 본문과 증거 manifest를 검토했습니다/ }))
+    fireEvent.click(within(region).getByRole('button', { name: '검토 확인 영수증 발급' }))
+    // 15분 영수증의 응답이 14분 56초 뒤 도착하면 5초 여유를 빼고 남은 시간이 없다.
+    now += 14 * 60_000 + 56_000
+    await act(async () => { late.resolve(json(201, receipt())) })
+    expect(await within(region).findByText(/검토 확인 영수증이 만료되어 폐기했습니다/)).toBeInTheDocument()
+    expect(within(region).queryByRole('button', { name: '결정 제출' })).not.toBeInTheDocument()
+    expect(posts(calls, `${requestPath}/decision`)).toHaveLength(0)
+    expect(posts(calls, packagePath)).toHaveLength(1)
+    expectTokenNotLeaked()
+  })
+
+  it('타이머가 늦게 실행되어도 결정 본문을 만들 때 만료를 확인하고 지연 응답 시간만큼 일찍 폐기한다', async () => {
+    let now = 1_000
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const late = deferred()
+    const calls = stubFetch(requestRoutes({ [`GET ${packagePath}`]: () => json(200, reviewPackage()), [`POST ${packagePath}`]: () => late.promise }))
+    renderApp(requestRoute)
+    const region = await openPackage()
+    fireEvent.click(within(region).getByRole('checkbox', { name: /봉인된 보고서 본문과 증거 manifest를 검토했습니다/ }))
+    fireEvent.click(within(region).getByRole('button', { name: '검토 확인 영수증 발급' }))
+    // 응답이 10분 늦게 오면 남은 시간은 4분 55초다. 실제 타이머는 그 사이 실행되지 않는다.
+    now += 10 * 60_000
+    await act(async () => { late.resolve(json(201, receipt())) })
+    await within(region).findByText(RECEIPT_1)
+    now += 4 * 60_000 + 56_000
+    fillDecision(region, 'APPROVE')
+    fireEvent.click(within(region).getByRole('button', { name: '결정 제출' }))
+    expect(await within(region).findByText(/검토 확인 영수증이 만료되어 폐기했습니다/)).toBeInTheDocument()
+    expect(posts(calls, `${requestPath}/decision`)).toHaveLength(0)
+    expect(within(region).queryByRole('button', { name: '결정 제출' })).not.toBeInTheDocument()
+    expect(posts(calls, packagePath)).toHaveLength(1)
+    expectTokenNotLeaked()
+  })
+
   it('만료 직전 보낸 결정의 응답이 유실되면 만료 뒤에도 같은 키와 본문으로 재확인하고 새 영수증과 새 결정을 막는다', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout', 'Date'] })
     const first = deferred()
