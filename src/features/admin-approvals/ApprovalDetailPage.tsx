@@ -55,7 +55,9 @@ function EvidenceSources({ item, track1, track2 }: { item: CaseRecord; track1: T
 export function ApprovalDetailPage({ data = demoCaseData, track1 = demoTrack1Data, track2 = demoTrack2Data, state = 'ready' }: {
   data?: CaseDataset; track1?: Track1Dataset; track2?: Track2Dataset; state?: ViewState
 }) {
-  const { caseId } = useParams()
+  // 미리보기 경로는 앱 라우트의 승인 요청 매개변수 자리에 합성 Case ID를 넣어 연다.
+  const params = useParams()
+  const caseId = params.caseId ?? params.approvalRequestId
   if (state === 'loading') return <LoadingSkeleton label="승인 검토 근거를 불러오는 중" />
   if (state === 'failed') return <ErrorState title="승인 검토 근거를 불러오지 못했습니다" description="조회 기능을 연결한 뒤 다시 시도해 주세요." />
   if (state === 'forbidden') return <PermissionDenied />

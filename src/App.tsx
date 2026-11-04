@@ -8,6 +8,7 @@ import { AdminPagePlaceholder } from './pages/admin/AdminPagePlaceholder'
 import { LoadingSkeleton } from './components/common/Feedback'
 import { AdminRouteErrorBoundary } from './features/admin-track1/AdminRouteErrorBoundary'
 import { AdminAuthProvider } from './features/admin-auth/AdminAuthProvider'
+import { ApprovalAttemptProvider } from './features/admin-approvals/approvalAttempts'
 import { RequireAdminAuth } from './features/admin-auth/RequireAdminAuth'
 import type { AdminAuthAdapter } from './features/admin-auth/authAdapter'
 import { BackendAuthCheckPanel } from './features/admin-settings/BackendAuthCheckPanel'
@@ -25,8 +26,8 @@ const Track2ListRoute = lazy(() => import('./features/admin-track2/Track2Routes'
 const Track2DetailRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.Track2DetailRoute })))
 const CaseListRoute = lazy(() => import('./features/admin-cases/CaseRoutes').then((module) => ({ default: module.CaseListRoute })))
 const CaseDetailRoute = lazy(() => import('./features/admin-cases/CaseRoutes').then((module) => ({ default: module.CaseDetailRoute })))
-const ApprovalListPage = lazy(() => import('./features/admin-approvals/ApprovalListPage').then((module) => ({ default: module.ApprovalListPage })))
-const ApprovalDetailPage = lazy(() => import('./features/admin-approvals/ApprovalDetailPage').then((module) => ({ default: module.ApprovalDetailPage })))
+const ApprovalListRoute = lazy(() => import('./features/admin-approvals/ApprovalRoutes').then((module) => ({ default: module.ApprovalListRoute })))
+const ApprovalDetailRoute = lazy(() => import('./features/admin-approvals/ApprovalRoutes').then((module) => ({ default: module.ApprovalDetailRoute })))
 
 const fanPageElements = {
   guide: <GuidePage />,
@@ -52,7 +53,7 @@ function Home() {
 export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuthAdapter }) {
   return <AdminAuthProvider adapter={adminAuthAdapter}><Routes>
     <Route path="/" element={<Home />} />
-    <Route path="/app" element={<RequireAdminAuth><AdminLayout /></RequireAdminAuth>}>
+    <Route path="/app" element={<RequireAdminAuth><ApprovalAttemptProvider><AdminLayout /></ApprovalAttemptProvider></RequireAdminAuth>}>
       <Route index element={<Navigate to="overview" replace />} />
       <Route path="analysis/findings" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 목록을 여는 중" />}><Track1ListRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings/detail" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DetailRoute /></Suspense></AdminRouteErrorBoundary>} />
@@ -61,8 +62,8 @@ export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuth
       <Route path="fan-reports/:reportId" element={<AdminRouteErrorBoundary backTo="/app/fan-reports" backLabel="제보 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="제보 상세를 여는 중" />}><Track2DetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="cases" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="사건 목록을 여는 중" />}><CaseListRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="cases/:caseId" element={<AdminRouteErrorBoundary backTo="/app/cases" backLabel="사건 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="사건 상세를 여는 중" />}><CaseDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
-      <Route path="approvals" element={<AdminRouteErrorBoundary backTo="/app/cases" backLabel="사건 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="승인 검토 후보를 여는 중" />}><ApprovalListPage /></Suspense></AdminRouteErrorBoundary>} />
-      <Route path="approvals/:caseId" element={<AdminRouteErrorBoundary backTo="/app/approvals" backLabel="승인 검토 후보 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="승인 검토 근거를 여는 중" />}><ApprovalDetailPage /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="approvals" element={<AdminRouteErrorBoundary backTo="/app/cases" backLabel="사건 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="승인 검토 화면을 여는 중" />}><ApprovalListRoute /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="approvals/:approvalRequestId" element={<AdminRouteErrorBoundary backTo="/app/approvals" backLabel="승인 검토 화면으로 이동"><Suspense fallback={<LoadingSkeleton label="승인 요청을 여는 중" />}><ApprovalDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       {adminPages.filter((page) => page.path !== 'analysis/findings' && page.path !== 'fan-reports' && page.path !== 'cases' && page.path !== 'approvals').map((page) => <Route key={page.path} path={page.path} element={<><AdminPagePlaceholder title={page.label} description={page.description} reportCenter={page.path === 'report-center'} />{page.path === 'settings' && <BackendAuthCheckPanel />}</>} />)}
     </Route>
     <Route path="/fan" element={<FanLayout />}>
