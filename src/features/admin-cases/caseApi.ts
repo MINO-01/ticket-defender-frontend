@@ -12,16 +12,16 @@ export const caseActivityPageSize = 20
 
 export const caseStatuses = ['OPEN', 'TRIAGED', 'IN_REVIEW', 'NEEDS_EVIDENCE', 'READY_FOR_APPROVAL', 'APPROVED_FOR_REPORT', 'DISMISSED', 'CLOSED'] as const
 export type CaseStatus = (typeof caseStatuses)[number]
-const caseTypes = ['GRAPH_CLUSTER', 'FAN_REPORT', 'COMBINED'] as const
+export const caseTypes = ['GRAPH_CLUSTER', 'FAN_REPORT', 'COMBINED'] as const
 export type CaseType = (typeof caseTypes)[number]
 
 // CaseDto의 시각은 OffsetDateTime(UTC 오프셋 포함)으로 직렬화된다.
 const offsetDateTimePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/
 const codePattern = /^[A-Z][A-Z0-9_]{0,63}$/
 
-const offsetDateTime = z.string().refine((value) => offsetDateTimePattern.test(value) && !Number.isNaN(Date.parse(value)))
-const uuid = z.string().refine(isUuid).transform((value) => value.toLowerCase())
-const version = z.number().int().nonnegative()
+export const offsetDateTime = z.string().refine((value) => offsetDateTimePattern.test(value) && !Number.isNaN(Date.parse(value)))
+export const uuid = z.string().refine(isUuid).transform((value) => value.toLowerCase())
+export const version = z.number().int().nonnegative()
 // 활동 유형과 역할은 서버 문자열이다. 코드 형식이 아닌 값은 내부 메시지일 수 있으므로 계약 위반으로 처리한다.
 const code = z.string().regex(codePattern)
 
