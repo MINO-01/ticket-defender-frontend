@@ -1,6 +1,7 @@
 import type { z } from 'zod'
 import { detectImageMediaType, readImageContentType, readLimitedBody } from './imageResponse'
 import type { EvidenceImageMediaType } from './imageResponse'
+import { isPdfContentType, looksLikePdf, maxOfficialPdfBytes } from './pdfResponse'
 import { readProblemCode } from './problemDetails'
 
 // 관리자 업무 API를 동일 출처로 호출하는 공통 클라이언트다.
@@ -39,6 +40,9 @@ export type AdminImageRequestOptions = {
 /** 크기와 형식 검사를 통과한 이미지 바이트. 브라우저 저장소에 보관하지 않고 화면 표시에만 쓴다. */
 export type AdminImage = { blob: Blob; mediaType: EvidenceImageMediaType; byteSize: number }
 
+/** 형식과 Frontend 임시 상한 검사를 통과한 PDF 바이트. 무결성 비교와 임시 다운로드에만 쓰고 브라우저 저장소에 보관하지 않는다. */
+export type AdminPdf = { bytes: Uint8Array<ArrayBuffer>; byteSize: number }
+
 export type AdminApiClientOptions = {
   /** 만료되지 않은 액세스 토큰만 반환하고, 없으면 null을 반환한다. */
   getAccessToken: () => string | null
@@ -51,6 +55,8 @@ export type AdminApiClient = {
   request<T>(path: string, options: AdminApiRequestOptions<T>): Promise<AdminApiResult<T>>
   /** PNG, JPEG 바이너리 GET 전용 요청. 성공 본문을 JSON으로 읽지 않는다. */
   requestImage(path: string, options?: AdminImageRequestOptions): Promise<AdminApiResult<AdminImage>>
+  /** 공식 PDF 바이너리 GET 전용 요청. 성공 본문을 JSON으로 읽지 않는다. */
+  requestPdf(path: string, options?: AdminImageRequestOptions): Promise<AdminApiResult<AdminPdf>>
 }
 
 type AdminApiFailureResult = Exclude<AdminApiResult<never>, { kind: 'success' }>
@@ -170,6 +176,20 @@ export function createAdminApiClient({ getAccessToken, onUnauthorized, fetchImpl
       const bytes = await readLimitedBody(response)
       if (bytes === null || detectImageMediaType(bytes) !== declared) return { kind: 'invalidResponse', status: response.status }
       return { kind: 'success', status: response.status, data: { blob: new Blob([bytes], { type: declared }), mediaType: declared, byteSize: bytes.byteLength } }
+    },
+
+    async requestPdf(path: string, { signal }: AdminImageRequestOptions = {}): Promise<AdminApiResult<AdminPdf>> {
+      const sent = await send(path, 'GET', 'application/pdf, application/problem+json', undefined, signal)
+      if (sent.kind !== 'response') return sent
+      const { response } = sent
+      // 상태와 선언 형식을 먼저 확인하고, 상한 안에서만 본문을 읽은 뒤 PDF 서명과 끝 표시를 보조로 확인한다.
+      if (response.status !== 200 || !isPdfContentType(response.headers.get('Content-Type'))) {
+        await response.body?.cancel().catch(() => undefined)
+        return { kind: 'invalidResponse', status: response.status }
+      }
+      const bytes = await readLimitedBody(response, maxOfficialPdfBytes)
+      if (bytes === null || !looksLikePdf(bytes)) return { kind: 'invalidResponse', status: response.status }
+      return { kind: 'success', status: response.status, data: { bytes, byteSize: bytes.byteLength } }
     },
   }
 }
