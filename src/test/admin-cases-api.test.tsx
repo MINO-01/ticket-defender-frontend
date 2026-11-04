@@ -420,8 +420,9 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     expect(items[1]).toHaveTextContent('Case 버전 1 → 2')
     expect(within(history).queryByRole('textbox')).not.toBeInTheDocument()
 
-    // 조사 준비 업무는 Issue #31에서 연결했고 승인 요청과 공식 PDF 발급은 계속 막는다.
-    for (const name of ['승인 요청', '공식 PDF 발급']) expect(screen.getByRole('button', { name })).toBeDisabled()
+    // 조사 준비 업무는 Issue #31, 승인 요청 제출은 Issue #33에서 연결했고 공식 PDF 발급은 계속 막는다.
+    expect(screen.getByRole('button', { name: '공식 PDF 발급' })).toBeDisabled()
+    expect(screen.getByRole('region', { name: '승인 요청 제출' })).toBeInTheDocument()
     for (const name of ['상태 변경', '담당자 변경', 'EvidenceSnapshot', '보고서 초안']) expect(screen.getByRole('region', { name })).toBeInTheDocument()
     expect(screen.queryByText(/DEMO-|합성 데모 데이터|시연 담당/)).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: '← Case 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
