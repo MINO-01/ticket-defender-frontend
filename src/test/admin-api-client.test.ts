@@ -144,7 +144,16 @@ describe('관리자 공통 API 클라이언트', () => {
     expect(init?.headers).toEqual({ Accept: 'application/json, application/problem+json', Authorization: `Bearer ${SYNTHETIC_TOKEN}`, 'Idempotency-Key': key })
   })
 
-  it('UUID v4가 아니거나 POST가 아닌 요청의 Idempotency-Key는 요청 전에 거부한다', async () => {
+  it('Case 담당자 PUT에도 검증된 Idempotency-Key와 JSON 본문을 함께 보낸다', async () => {
+    const key = '0f8fad5b-d9cb-469f-a165-70867728950e'
+    const { client, fetchImpl } = setup(jsonResponse(200, { id: 'case-1' }))
+    await expect(client.request('/api/v1/cases/c-1/assignee', { method: 'PUT', body: { reason: 'synthetic' }, idempotencyKey: key, successStatus: 200, schema: itemSchema })).resolves.toEqual({ kind: 'success', status: 200, data: { id: 'case-1' } })
+    const [, init] = fetchImpl.mock.calls[0]
+    expect(init).toMatchObject({ method: 'PUT', body: JSON.stringify({ reason: 'synthetic' }), redirect: 'error' })
+    expect(init?.headers).toEqual({ Accept: 'application/json, application/problem+json', Authorization: `Bearer ${SYNTHETIC_TOKEN}`, 'Content-Type': 'application/json', 'Idempotency-Key': key })
+  })
+
+  it('UUID v4가 아니거나 GET 요청의 Idempotency-Key는 요청 전에 거부한다', async () => {
     const invalid: [string, 'GET' | 'POST' | 'PUT'][] = [
       ['0f8fad5b-d9cb-169f-a165-70867728950e', 'POST'],
       ['0f8fad5b-d9cb-469f-c165-70867728950e', 'POST'],
@@ -152,7 +161,7 @@ describe('관리자 공통 API 클라이언트', () => {
       ['0f8fad5b-d9cb-469f-a165-70867728950e\r\nX-Injected: 1', 'POST'],
       ['', 'POST'],
       ['0f8fad5b-d9cb-469f-a165-70867728950e', 'GET'],
-      ['0f8fad5b-d9cb-469f-a165-70867728950e', 'PUT'],
+      ['not-a-uuid', 'PUT'],
     ]
     for (const [key, method] of invalid) {
       const { client, fetchImpl } = setup(jsonResponse(201, { id: 'x' }))

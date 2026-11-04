@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '../../components/common
 import { PageHeader } from '../../components/common/PageHeader'
 import { useAdminQuery } from '../admin-auth/useAdminQuery'
 import { EvidenceContentPreview } from './EvidenceContentPreview'
+import { FanReportCasePanel } from './FanReportCasePanel'
 import { ListingAnalysisRunPanel } from './ListingAnalysisRunPanel'
 import { StatusPill } from './StatusPill'
 import {
@@ -21,7 +22,7 @@ import { useListingAnalysisRuns } from './useListingAnalysisRuns'
 
 // 인증된 관리자의 Track 2 팬 제보 상세다. 주소의 제보 ID로 조회하며 다른 고객사나 권한 없는 공연의 제보는 서버가 404로 숨긴다.
 // 팬 입력값은 검증되지 않은 문자열이므로 일반 텍스트로만 표시하고, listingUrl에 접속하거나 미리보기, 임베드를 만들지 않는다.
-// 분석 이력, 원본 미리보기, 분석 실행은 상세 응답에 있는 증거 ID로만 요청한다. 원본 다운로드, 예매 대조, 수동 교정은 제공하지 않는다.
+// 분석 이력, 원본 미리보기, 분석 실행, Case 생성은 상세 응답에 있는 제보와 증거 ID로만 요청한다. 원본 다운로드, 예매 대조, 수동 교정은 제공하지 않는다.
 
 const listLink = '/app/fan-reports'
 
@@ -72,10 +73,10 @@ function ReportDetail({ fanReportId }: { fanReportId: string }) {
       <div className={styles.followUp}>
         <Button disabled>예매 후보 대조</Button>
         <Button disabled>관찰값 수동 교정</Button>
-        <Button disabled>Case 생성</Button>
       </div>
-      <p className={styles.subtleNote}>이미지 분석 실행은 증거 영역에서 증거별로 요청합니다. 예매 후보 대조, 수동 교정, Case 생성, 승인과 공식 PDF 발급은 연결하지 않았습니다.</p>
+      <p className={styles.subtleNote}>이미지 분석 실행은 증거 영역에서 증거별로 요청합니다. 예매 후보 대조, 수동 교정, 승인과 공식 PDF 발급은 연결하지 않았습니다.</p>
     </Card>
+    <FanReportCasePanel report={report} />
   </div>
 }
 

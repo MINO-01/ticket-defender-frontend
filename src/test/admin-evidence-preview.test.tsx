@@ -376,7 +376,7 @@ describe('관리자 증거 원본 미리보기', () => {
     expect(liveUrls()).toEqual(['blob:synthetic-2'])
   })
 
-  it('다운로드, 예매 대조, Case 생성은 연결하지 않고 미리보기가 분석을 요청하지 않으며 이미지와 토큰을 브라우저 저장소에 남기지 않는다', async () => {
+  it('다운로드와 예매 대조는 연결하지 않고 미리보기가 분석이나 Case 생성을 요청하지 않으며 이미지와 토큰을 브라우저 저장소에 남기지 않는다', async () => {
     const fetchMock = stubFetch(() => image(SYNTHETIC_PNG, 'image/png'))
     renderApp()
     const region = await openPreview()
@@ -385,7 +385,9 @@ describe('관리자 증거 원본 미리보기', () => {
     expect(screen.queryByRole('link', { name: /다운로드/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /다운로드/ })).not.toBeInTheDocument()
     expect(document.querySelector('a[download]')).toBeNull()
-    for (const name of ['예매 후보 대조', 'Case 생성']) expect(screen.getByRole('button', { name })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '예매 후보 대조' })).toBeDisabled()
+    // Case 생성은 관리자가 사유를 입력해 누를 때만 요청한다. 미리보기는 생성 요청을 만들지 않는다.
+    expect(screen.getByRole('region', { name: 'Case 생성' })).toBeInTheDocument()
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
     const stored = JSON.stringify({ ...sessionStorage, ...localStorage })
     expect(stored).not.toContain(SYNTHETIC_TOKEN)

@@ -86,6 +86,8 @@ function listPath(eventId: string, page = 0, status?: string) {
 const detailPath = (id = CASE_1) => `/api/v1/cases/${id}`
 const sourcesPath = (id = CASE_1) => `/api/v1/cases/${id}/sources`
 const activitiesPath = (id = CASE_1, page = 0) => `/api/v1/cases/${id}/activities?page=${page}&pageSize=20`
+const snapshotsPath = (id = CASE_1, page = 0) => `/api/v1/cases/${id}/evidence-snapshots?page=${page}&pageSize=20`
+const reportVersionsPath = (id = CASE_1, page = 0) => `/api/v1/cases/${id}/report-versions?page=${page}&pageSize=20`
 
 const clusterSource = {
   sourceReferenceId: SOURCE_CLUSTER, sourceType: 'STORED_CLUSTER_EVIDENCE', analysisRequestId: 'synthetic-run/2026-11', clusterId: 'cluster-7',
@@ -126,6 +128,8 @@ function detailRoute(overrides: Partial<Record<string, () => Response | Promise<
   const defaults: Record<string, () => Response | Promise<Response>> = {
     [detailPath()]: () => json(200, caseView()),
     [sourcesPath()]: () => json(200, [clusterSource, reportSource, assetSource]),
+    [snapshotsPath()]: () => json(200, { items: [], page: 0, pageSize: 20, hasNext: false }),
+    [reportVersionsPath()]: () => json(200, { items: [], page: 0, pageSize: 20, hasNext: false }),
     [activitiesPath()]: () => json(200, activityPage([
       activity(),
       activity({ activityId: ACTIVITY_2, eventType: 'CASE_TRIAGED', reason: '합성 분류 사유', fromStatus: 'OPEN', toStatus: 'TRIAGED', versionBefore: 1, versionAfter: 2, occurredAt: '2026-11-01T11:00:00Z' }),
@@ -416,10 +420,12 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     expect(items[1]).toHaveTextContent('Case 버전 1 → 2')
     expect(within(history).queryByRole('textbox')).not.toBeInTheDocument()
 
-    for (const name of ['담당자 변경', '상태 변경', 'EvidenceSnapshot 생성', '보고서 초안 작성', '승인 요청', '공식 PDF 발급']) expect(screen.getByRole('button', { name })).toBeDisabled()
+    // 조사 준비 업무는 Issue #31에서 연결했고 승인 요청과 공식 PDF 발급은 계속 막는다.
+    for (const name of ['승인 요청', '공식 PDF 발급']) expect(screen.getByRole('button', { name })).toBeDisabled()
+    for (const name of ['상태 변경', '담당자 변경', 'EvidenceSnapshot', '보고서 초안']) expect(screen.getByRole('region', { name })).toBeInTheDocument()
     expect(screen.queryByText(/DEMO-|합성 데모 데이터|시연 담당/)).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: '← Case 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
-    expect(requestedUrls(fetchMock)).toEqual([detailPath(), sourcesPath(), activitiesPath()])
+    expect(requestedUrls(fetchMock)).toEqual([detailPath(), sourcesPath(), snapshotsPath(), reportVersionsPath(), activitiesPath()])
   })
 
   it.each([
@@ -460,7 +466,7 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     expect(await screen.findByRole('region', { name: 'Case 개요' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '← Case 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
     await screen.findByRole('region', { name: '활동 이력' })
-    expect(requestedUrls(fetchMock)).toEqual([detailPath(), sourcesPath(), activitiesPath()])
+    expect(requestedUrls(fetchMock)).toEqual([detailPath(), sourcesPath(), snapshotsPath(), reportVersionsPath(), activitiesPath()])
   })
 
   it('UUID가 아닌 Case 주소나 잘못된 공연 값은 API를 호출하지 않는다', async () => {

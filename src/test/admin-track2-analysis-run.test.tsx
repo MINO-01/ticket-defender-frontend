@@ -454,14 +454,15 @@ describe('Track 2 이미지 분석 실행 회귀', () => {
     expect(within(screen.getByRole('region', { name: '원본 이미지 미리보기' })).getByRole('button', { name: '원본 미리보기' })).toBeEnabled()
   })
 
-  it('예매 후보 대조, 수동 교정, Case 생성은 계속 비활성화한다', async () => {
-    stubFetch(postSequence(() => json(201, analysis())))
+  it('예매 후보 대조, 수동 교정은 계속 비활성화하고 분석 결과로 Case를 자동 생성하지 않는다', async () => {
+    const calls = stubFetch(postSequence(() => json(201, analysis())))
     await openDetail()
     await clickRun()
     await within(runRegion()).findByText('분석 요청이 끝났습니다')
-    for (const name of ['예매 후보 대조', '관찰값 수동 교정', 'Case 생성']) {
+    for (const name of ['예매 후보 대조', '관찰값 수동 교정']) {
       expect(screen.getByRole('button', { name })).toBeDisabled()
     }
+    expect(calls.some((call) => call.url.startsWith('/api/v1/cases'))).toBe(false)
   })
 
   it('요청 키를 브라우저 저장소에 남기지 않는다', async () => {

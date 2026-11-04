@@ -26,7 +26,7 @@ export type AdminApiRequestOptions<T> = {
   /** 성공 응답 검증 스키마. 검증에 실패한 응답은 성공으로 처리하지 않는다. */
   schema: z.ZodType<T>
   signal?: AbortSignal
-  /** 멱등 POST 키. UUID v4 형식만 Idempotency-Key 헤더로 보내며 임의 헤더는 받지 않는다. */
+  /** 멱등 POST, PUT 키. UUID v4 형식만 Idempotency-Key 헤더로 보내며 임의 헤더는 받지 않는다. Backend Case 담당자 PUT도 이 헤더를 요구한다. */
   idempotencyKey?: string
   /** 계약상 성공 상태. 지정하면 다른 2xx 응답은 계약 위반으로 처리한다. */
   successStatus?: number
@@ -96,7 +96,7 @@ export function createAdminApiClient({ getAccessToken, onUnauthorized, fetchImpl
   /** JSON 요청과 이미지 요청이 같은 경로 검사, 토큰, 요청 옵션, 401 처리를 쓰도록 한 곳에서 보낸다. */
   async function send(path: string, method: 'GET' | 'POST' | 'PUT', accept: string, body: unknown, signal: AbortSignal | undefined, idempotencyKey?: string): Promise<{ kind: 'response'; response: Response } | AdminApiFailureResult> {
     if (!isAllowedAdminApiPath(path)) throw new TypeError('허용되지 않은 관리자 API 경로입니다')
-    if (idempotencyKey !== undefined && (method !== 'POST' || !isIdempotencyKey(idempotencyKey))) throw new TypeError('허용되지 않은 멱등성 키입니다')
+    if (idempotencyKey !== undefined && (method === 'GET' || !isIdempotencyKey(idempotencyKey))) throw new TypeError('허용되지 않은 멱등성 키입니다')
     const token = getAccessToken()
     if (!token) return { kind: 'unauthenticated' }
 

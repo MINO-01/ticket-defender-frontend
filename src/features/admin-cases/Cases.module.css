@@ -51,6 +51,26 @@
 .activityFacts div{display:grid;grid-template-columns:88px minmax(0,1fr);gap:8px}
 .activityFacts dt{color:var(--color-text-secondary)}
 .activityFacts dd{margin:0;overflow-wrap:anywhere}
+.form{display:grid;gap:14px;margin-top:16px;min-width:0}
+.form h3,.created h3{margin:0;font-size:16px}
+.formActions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.fieldset{display:grid;gap:12px;min-width:0;margin:0;padding:16px;border:1px solid var(--color-border);border-radius:10px}
+.fieldset legend{padding:0 6px;font-size:14px;font-weight:700}
+.plainFieldset{display:grid;gap:12px;min-width:0;margin:0;padding:0;border:0}
+.checkList{display:grid;gap:8px;margin:0;padding:0;list-style:none;font-size:14px}
+.checkList label{display:flex;gap:8px;align-items:flex-start;overflow-wrap:anywhere}
+.blocked,.fieldError{margin:0;padding:12px 14px;border-radius:8px;background:#fff7ed;border-left:3px solid #c2410c;font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+.fieldError{color:#9a3412}
+.success,.failure,.uncertain{display:grid;gap:4px;margin:0;padding:12px 14px;border-radius:8px;font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+.success{background:#ecfdf3;border-left:3px solid #15803d}
+.failure{background:#fef2f2;border-left:3px solid #b91c1c}
+.uncertain{background:#fffbeb;border-left:3px solid #b45309}
+.success p,.failure p,.uncertain p{margin:0}
+.recordList{display:grid;gap:10px;margin:16px 0 0;padding:0;list-style:none}
+.recordList li{display:grid;gap:4px;padding:12px 14px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-subtle);font-size:13px;min-width:0;overflow-wrap:anywhere}
+.recordList li button{justify-self:start}
+.created{display:grid;gap:8px;margin-top:16px;padding:16px;border:1px solid var(--color-border);border-radius:10px;min-width:0}
+.created .definition{margin-top:4px;grid-template-columns:repeat(2,minmax(0,1fr))}
 @media(max-width:1100px){.filters{grid-template-columns:repeat(3,minmax(0,1fr))}.filters .search{grid-column:span 2}.detailGrid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:680px){.page{gap:16px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metrics>section{padding:16px}.metrics strong{font-size:24px}.filterCard,.tableCard,.panel,.overview{padding:18px}.filters{grid-template-columns:repeat(2,minmax(0,1fr))}.filters .search{grid-column:1/-1}.filters>button{grid-column:1/-1}.overviewGrid,.source .definition{grid-template-columns:repeat(2,minmax(0,1fr))}.reviewGrid{grid-template-columns:minmax(0,1fr)}.reviewGrid .unknowns{grid-column:auto}.actions{grid-template-columns:minmax(0,1fr)}.pagination{justify-content:center}}
 @media(max-width:420px){.overviewGrid,.source .definition{grid-template-columns:minmax(0,1fr)}.filters{grid-template-columns:minmax(0,1fr)}.filters .search{grid-column:auto}}
