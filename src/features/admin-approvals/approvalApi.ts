@@ -336,8 +336,9 @@ export const decisionMessages: OperationMessages = {
   codes: {
     ...basisCodes,
     REVIEW_RECEIPT_EXPIRED: { title: '검토 확인 영수증이 만료되었습니다', description: `결정이 기록되지 않았습니다. 검토 패키지를 다시 확인하고 새 영수증을 발급해 주세요.` },
-    REVIEW_RECEIPT_ALREADY_USED: { title: '이미 사용한 검토 확인 영수증입니다', description: `영수증은 한 번만 쓸 수 있습니다. 최신 요청 상태를 다시 불러왔습니다. ${notApplied}` },
-    REVIEW_RECEIPT_INVALID: { title: '검토 확인 영수증을 사용할 수 없습니다', description: `다른 승인자나 다른 요청의 영수증이거나 취소된 영수증입니다. 새 영수증을 발급해 주세요. ${notApplied}` },
+    // 서버는 새 영수증 발급으로 취소된 이전 영수증도 이 코드로 거부한다(격리 E2E에서 확인).
+    REVIEW_RECEIPT_ALREADY_USED: { title: '이미 사용한 검토 확인 영수증입니다', description: `이미 결정에 사용했거나 새 영수증 발급으로 취소된 영수증입니다. 최신 요청 상태를 다시 불러왔습니다. ${notApplied}` },
+    REVIEW_RECEIPT_INVALID: { title: '검토 확인 영수증을 사용할 수 없습니다', description: `다른 승인자나 다른 요청의 영수증입니다. 새 영수증을 발급해 주세요. ${notApplied}` },
     REQUEST_VERSION_CONFLICT: { title: '승인 요청이 먼저 변경되었습니다', description: `최신 요청 상태를 다시 불러왔습니다. ${notApplied}` },
     REPORT_VERSION_CONFLICT: { title: '보고서가 먼저 변경되었습니다', description: `최신 요청 상태를 다시 불러왔습니다. ${notApplied}` },
   },
