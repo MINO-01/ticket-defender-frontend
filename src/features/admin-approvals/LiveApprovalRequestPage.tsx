@@ -15,6 +15,7 @@ import type { WorkflowMessage } from '../admin-cases/caseWorkflowApi'
 import { MutationStatus } from '../admin-cases/MutationStatus'
 import styles from '../admin-cases/Cases.module.css'
 import { useCaseMutation } from '../admin-cases/useCaseMutation'
+import { officialPdfDecisionRoute, reportCenterRoute } from '../admin-reports/officialPdfApi'
 import { formatUtc } from '../admin-track2/track2Api'
 import {
   approvalEntryRoute, approvalRequestPath, approvalRequestSchema, approvalStatusLabels, buildDecisionRequest, buildWithdrawRequest, decisionMessages,
@@ -28,7 +29,8 @@ import { useReviewReceipt } from './useReviewReceipt'
 // 인증된 관리자의 승인 요청 상세다. 승인 대기 목록 API가 없어 요청 ID를 아는 경우에만 들어올 수 있다.
 // 다른 고객사나 권한 없는 공연의 요청은 서버가 404로 숨긴다. 요청한 ID와 다른 응답은 표시하지 않는다.
 // 철회(REVIEWER)와 독립 검토 및 결정(APPROVER)은 역할을 추정하지 않고 모두 보여 주며 서버의 403 응답 뒤에만 막는다.
-// 쓰기 성공이나 확정된 거부 뒤에는 서버의 최신 요청 상태를 다시 조회한다. 승인 결정은 공식 PDF 발급이 아니며 PDF 기능은 연결하지 않는다.
+// 쓰기 성공이나 확정된 거부 뒤에는 서버의 최신 요청 상태를 다시 조회한다. 승인 결정은 공식 PDF 발급이 아니다.
+// 승인(APPROVE) 결정 직후에만 결정 ID로 보고서 센터의 공식 PDF 화면에 이동하는 링크를 준다. 발급 권한(TENANT_ADMIN)과 적격성은 그 화면에서 서버가 확인한다.
 
 export function LiveApprovalRequestPage() {
   const { approvalRequestId } = useParams()
@@ -87,8 +89,8 @@ function ApprovalRequestDetail({ requestId }: { requestId: string }) {
         <WithdrawPanel request={request} locked={refreshing} onRefresh={refresh} />
         <Card className={styles.panel}>
           <h2>후속 단계</h2>
-          <p className={styles.caution}>공식 PDF 발급은 별도 절차이며 이번 화면에서 연결하지 않아 실행할 수 없습니다. 승인 결정 뒤에도 서버의 발급 적격성은 차단(BLOCKED)입니다.</p>
-          <div className={styles.actions}><Button variant="secondary" disabled>공식 PDF 발급</Button></div>
+          <p className={styles.caution}>공식 PDF 발급은 승인 결정과 별도 절차입니다. 보고서 센터에서 승인 결정 ID로 서버의 발급 적격성을 확인한 뒤 고객사 관리자가 요청합니다. 이 요청 상세에서는 결정 ID를 다시 조회할 수 없어 결정 직후 결과의 링크나 결정 ID를 사용해야 합니다.</p>
+          <Link className={styles.detailLink} to={reportCenterRoute}>보고서 센터로 이동</Link>
         </Card>
       </aside>
     </div>
@@ -429,6 +431,10 @@ function DecisionResult({ view }: { view: DecisionView }) {
       <div><dt>사용한 영수증 ID</dt><dd className={styles.idCell}>{view.reviewReceiptId}</dd></div>
       <div><dt>발급 적격성 (서버 값)</dt><dd>차단 (BLOCKED)</dd></div>
     </dl>
-    <p className={styles.caution}>승인 결정은 사람이 검토 근거를 확인한 기록이며 공식 PDF 발급이 아닙니다. 공식 PDF 발급은 별도 절차에서 서버가 다시 검증해야 하며 현재 비활성입니다.</p>
+    <p className={styles.caution}>승인 결정은 사람이 검토 근거를 확인한 기록이며 공식 PDF 발급이 아닙니다. 위 발급 적격성은 결정 응답에 고정된 값이며, 공식 PDF 발급은 별도 화면에서 서버가 현재 적격성을 다시 검증합니다.</p>
+    {view.outcome === 'APPROVE' && <>
+      <p className={styles.caution}>공식 PDF 화면은 고객사 관리자(TENANT_ADMIN) 역할이 있어야 쓸 수 있습니다. 승인 담당 역할만으로는 발급할 수 없으며 서버가 확인합니다. 이 결정 ID는 화면을 떠나면 다시 찾을 수 없으니 필요하면 기록해 두세요.</p>
+      <Link className={styles.detailLink} to={officialPdfDecisionRoute(view.approvalDecisionId)}>공식 PDF 발급 화면으로 이동</Link>
+    </>}
   </section>
 }
