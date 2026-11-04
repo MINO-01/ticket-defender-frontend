@@ -11,8 +11,8 @@ export type AdminApiResult<T> =
   | { kind: 'success'; status: number; data: T }
   /** 유효한 세션이 없어 요청하지 않았거나 서버가 401로 거부했다. */
   | { kind: 'unauthenticated' }
-  /** 인증은 되었지만 필요한 역할이 없다. */
-  | { kind: 'forbidden' }
+  /** 인증은 되었지만 필요한 역할이 없다. code는 허용 목록의 안정 코드일 때만 붙는다. */
+  | { kind: 'forbidden'; code?: ForbiddenProblemCode }
   /** 존재하지 않거나 접근 범위 밖이다. 서버 정책에 따라 두 경우를 구분하지 않는다. */
   | { kind: 'notFound' }
   | { kind: 'problem'; status: number; code: string }
@@ -62,6 +62,9 @@ const adminPathnamePattern = /^\/api\/v1\/[A-Za-z0-9\-._~/]+$/
 const adminQueryPattern = /^(?:[A-Za-z0-9\-._~&=+]|%[0-9A-Fa-f]{2})*$/
 // 공개 팬 제보 API와 Track 1 반입 API는 관리자 토큰을 받지 않는 별도 보안 경계다.
 const blockedPathPrefixes = ['/api/v1/fan-reports', '/api/v1/audits/analyze']
+// 403 본문에서 읽는 코드 허용 목록이다. 역할 부족과 업무 규칙 차단을 구분해야 하는 코드만 두고, 나머지 403은 코드 없이 권한 오류로 처리한다.
+const forbiddenProblemCodes = ['SELF_APPROVAL_FORBIDDEN'] as const
+export type ForbiddenProblemCode = (typeof forbiddenProblemCodes)[number]
 const idempotencyKeyPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 /** Backend가 받는 UUID v4 형식인지 확인한다. 줄바꿈 등 헤더 주입 문자가 섞인 값은 통과하지 않는다. */
@@ -125,7 +128,11 @@ export function createAdminApiClient({ getAccessToken, onUnauthorized, fetchImpl
       onUnauthorized()
       return { kind: 'unauthenticated' }
     }
-    if (response.status === 403) return { kind: 'forbidden' }
+    if (response.status === 403) {
+      const code = await readProblemCode(response)
+      const known = forbiddenProblemCodes.find((item) => item === code)
+      return known === undefined ? { kind: 'forbidden' } : { kind: 'forbidden', code: known }
+    }
     if (response.status === 404) return { kind: 'notFound' }
     if (response.status >= 200 && response.status < 300) return { kind: 'response', response }
     return { kind: 'problem', status: response.status, code: await readProblemCode(response) }

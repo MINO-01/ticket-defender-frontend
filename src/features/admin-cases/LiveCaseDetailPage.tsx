@@ -16,6 +16,7 @@ import {
   caseViewSchema, readCaseId,
 } from './caseApi'
 import type { CaseActivity, CaseSource, CaseStatus, CaseView } from './caseApi'
+import { ApprovalSubmitPanel } from '../admin-approvals/ApprovalSubmitPanel'
 import { AssigneePanel, PreparationPanels, TransitionPanel } from './CaseWorkflowPanels'
 import type { WorkflowOutcome } from './CaseWorkflowPanels'
 import styles from './Cases.module.css'
@@ -24,7 +25,8 @@ import styles from './Cases.module.css'
 // 주소에 공연이 있으면 응답의 eventId와 일치할 때만 표시한다. 공연이 없는 직접 주소는 서버 권한 검증 결과를 그대로 따르고 목록 링크는 응답 공연으로 만든다.
 // 출처와 활동 이력은 상세 조회가 성공하고 공연이 확인된 뒤에만 요청한다.
 // 상태 변경, 담당자, EvidenceSnapshot, 보고서 초안은 쓰기 성공이나 버전 충돌 뒤 서버의 최신 Case를 다시 조회한다.
-// 재조회 중에는 직전에 확인한 Case를 표시하되 모든 쓰기를 막아 오래된 caseVersion으로 요청하지 않는다. 승인과 PDF 기능은 연결하지 않는다.
+// 재조회 중에는 직전에 확인한 Case를 표시하되 모든 쓰기를 막아 오래된 caseVersion으로 요청하지 않는다.
+// 승인 요청 제출은 이 화면에서, 철회와 승인 결정은 승인 요청 상세에서 한다. 공식 PDF 기능은 연결하지 않는다.
 
 const listLink = '/app/cases'
 
@@ -94,7 +96,8 @@ function CaseDetail({ caseId, eventId }: { caseId: string; eventId: string | nul
     <div className={styles.detailGrid}>
       <div className={styles.mainColumn}>
         <SourcePanel caseId={item.caseId} eventId={item.eventId} />
-        <PreparationPanels view={item} locked={locked} onOutcome={onOutcome} refreshKey={refreshKey} />
+        <PreparationPanels view={item} locked={locked} onOutcome={onOutcome} refreshKey={refreshKey}
+          approvalPanel={(drafts) => <ApprovalSubmitPanel view={item} locked={locked} drafts={drafts} onOutcome={onOutcome} onRefresh={refresh} />} />
       </div>
       <aside className={styles.sideColumn} aria-label="활동 이력과 업무 동작">
         {reviewerDenied && <p className={styles.blocked} role="note">현재 계정은 검토 담당(REVIEWER) 역할이 없어 서버가 변경 요청을 거부했습니다. 이 화면의 변경 동작을 막았습니다. 역할은 고객사 관리자에게 확인해 주세요.</p>}
@@ -105,9 +108,8 @@ function CaseDetail({ caseId, eventId }: { caseId: string; eventId: string | nul
         <ActivityPanel key={refreshKey} caseId={item.caseId} />
         <Card className={styles.panel}>
           <h2>후속 단계</h2>
-          <p className={styles.caution}>승인 요청, 승인 결정, 검토 확인, 공식 PDF 발급은 이번 범위에서 연결하지 않아 실행할 수 없습니다. 보고서 초안 저장은 승인이나 PDF 발급이 아닙니다.</p>
+          <p className={styles.caution}>공식 PDF 발급은 별도 절차이며 이번 범위에서 연결하지 않아 실행할 수 없습니다. 보고서 초안 저장과 승인 결정은 PDF 발급이 아닙니다.</p>
           <div className={styles.actions}>
-            <Button variant="secondary" disabled>승인 요청</Button>
             <Button variant="secondary" disabled>공식 PDF 발급</Button>
           </div>
         </Card>

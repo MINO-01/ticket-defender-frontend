@@ -651,7 +651,9 @@ describe('Case 상세 EvidenceSnapshot과 보고서 초안', () => {
     expect(screen.getByText('보고서 초안 개정 1을 저장했습니다. 초안은 승인된 보고서가 아닙니다.')).toBeInTheDocument()
     await waitFor(() => expect(within(screen.getByRole('list', { name: '보고서 초안 목록' })).getAllByRole('listitem')).toHaveLength(1))
     expect(document.body.textContent).not.toContain('합성 보고서 원문 JSON')
-    for (const name of ['승인 요청', '공식 PDF 발급']) expect(screen.getByRole('button', { name })).toBeDisabled()
+    // 승인 요청 제출은 Issue #33에서 별도 영역으로 연결했고 공식 PDF 발급은 계속 막는다.
+    expect(screen.getByRole('button', { name: '공식 PDF 발급' })).toBeDisabled()
+    expect(screen.getByRole('region', { name: '승인 요청 제출' })).toBeInTheDocument()
     expect(writes(calls).every((call) => !call.url.includes('approval') && !call.url.includes('pdf'))).toBe(true)
   })
 

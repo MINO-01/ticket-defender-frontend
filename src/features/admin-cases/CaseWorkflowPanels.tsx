@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { describeAdminApiFailure } from '../../api/adminApiFailure'
 import { Button } from '../../components/common/Button'
 import { Card } from '../../components/common/Card'
@@ -25,7 +26,7 @@ import { useCaseMutation } from './useCaseMutation'
 
 // 인증된 Case 상세의 조사 준비 업무 영역이다. 모든 쓰기는 현재 화면의 caseVersion을 expectedCaseVersion으로 보내고 서버가 최종 판단한다.
 // 상태 전이, 담당자, Snapshot, 초안은 검토 담당(REVIEWER)만 허용되며 역할 조회 API가 없어 403 응답 뒤에만 동작을 막는다.
-// 승인 요청, 승인 결정, ReviewReceipt, 공식 PDF는 이번 범위가 아니므로 연결하지 않는다.
+// 승인 요청 제출 영역은 approvalPanel로 받아 초안 목록 조회를 함께 쓴다. 승인 결정, ReviewReceipt, 공식 PDF는 이 파일에서 다루지 않는다.
 
 /** 부모(Case 상세)가 결과에 따라 최신 상태 재조회, 안내, 역할 차단을 처리한다. */
 export type WorkflowOutcome = { kind: 'succeeded'; message: string } | { kind: 'conflict'; message: WorkflowMessage } | { kind: 'forbidden' }
@@ -191,7 +192,10 @@ function DraftFacts({ draft }: { draft: ReportVersionDraft }) {
 const emptyDraft: Omit<DraftInput, 'evidenceSnapshotId'> = { title: '', assessment: '', limitations: '', conclusion: '', reason: '' }
 
 /** EvidenceSnapshot과 ReportVersion 초안 영역이다. 목록은 refreshKey가 바뀔 때마다 다시 조회하고 작성 중인 입력은 유지한다. */
-export function PreparationPanels({ view, locked, onOutcome, refreshKey }: PanelProps & { refreshKey: number }) {
+/** 보고서 초안 목록의 현재 페이지 조회 결과다. 승인 요청 영역이 같은 조회를 다시 보내지 않고 최신 초안을 확인할 때 쓴다. */
+export type DraftListState = { items: ReportVersionDraft[] | null; page: number; query: ReturnType<typeof useAdminQuery<{ items: ReportVersionDraft[]; page: number; pageSize: number; hasNext: boolean }>> }
+
+export function PreparationPanels({ view, locked, onOutcome, refreshKey, approvalPanel }: PanelProps & { refreshKey: number; approvalPanel?: (drafts: DraftListState) => ReactNode }) {
   const [snapshotPage, setSnapshotPage] = useState(0)
   const [draftPage, setDraftPage] = useState(0)
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null)
@@ -292,6 +296,7 @@ export function PreparationPanels({ view, locked, onOutcome, refreshKey }: Panel
         <MutationStatus attempt={write.attempt?.kind === 'conflict' ? null : write.attempt} successText={null} />
       </div>
     </Card>
+    {approvalPanel?.({ items: draftItems, page: draftPage, query: drafts })}
   </>
 }
 

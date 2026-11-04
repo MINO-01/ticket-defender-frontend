@@ -45,6 +45,21 @@ describe('관리자 공통 API 클라이언트', () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(1)
   })
 
+  it('403은 허용된 안정 코드만 읽고, 코드가 없거나 형식이 다르면 기존 권한 오류로 처리한다', async () => {
+    const self = setup(jsonResponse(403, { code: 'SELF_APPROVAL_FORBIDDEN', detail: '내부 멤버십 정보' }))
+    await expect(self.client.request('/api/v1/approval-requests/r-1/decision', { schema: itemSchema })).resolves.toEqual({ kind: 'forbidden', code: 'SELF_APPROVAL_FORBIDDEN' })
+    for (const response of [
+      jsonResponse(403, { code: 'FORBIDDEN' }),
+      jsonResponse(403, { code: 'self_approval_forbidden' }),
+      jsonResponse(403, { code: 42 }),
+      jsonResponse(403, {}),
+      new Response('<html>forbidden</html>', { status: 403 }),
+      new Response(null, { status: 403 }),
+    ]) {
+      await expect(setup(response).client.request('/api/v1/cases/c-1', { schema: itemSchema })).resolves.toEqual({ kind: 'forbidden' })
+    }
+  })
+
   it('403 권한 부족과 404 범위 비노출을 구분하고 세션은 유지한다', async () => {
     const forbidden = setup(jsonResponse(403, { code: 'ROLE_MISSING' }))
     await expect(forbidden.client.request('/api/v1/cases/c-1', { schema: itemSchema })).resolves.toEqual({ kind: 'forbidden' })
