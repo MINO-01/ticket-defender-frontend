@@ -94,4 +94,11 @@ Backend 계약은 변경하지 않았습니다. 기준 문서는 Backend `docs/a
 
 - `src/test/admin-approval-workflow.test.tsx`: 계약 경로와 스키마, 요청 본문, 승인 요청, 철회, 검토 패키지, 악성 HTML 비실행, 영수증 비노출, 영수증 자동 재시도 없음, 승인과 반려, 403과 자기 승인, 404 범위 비노출, 영수증 만료와 재사용, digest 불일치, 버전 충돌, 응답 유실 재확인, 만료 직전 결정, 화면 이탈 후 재진입, 로그아웃, 중복 클릭
 - `src/test/admin-api-client.test.ts`: 403 코드 허용 목록과 코드 없음, 잘못된 형식의 기존 처리 유지
-- 실제 Spring, 격리 MySQL 8, OIDC 대역 서버, Chrome E2E 결과는 PR 본문에 환경과 함께 기록합니다.
+### 격리 E2E (합성 데이터)
+
+환경: Spring Boot jar(Backend main 17c832b 소스와 같은 빌드), 격리 MySQL 8.0.45(별도 datadir, 127.0.0.1:13306, Windows MySQL80 서비스와 데이터 미사용), HTTPS OIDC 대역 서버(Keycloak 아님, 합성 RS256 JWT), Vite 개발 서버, 시스템 Chrome headless(CDP). 영수증 TTL은 만료 시험을 위해 `PT30S`로 줄였습니다. 출처는 파일 없는 Track 1 저장 군집 증거뿐이며 MinIO와 W06/W07 경로는 쓰지 않았습니다.
+
+- HTTP 15건 통과: 승인 요청 생성, 같은 키 재생과 다른 본문 거부, 중복 요청 `APPROVAL_REQUEST_ALREADY_PENDING`, 역할과 범위(ANALYST 403, 다른 공연 승인자와 다른 고객사 승인자 404), 검토 패키지 역할과 조회만으로 영수증 미생성, DB에 영수증 SHA-256만 저장, digest 변경 `APPROVAL_REVIEW_MISMATCH`, 오래된 요청 버전 `REQUEST_VERSION_CONFLICT`, 다른 승인자 영수증 `REVIEW_RECEIPT_INVALID`, 자기 승인 `SELF_APPROVAL_FORBIDDEN`(영수증 발급은 허용, 결정에서 차단), 재발급으로 취소된 이전 영수증 `REVIEW_RECEIPT_ALREADY_USED`, 승인 뒤 영수증 TTL이 지나도 같은 키와 본문은 같은 결정을 재생, 사용한 영수증의 새 키 결정 `APPROVAL_REQUEST_CLOSED`, 반려, 만료 영수증 `REVIEW_RECEIPT_EXPIRED`, 철회와 재생
+- Chrome 15건 통과: Case 상세 승인 요청 제출(연속 클릭 1회)과 요청 상세 이동, 철회, REVIEWER 검토 패키지 403, 요청 ID 진입, 봉인 JSON의 HTML 비실행, 영수증 원문 비노출(화면, 주소, 저장소, 콘솔), 승인, 결정 응답 유실 뒤 TTL 경과 후 같은 키 재확인, 결정 전 영수증 만료와 재발급, 영수증 발급 응답 유실 시 자동 재시도 없음, 결과 미확인 이탈 후 재진입 해소, 다른 고객사 승인자 404, 자기 승인 안내, 로그아웃 정리, 모든 요청 Bearer와 페이지 예외 없음
+
+첫 Chrome 실행의 1건 실패는 시험 스크립트의 요청 시간 범위가 직전 단계의 의도된 조회를 포함한 문제였으며, 범위를 고친 뒤 새 합성 데이터로 HTTP와 Chrome을 모두 다시 실행했습니다. 실제 Keycloak 로그인, MinIO Object Lock, 파일 증거의 승인 경로는 검증하지 않았습니다.
