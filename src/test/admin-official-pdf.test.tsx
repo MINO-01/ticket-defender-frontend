@@ -417,6 +417,22 @@ describe('실패한 발급 재시도', () => {
     expect(sent).toHaveLength(2)
     expect(sent[1].headers['Idempotency-Key']).toBe(sent[0].headers['Idempotency-Key'])
   })
+
+  it('네트워크 유실 뒤 재확인이 끝나면 상태 다시 조회를 다시 쓸 수 있다', async () => {
+    const calls = stubFetch(routes({
+      [`POST ${retryUrl}`]: (_call, count) => { if (count === 1) throw new TypeError('network'); return json(202, failed) },
+      [`GET ${detailUrl}`]: () => json(200, failed),
+    }, [failed]))
+    renderApp(pageRoute)
+    const region = await openPage()
+    fireEvent.click(await within(region).findByRole('button', { name: '실패한 발급 재시도' }))
+    fireEvent.click(await within(region).findByRole('button', { name: '재시도 재확인' }))
+    expect(await within(region).findByText(/서버가 요청을 접수했습니다/)).toBeInTheDocument()
+    const recheck = await within(region).findByRole('button', { name: '상태 다시 조회' })
+    await waitFor(() => expect(recheck).toBeEnabled())
+    fireEvent.click(recheck)
+    await waitFor(() => expect(gets(calls, detailUrl)).toHaveLength(1))
+  })
 })
 
 describe('공식 PDF 다운로드', () => {
