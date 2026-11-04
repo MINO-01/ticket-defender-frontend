@@ -409,6 +409,8 @@ const commonCodes: Record<string, WorkflowMessage> = {
 
 export type OperationMessages = {
   forbidden: WorkflowMessage
+  /** 403 중 공통 클라이언트가 읽은 안정 코드별 안내다. 없거나 모르는 코드는 forbidden 문구를 쓴다. */
+  forbiddenCodes?: Record<string, WorkflowMessage>
   notFound: WorkflowMessage
   codes: Record<string, WorkflowMessage>
 }
@@ -436,7 +438,7 @@ export function classifyMutation<T>(result: AdminApiResult<T>, messages: Operati
     case 'unauthenticated':
       return { kind: 'rejected', forbidden: false, message: { title: '관리자 세션이 만료되었습니다', description: `다시 로그인한 뒤 Case 상태를 확인해 주세요.` } }
     case 'forbidden':
-      return { kind: 'rejected', forbidden: true, message: messages.forbidden }
+      return { kind: 'rejected', forbidden: true, message: (result.code === undefined ? undefined : messages.forbiddenCodes?.[result.code]) ?? messages.forbidden }
     case 'notFound':
       return { kind: 'rejected', forbidden: false, message: messages.notFound }
     case 'problem': {
