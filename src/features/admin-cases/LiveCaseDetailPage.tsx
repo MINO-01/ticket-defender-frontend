@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { describeAdminApiFailure } from '../../api/adminApiFailure'
 import { Button } from '../../components/common/Button'
@@ -16,11 +16,15 @@ import {
   caseViewSchema, readCaseId,
 } from './caseApi'
 import type { CaseActivity, CaseSource, CaseStatus, CaseView } from './caseApi'
+import { AssigneePanel, PreparationPanels, TransitionPanel } from './CaseWorkflowPanels'
+import type { WorkflowOutcome } from './CaseWorkflowPanels'
 import styles from './Cases.module.css'
 
 // 인증된 관리자의 Case 상세다. 주소의 Case UUID로 조회하며 다른 고객사, 권한 없는 공연, ANALYST에게 허용되지 않은 Case는 서버가 404로 숨긴다.
 // 주소에 공연이 있으면 응답의 eventId와 일치할 때만 표시한다. 공연이 없는 직접 주소는 서버 권한 검증 결과를 그대로 따르고 목록 링크는 응답 공연으로 만든다.
-// 출처와 활동 이력은 상세 조회가 성공하고 공연이 확인된 뒤에만 요청한다. 담당자, 상태 변경, 승인, PDF 기능은 연결하지 않는다.
+// 출처와 활동 이력은 상세 조회가 성공하고 공연이 확인된 뒤에만 요청한다.
+// 상태 변경, 담당자, EvidenceSnapshot, 보고서 초안은 쓰기 성공이나 버전 충돌 뒤 서버의 최신 Case를 다시 조회한다.
+// 재조회 중에는 직전에 확인한 Case를 표시하되 모든 쓰기를 막아 오래된 caseVersion으로 요청하지 않는다. 승인과 PDF 기능은 연결하지 않는다.
 
 const listLink = '/app/cases'
 
@@ -42,41 +46,67 @@ export function LiveCaseDetailPage() {
   return <CaseDetail key={`${caseId}:${eventId ?? ''}`} caseId={caseId} eventId={eventId} />
 }
 
-function CaseDetail({ caseId, eventId }: { caseId: string; eventId: string | null }) {
-  const { result, retry } = useAdminQuery(caseDetailPath(caseId), caseViewSchema)
-  const back = (target: string | null) => <Link className={styles.backLink} to={target ? caseListRoute(target) : listLink}>← Case 목록</Link>
-  if (result === null) return <div className={styles.page}>{back(eventId)}<LoadingSkeleton label="Case 상세를 불러오는 중" /></div>
+type Notice = { tone: 'success' | 'conflict'; title: string; description?: string }
 
-  if (result.kind === 'success' && result.data.caseId === caseId && eventId !== null && result.data.eventId !== eventId) {
-    return <div className={styles.page}>{back(eventId)}<ErrorState title="선택한 공연의 Case가 아닙니다" description="주소의 공연과 Case의 공연이 달라 표시하지 않았습니다. Case 목록에서 다시 선택해 주세요." /></div>
-  }
-  // 요청한 Case와 다른 응답은 다른 Case의 정보가 섞일 수 있으므로 표시하지 않는다.
-  const mismatched = result.kind === 'success' && result.data.caseId !== caseId
-  if (result.kind !== 'success' || mismatched) {
+function CaseDetail({ caseId, eventId }: { caseId: string; eventId: string | null }) {
+  const [refreshKey, setRefreshKey] = useState(0)
+  const { result } = useAdminQuery(caseDetailPath(caseId), caseViewSchema, refreshKey)
+  const [lastView, setLastView] = useState<CaseView | null>(null)
+  const [notice, setNotice] = useState<Notice | null>(null)
+  const [reviewerDenied, setReviewerDenied] = useState(false)
+  const back = (target: string | null) => <Link className={styles.backLink} to={target ? caseListRoute(target) : listLink}>← Case 목록</Link>
+  const verified = result?.kind === 'success' && result.data.caseId === caseId && (eventId === null || result.data.eventId === eventId) ? result.data : null
+  // 직전에 확인한 Case를 기억해 재조회 중에도 작성 중인 입력과 결과 안내가 사라지지 않게 한다.
+  if (verified !== null && verified !== lastView) setLastView(verified)
+  const refresh = useCallback(() => setRefreshKey((value) => value + 1), [])
+
+  const onOutcome = useCallback((outcome: WorkflowOutcome) => {
+    if (outcome.kind === 'forbidden') { setReviewerDenied(true); return }
+    setNotice(outcome.kind === 'succeeded'
+      ? { tone: 'success', title: outcome.message }
+      : { tone: 'conflict', title: outcome.message.title, description: outcome.message.description })
+    refresh()
+  }, [refresh])
+
+  const shown = verified ?? (result === null ? lastView : null)
+  if (shown === null) {
+    if (result === null) return <div className={styles.page}>{back(eventId)}<LoadingSkeleton label="Case 상세를 불러오는 중" /></div>
+    if (result.kind === 'success' && result.data.caseId === caseId && eventId !== null && result.data.eventId !== eventId) {
+      return <div className={styles.page}>{back(eventId)}<ErrorState title="선택한 공연의 Case가 아닙니다" description="주소의 공연과 Case의 공연이 달라 표시하지 않았습니다. Case 목록에서 다시 선택해 주세요." /></div>
+    }
+    // 요청한 Case와 다른 응답은 다른 Case의 정보가 섞일 수 있으므로 표시하지 않는다.
     const failure = result.kind === 'success' ? { kind: 'invalidResponse' as const, status: result.status } : result
     const message = describeAdminApiFailure(failure, 'Case를 찾을 수 없거나 접근 범위 밖입니다')
-    return <div className={styles.page}>{back(eventId)}<ErrorState title={message.title} description={message.description} onRetry={retry} /></div>
+    return <div className={styles.page}>{back(eventId)}<ErrorState title={message.title} description={message.description} onRetry={refresh} /></div>
   }
 
-  const item = result.data
+  const item = shown
+  const refreshing = verified === null
+  const locked = refreshing || reviewerDenied
   return <div className={styles.page}>
     {back(item.eventId)}
-    <PageHeader eyebrow="Case 조회" title="Case 상세" description="서버에 저장된 Case 정보와 연결 출처, 활동 이력을 확인합니다. Case 상태는 조사 진행 단계이며 부정 거래 판정이 아닙니다." />
+    <PageHeader eyebrow="Case 조사 준비" title="Case 상세" description="서버에 저장된 Case 정보와 연결 출처, 활동 이력을 확인하고 조사 준비 업무를 진행합니다. Case 상태는 조사 진행 단계이며 부정 거래 판정이 아닙니다." />
+    {refreshing && <p className={styles.caution} role="status">서버의 최신 Case 상태를 다시 불러오는 중입니다. 완료될 때까지 변경 요청을 막습니다.</p>}
+    {notice && <div className={notice.tone === 'success' ? styles.success : styles.failure} role={notice.tone === 'success' ? 'status' : 'alert'}>
+      <strong>{notice.title}</strong>{notice.description && <p>{notice.description}</p>}
+    </div>}
     <CaseOverview item={item} />
     <div className={styles.detailGrid}>
       <div className={styles.mainColumn}>
         <SourcePanel caseId={item.caseId} eventId={item.eventId} />
+        <PreparationPanels view={item} locked={locked} onOutcome={onOutcome} refreshKey={refreshKey} />
       </div>
       <aside className={styles.sideColumn} aria-label="활동 이력과 업무 동작">
-        <ActivityPanel caseId={item.caseId} />
+        {reviewerDenied && <p className={styles.blocked} role="note">현재 계정은 검토 담당(REVIEWER) 역할이 없어 서버가 변경 요청을 거부했습니다. 이 화면의 변경 동작을 막았습니다. 역할은 고객사 관리자에게 확인해 주세요.</p>}
+        {!reviewerDenied && <p className={styles.caution}>현재 계정의 역할을 조회하는 API가 없어 변경 동작을 표시합니다. 상태 변경, 담당자, Snapshot, 초안은 검토 담당 역할만 가능하며 서버가 최종 확인합니다.</p>}
+        <TransitionPanel view={item} locked={locked} onOutcome={onOutcome} />
+        <AssigneePanel view={item} locked={locked} onOutcome={onOutcome} />
+        {/* 활동 이력은 변경 성공이나 충돌 뒤 첫 페이지부터 다시 조회한다. */}
+        <ActivityPanel key={refreshKey} caseId={item.caseId} />
         <Card className={styles.panel}>
-          <h2>업무 동작</h2>
-          <p className={styles.caution}>이번 화면은 조회 전용입니다. 담당자 지정, 상태 변경, EvidenceSnapshot, 보고서, 승인, 공식 PDF 기능은 연결하지 않아 실행할 수 없습니다.</p>
+          <h2>후속 단계</h2>
+          <p className={styles.caution}>승인 요청, 승인 결정, 검토 확인, 공식 PDF 발급은 이번 범위에서 연결하지 않아 실행할 수 없습니다. 보고서 초안 저장은 승인이나 PDF 발급이 아닙니다.</p>
           <div className={styles.actions}>
-            <Button variant="secondary" disabled>담당자 변경</Button>
-            <Button variant="secondary" disabled>상태 변경</Button>
-            <Button variant="secondary" disabled>EvidenceSnapshot 생성</Button>
-            <Button variant="secondary" disabled>보고서 초안 작성</Button>
             <Button variant="secondary" disabled>승인 요청</Button>
             <Button variant="secondary" disabled>공식 PDF 발급</Button>
           </div>
