@@ -1,11 +1,12 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { describeAdminApiFailure } from '../../api/adminApiFailure'
-import { Button } from '../../components/common/Button'
 import { Card } from '../../components/common/Card'
 import { DataTable } from '../../components/common/DataTable'
 import { EmptyState, ErrorState, LoadingSkeleton } from '../../components/common/Feedback'
 import { PageHeader } from '../../components/common/PageHeader'
 import { useAdminQuery } from '../admin-auth/useAdminQuery'
+import { CreateCasePanel } from '../admin-cases/CreateCasePanel'
+import { isCanonicalAnalysisRequestId } from '../admin-cases/caseWorkflowApi'
 import { useAccessibleEvents } from '../admin-events/useAccessibleEvents'
 import {
   formatAlgorithm, formatAnalyzedAt, formatRiskScore, readTrack1ClusterKey, track1ClusterDetailPath, track1ClusterDetailSchema, track1ListRoute,
@@ -16,6 +17,7 @@ import styles from './Track1.module.css'
 // 인증된 관리자의 Track 1 군집 상세다. eventId, analysisRequestId, clusterId를 주소에서 읽어 함께 조회하므로 직접 주소로 접근해도 같은 군집을 연다.
 // 공연은 접근 가능 공연 목록에서 확인된 뒤에만 상세를 조회한다.
 // 현재 응답은 저장된 구성원 식별자와 분석 메타데이터뿐이므로 공유 신호와 그래프 간선을 만들지 않고 미지원으로 표시한다.
+// Case 생성은 서버가 확인한 이 군집의 공연, 분석 요청 ID, 군집 ID만 출처로 보내며 관리자가 사유를 입력해 명시적으로 요청할 때만 실행한다.
 
 type Member = Track1ClusterDetail['members'][number]
 
@@ -100,7 +102,8 @@ function ClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey }) {
       </div>
       <div className={styles.detailColumn}>
         <Card className={styles.panel}><h2>확인된 사실과 검토 사항</h2><h3>저장 증거로 확인되는 사실</h3><p>분석 요청에서 이 군집에 속한 것으로 저장된 계정과 예매 참조만 표시했습니다.</p><h3>추가 검토 사항</h3><p>중복 저장 방지로 일부 구성원이 저장되지 않았을 수 있습니다. 전체 분석 스냅샷이나 확정 판정으로 해석하지 마세요.</p><p className={styles.warning}>군집 소속이나 조사 우선순위만으로 동일인 또는 부정 거래를 판단하지 마세요.</p></Card>
-        <Card className={styles.panel}><h2>후속 조치</h2><Button disabled>Case 생성</Button><p className={styles.muted}>Case 생성 화면은 이번 범위에서 연결하지 않았습니다.</p></Card>
+        <CreateCasePanel context="Track 1 저장 군집" sources={{ eventId: event.id, graphClusters: [{ analysisRequestId: cluster.analysisRequestId, clusterId: cluster.clusterId }], fanReportIds: [], evidenceIds: [] }}
+          blockedReason={isCanonicalAnalysisRequestId(cluster.analysisRequestId) ? null : '이 군집의 분석 요청 ID가 소문자 UUID 형식이 아니어서 서버 계약상 Case 출처로 연결할 수 없습니다. 분석 결과를 다시 반입해야 하며 화면에서 ID를 바꾸지 않습니다.'} />
       </div>
     </div>
   </div>
