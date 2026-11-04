@@ -122,7 +122,7 @@ const candidateMatchSchema = z.object({ status: z.literal('NOT_LINKED'), reason:
 // 실행 상태와 결과 상태의 조합을 계약대로 확인한다.
 // SUCCEEDED는 COMPLETED, PARTIAL, UNVERIFIABLE 중 하나와 9개 필드를 가진다. IN_PROGRESS는 결과가 없다.
 // 그 외 종료 상태는 항상 FAILED이고 fields가 null이다. 실패 이력을 정상 빈 추출로 바꾸지 않기 위해서다.
-const analysisSchema = z.object({
+export const listingAnalysisSchema = z.object({
   analysisId: uuid,
   fanReportId: uuid,
   evidenceId: uuid,
@@ -148,7 +148,7 @@ const analysisSchema = z.object({
 })
 
 export const listingAnalysisPageSchema = z.object({
-  items: z.array(analysisSchema),
+  items: z.array(listingAnalysisSchema),
   page: z.number().int().nonnegative(),
   pageSize: z.number().int().min(1).max(100),
   hasNext: z.boolean(),
@@ -158,7 +158,7 @@ export type FanReportSummary = z.infer<typeof summarySchema>
 export type FanReportPage = z.infer<typeof fanReportPageSchema>
 export type FanReportDetail = z.infer<typeof fanReportDetailSchema>
 export type FanReportEvidence = FanReportDetail['evidence'][number]
-export type ListingAnalysis = z.infer<typeof analysisSchema>
+export type ListingAnalysis = z.infer<typeof listingAnalysisSchema>
 export type ListingField = z.infer<typeof fieldSchema>
 
 export function fanReportListPath(eventId: string, page: number, intakeStatus: IntakeStatus | null) {
@@ -173,6 +173,11 @@ export function fanReportDetailPath(fanReportId: string) {
 
 export function listingAnalysesPath(fanReportId: string, evidenceId: string, page: number) {
   return adminApiPath(`/api/v1/admin/fan-reports/${fanReportId}/evidence/${evidenceId}/listing-analyses`, { page, pageSize: listingAnalysisPageSize })
+}
+
+/** 분석 실행 POST 경로. 이력 조회와 같은 자원이며 쿼리와 요청 본문 없이 제보와 증거 ID만 쓴다. */
+export function listingAnalysisRunPath(fanReportId: string, evidenceId: string) {
+  return `/api/v1/admin/fan-reports/${fanReportId}/evidence/${evidenceId}/listing-analyses`
 }
 
 /** 관리자 증거 원본 이미지 경로. 저장소 주소, 객체 키, 사전 서명 URL이 아닌 Backend 프록시 API만 사용한다. */

@@ -132,4 +132,40 @@ describe('관리자 공통 API 클라이언트', () => {
       expect(fetchImpl.mock.calls[0][1]).toMatchObject({ method, redirect: 'error', credentials: 'omit' })
     }
   })
+  it('검증된 UUID v4 Idempotency-Key만 본문 없는 POST에 붙이고 기존 보안 옵션을 유지한다', async () => {
+    const key = '0f8fad5b-d9cb-469f-a165-70867728950e'
+    const { client, fetchImpl } = setup(jsonResponse(201, { id: 'run-1' }))
+    const path = '/api/v1/admin/fan-reports/r-1/evidence/e-1/listing-analyses'
+    await expect(client.request(path, { method: 'POST', idempotencyKey: key, successStatus: 201, schema: itemSchema })).resolves.toEqual({ kind: 'success', status: 201, data: { id: 'run-1' } })
+    const [url, init] = fetchImpl.mock.calls[0]
+    expect(url).toBe(path)
+    expect(init).toMatchObject({ method: 'POST', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' })
+    expect(init?.body).toBeUndefined()
+    expect(init?.headers).toEqual({ Accept: 'application/json, application/problem+json', Authorization: `Bearer ${SYNTHETIC_TOKEN}`, 'Idempotency-Key': key })
+  })
+
+  it('UUID v4가 아니거나 POST가 아닌 요청의 Idempotency-Key는 요청 전에 거부한다', async () => {
+    const invalid: [string, 'GET' | 'POST' | 'PUT'][] = [
+      ['0f8fad5b-d9cb-169f-a165-70867728950e', 'POST'],
+      ['0f8fad5b-d9cb-469f-c165-70867728950e', 'POST'],
+      ['not-a-uuid', 'POST'],
+      ['0f8fad5b-d9cb-469f-a165-70867728950e\r\nX-Injected: 1', 'POST'],
+      ['', 'POST'],
+      ['0f8fad5b-d9cb-469f-a165-70867728950e', 'GET'],
+      ['0f8fad5b-d9cb-469f-a165-70867728950e', 'PUT'],
+    ]
+    for (const [key, method] of invalid) {
+      const { client, fetchImpl } = setup(jsonResponse(201, { id: 'x' }))
+      await expect(client.request('/api/v1/admin/fan-reports/r-1/evidence/e-1/listing-analyses', { method, idempotencyKey: key, schema: itemSchema }), key).rejects.toThrow(TypeError)
+      expect(fetchImpl).not.toHaveBeenCalled()
+    }
+  })
+
+  it('지정한 성공 상태와 다른 2xx 응답은 성공으로 처리하지 않는다', async () => {
+    const { client } = setup(jsonResponse(200, { id: 'run-1' }))
+    await expect(client.request('/api/v1/cases', { method: 'POST', successStatus: 201, schema: itemSchema })).resolves.toEqual({ kind: 'invalidResponse', status: 200 })
+    const plain = setup(jsonResponse(200, { id: 'x' }))
+    await plain.client.request('/api/v1/cases', { schema: itemSchema })
+    expect(Object.keys(plain.fetchImpl.mock.calls[0][1]?.headers as Record<string, string>)).not.toContain('Idempotency-Key')
+  })
 })

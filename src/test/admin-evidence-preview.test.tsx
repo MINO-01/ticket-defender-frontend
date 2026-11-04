@@ -376,8 +376,8 @@ describe('관리자 증거 원본 미리보기', () => {
     expect(liveUrls()).toEqual(['blob:synthetic-2'])
   })
 
-  it('다운로드, 분석 실행, 예매 대조, Case 생성은 연결하지 않고 이미지와 토큰을 브라우저 저장소에 남기지 않는다', async () => {
-    stubFetch(() => image(SYNTHETIC_PNG, 'image/png'))
+  it('다운로드, 예매 대조, Case 생성은 연결하지 않고 미리보기가 분석을 요청하지 않으며 이미지와 토큰을 브라우저 저장소에 남기지 않는다', async () => {
+    const fetchMock = stubFetch(() => image(SYNTHETIC_PNG, 'image/png'))
     renderApp()
     const region = await openPreview()
     const img = await within(region).findByRole('img')
@@ -385,7 +385,8 @@ describe('관리자 증거 원본 미리보기', () => {
     expect(screen.queryByRole('link', { name: /다운로드/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /다운로드/ })).not.toBeInTheDocument()
     expect(document.querySelector('a[download]')).toBeNull()
-    for (const name of ['이미지 분석 실행', '예매 후보 대조', 'Case 생성']) expect(screen.getByRole('button', { name })).toBeDisabled()
+    for (const name of ['예매 후보 대조', 'Case 생성']) expect(screen.getByRole('button', { name })).toBeDisabled()
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
     const stored = JSON.stringify({ ...sessionStorage, ...localStorage })
     expect(stored).not.toContain(SYNTHETIC_TOKEN)
     expect(stored).not.toContain('blob:')
