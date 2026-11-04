@@ -40,6 +40,17 @@
 .timeline p{margin:5px 0 0;font-size:14px;line-height:1.6}
 .actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}
 .actions button{min-width:0;white-space:normal}
+.serverFilters{display:grid;grid-template-columns:minmax(180px,260px);gap:12px}
+.serverFilters label{display:grid;gap:7px;color:var(--color-text-secondary);font-size:13px;font-weight:600}
+.serverFilters select{width:100%;min-height:42px;border:1px solid var(--color-border);border-radius:8px;background:#fff;padding:0 12px;color:var(--color-text);font:inherit;font-size:14px}
+.serverFilters select:focus-visible,.backLink:focus-visible{outline:3px solid var(--color-primary-500);outline-offset:2px}
+.backLink{width:fit-content;color:var(--color-primary-700);font-size:14px;font-weight:700;text-underline-offset:3px}
+.idCell{font-family:var(--font-mono,monospace);font-size:12px;overflow-wrap:anywhere}
+.plainText{white-space:pre-wrap;overflow-wrap:anywhere}
+.activityFacts{display:grid;gap:6px;margin:8px 0 0;font-size:13px}
+.activityFacts div{display:grid;grid-template-columns:88px minmax(0,1fr);gap:8px}
+.activityFacts dt{color:var(--color-text-secondary)}
+.activityFacts dd{margin:0;overflow-wrap:anywhere}
 @media(max-width:1100px){.filters{grid-template-columns:repeat(3,minmax(0,1fr))}.filters .search{grid-column:span 2}.detailGrid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:680px){.page{gap:16px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metrics>section{padding:16px}.metrics strong{font-size:24px}.filterCard,.tableCard,.panel,.overview{padding:18px}.filters{grid-template-columns:repeat(2,minmax(0,1fr))}.filters .search{grid-column:1/-1}.filters>button{grid-column:1/-1}.overviewGrid,.source .definition{grid-template-columns:repeat(2,minmax(0,1fr))}.reviewGrid{grid-template-columns:minmax(0,1fr)}.reviewGrid .unknowns{grid-column:auto}.actions{grid-template-columns:minmax(0,1fr)}.pagination{justify-content:center}}
 @media(max-width:420px){.overviewGrid,.source .definition{grid-template-columns:minmax(0,1fr)}.filters{grid-template-columns:minmax(0,1fr)}.filters .search{grid-column:auto}}
