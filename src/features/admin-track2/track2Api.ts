@@ -32,7 +32,7 @@ function toInstant(value: string) {
 }
 
 const offsetDateTime = z.string().refine((value) => offsetDateTimePattern.test(value) && !Number.isNaN(Date.parse(value)))
-const utcDateTime = z.string().refine((value) => utcDateTimePattern.test(value) && !Number.isNaN(Date.parse(toInstant(value))))
+export const utcDateTime = z.string().refine((value) => utcDateTimePattern.test(value) && !Number.isNaN(Date.parse(toInstant(value))))
 const uuid = z.string().refine(isUuid).transform((value) => value.toLowerCase())
 
 const eventSchema = z.object({ id: uuid, externalEventId: z.string(), name: z.string().min(1) })
