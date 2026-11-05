@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
+import { track2PipelineDefault } from './track2PipelineDefaults'
 import type { AdminAuthAdapter } from '../features/admin-auth/authAdapter'
 
 // Mock 인증 어댑터와 fetch로 관리자 Track 2 이미지 분석 실행 POST 연동 계약을 검증한다.
@@ -104,6 +105,8 @@ function stubFetch(route: Route, detailBody: unknown = detail()) {
     if (custom) return custom
     if (url === detailPath) return json(200, detailBody)
     if (url.includes('/listing-analyses?')) return json(200, historyPage())
+    const pipeline = track2PipelineDefault(url, init?.method ?? 'GET')
+    if (pipeline) return pipeline
     throw new Error(`예상하지 못한 요청: ${url}`)
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -225,8 +228,9 @@ describe('Track 2 이미지 분석 결과 상태', () => {
     expect(region).toHaveTextContent('사람의 확인이 필요한 관찰 후보')
     await waitFor(() => expect(historyGets(calls)).toHaveLength(2))
     expect(await screen.findByRole('article', { name: /분석 시도/ })).toBeInTheDocument()
-    // 결과 화면은 예매 대조를 연결하지 않는다.
-    expect(screen.queryByText(/MATCH_CANDIDATE|일치 후보 발견|부정 거래 확정/)).not.toBeInTheDocument()
+    // 분석 결과가 예매 후보 대조를 자동으로 실행하거나 후보 결과를 만들지 않는다. 후보 대조는 관리자가 따로 눌러야 한다.
+    expect(calls.some((call) => call.url.includes('/candidate-matches'))).toBe(false)
+    expect(screen.queryByText(/MATCH_CANDIDATE|일치 후보 발견|후보 실행 기록이 생성/)).not.toBeInTheDocument()
   })
 
   it('확정된 분석 실패는 정상 빈 결과로 바꾸지 않고 실패 이력을 다시 조회하며 새 키로만 다시 실행한다', async () => {
@@ -454,15 +458,13 @@ describe('Track 2 이미지 분석 실행 회귀', () => {
     expect(within(screen.getByRole('region', { name: '원본 이미지 미리보기' })).getByRole('button', { name: '원본 미리보기' })).toBeEnabled()
   })
 
-  it('예매 후보 대조, 수동 교정은 계속 비활성화하고 분석 결과로 Case를 자동 생성하지 않는다', async () => {
+  it('수동 교정은 계속 비활성화하고 분석 결과로 후보 대조나 Case를 자동 실행하지 않는다', async () => {
     const calls = stubFetch(postSequence(() => json(201, analysis())))
     await openDetail()
     await clickRun()
     await within(runRegion()).findByText('분석 요청이 끝났습니다')
-    for (const name of ['예매 후보 대조', '관찰값 수동 교정']) {
-      expect(screen.getByRole('button', { name })).toBeDisabled()
-    }
-    expect(calls.some((call) => call.url.startsWith('/api/v1/cases'))).toBe(false)
+    expect(screen.getByRole('button', { name: '관찰값 수동 교정' })).toBeDisabled()
+    expect(calls.some((call) => call.url.startsWith('/api/v1/cases') || call.url.includes('/candidate-matches'))).toBe(false)
   })
 
   it('요청 키를 브라우저 저장소에 남기지 않는다', async () => {

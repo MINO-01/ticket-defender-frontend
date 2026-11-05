@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
+import { track2PipelineDefault } from './track2PipelineDefaults'
 import type { AdminAuthAdapter } from '../features/admin-auth/authAdapter'
 import { readBlobBytes, SYNTHETIC_JPEG, SYNTHETIC_PNG } from './syntheticImages'
 
@@ -78,7 +79,7 @@ type Route = (url: string) => Response | Promise<Response> | undefined
 function stubFetch(content: Route, extra: Route = () => undefined) {
   const fetchMock = vi.fn<typeof fetch>(async (input) => {
     const url = String(input)
-    const response = await (url.endsWith('/content') ? content(url) : extra(url) ?? (url === detailPath() ? json(200, detail()) : url.includes('/listing-analyses?') ? json(200, emptyHistory) : undefined))
+    const response = await (url.endsWith('/content') ? content(url) : extra(url) ?? (url === detailPath() ? json(200, detail()) : url.includes('/listing-analyses?') ? json(200, emptyHistory) : track2PipelineDefault(url)))
     if (!response) throw new Error(`예상하지 못한 요청: ${url}`)
     return response
   })
@@ -385,7 +386,8 @@ describe('관리자 증거 원본 미리보기', () => {
     expect(screen.queryByRole('link', { name: /다운로드/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /다운로드/ })).not.toBeInTheDocument()
     expect(document.querySelector('a[download]')).toBeNull()
-    expect(screen.getByRole('button', { name: '예매 후보 대조' })).toBeDisabled()
+    // 예매 후보 대조는 Issue #37에서 분석별 명시적 실행으로 연결했고, 수동 교정은 계속 막는다.
+    expect(screen.getByRole('button', { name: '관찰값 수동 교정' })).toBeDisabled()
     // Case 생성은 관리자가 사유를 입력해 누를 때만 요청한다. 미리보기는 생성 요청을 만들지 않는다.
     expect(screen.getByRole('region', { name: 'Case 생성' })).toBeInTheDocument()
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)

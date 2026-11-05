@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
+import { track2PipelineDefault, withoutPipelineReads } from './track2PipelineDefaults'
 import type { AdminAuthAdapter } from '../features/admin-auth/authAdapter'
 
 // Mock 인증 어댑터와 fetch로 관리자 Track 2 팬 제보 조회 API 연동 계약을 검증한다.
@@ -128,7 +129,7 @@ type Route = (url: string) => Response | Promise<Response> | undefined
 function stubFetch(route: Route) {
   const fetchMock = vi.fn<typeof fetch>(async (input) => {
     const url = String(input)
-    const response = await route(url)
+    const response = await route(url) ?? track2PipelineDefault(url)
     if (!response) throw new Error(`예상하지 못한 요청: ${url}`)
     return response
   })
@@ -136,7 +137,8 @@ function stubFetch(route: Route) {
   return fetchMock
 }
 
-const requestedUrls = (fetchMock: ReturnType<typeof stubFetch>) => fetchMock.mock.calls.map(([url]) => String(url))
+// 회차 영역의 기본 조회(Issue #37)는 각 테스트의 요청 순서 검증 대상이 아니어서 뺀다.
+const requestedUrls = (fetchMock: ReturnType<typeof stubFetch>) => withoutPipelineReads(fetchMock.mock.calls.map(([url]) => String(url)))
 
 /** 기본 상세 응답과 증거별 분석 이력을 돌려주는 라우터다. */
 function detailRoute(history: Record<string, unknown> = { [historyPath()]: analysisPage([analysis()]), [historyPath(EVIDENCE_2)]: analysisPage() }, body = detail()): Route {
@@ -358,7 +360,7 @@ describe('Track 2 팬 제보 상세 실제 API', () => {
     expect(container.querySelector('a[href*="listing.invalid"], iframe, img')).toBeNull()
     expect(screen.getByText(/<img src=x onerror=alert\(1\)> 합성 설명/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '← 제보 목록' })).toHaveAttribute('href', `/app/fan-reports?eventId=${EVENT_A}`)
-    await screen.findByText('예매 대조 미연결 (검증된 회차 정보가 없습니다)')
+    await screen.findByText('분석 시점 미연결 (검증된 회차 정보가 없습니다)')
     // 상세 직접 주소는 상세와 상세 응답의 증거 ID로만 조회한다.
     expect(requestedUrls(fetchMock)).toEqual([detailPath(), historyPath()])
   })
@@ -441,9 +443,8 @@ describe('Track 2 팬 제보 상세 실제 API', () => {
   it('범위 밖 기능은 비활성화하고 분석 실행은 클릭 전 요청하지 않으며 데모 대조 결과를 만들지 않는다', async () => {
     const fetchMock = stubFetch(detailRoute())
     renderApp(`/app/fan-reports/${REPORT_1}`)
-    for (const name of ['예매 후보 대조', '관찰값 수동 교정']) {
-      expect(await screen.findByRole('button', { name })).toBeDisabled()
-    }
+    // 예매 후보 대조는 Issue #37에서 분석별 명시적 실행으로 연결했다. 수동 교정은 계속 막는다.
+    expect(await screen.findByRole('button', { name: '관찰값 수동 교정' })).toBeDisabled()
     // Case 생성은 사유를 입력해 명시적으로 누를 때만 요청한다.
     expect(screen.getByRole('region', { name: 'Case 생성' })).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: '이미지 분석 실행' })).getByRole('button', { name: '이미지 분석 실행' })).toBeEnabled()
@@ -489,7 +490,7 @@ describe('Track 2 증거별 분석 이력 실제 API', () => {
     // LocalDateTime 분석 시각은 계약대로 UTC로 표시하고 브라우저 시간대로 바꾸지 않는다.
     expect(within(attempt).getByText('2026-11-01 10:00 UTC')).toBeInTheDocument()
     expect(within(attempt).getByText('접수 원본과 SHA-256 일치')).toBeInTheDocument()
-    expect(within(attempt).getByText('예매 대조 미연결 (검증된 회차 정보가 없습니다)')).toBeInTheDocument()
+    expect(within(attempt).getByText('분석 시점 미연결 (검증된 회차 정보가 없습니다)')).toBeInTheDocument()
 
     const eventName = within(attempt).getByRole('region', { name: '공연명 관찰' })
     expect(within(eventName).getByText('관찰 후보')).toBeInTheDocument()
@@ -533,7 +534,7 @@ describe('Track 2 증거별 분석 이력 실제 API', () => {
     const failed = attempts[1]
     expect(within(failed).getByRole('alert')).toHaveTextContent('정상적인 빈 추출 결과가 아닙니다')
     expect(within(failed).getByText(/ANALYZER_MODEL_FAILED/)).toHaveTextContent('ANALYZER_MODEL_FAILED, 분석 서버 형식을 확인할 수 없는 코드 (HTTP 502)')
-    expect(within(failed).getByText('예매 대조 미연결 (분석이 성공하지 않았습니다)')).toBeInTheDocument()
+    expect(within(failed).getByText('분석 시점 미연결 (분석이 성공하지 않았습니다)')).toBeInTheDocument()
     expect(within(failed).queryByRole('region', { name: '공연명 관찰' })).not.toBeInTheDocument()
     expect(screen.queryByText(/SQLException|tenant secret/)).not.toBeInTheDocument()
   })
