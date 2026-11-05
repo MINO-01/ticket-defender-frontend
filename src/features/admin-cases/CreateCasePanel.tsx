@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/common/Button'
@@ -26,9 +26,13 @@ type Props = {
   blockedReason?: string | null
   /** 출처 선택 같은 화면별 추가 입력 */
   children?: ReactNode
+  /** 사용자가 고칠 수 있는 출처 선택 문제. 사유 입력은 막지 않고 생성 버튼만 막는다. */
+  sourceIssue?: string | null
+  /** 요청 중이거나 결과 미확인 상태가 바뀔 때 알린다. 패널 밖의 출처 선택을 같은 기간 동안 잠그는 데 쓴다. */
+  onBusyChange?: (busy: boolean) => void
 }
 
-export function CreateCasePanel({ context, sources, blockedReason = null, children }: Props) {
+export function CreateCasePanel({ context, sources, blockedReason = null, children, sourceIssue = null, onBusyChange }: Props) {
   const navigate = useNavigate()
   const [reason, setReason] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -38,13 +42,15 @@ export function CreateCasePanel({ context, sources, blockedReason = null, childr
   const type = caseTypeFor(sources)
   // 결과를 확인하지 못한 요청의 본문이다. 재확인 응답도 이 본문 기준으로 검증한다.
   const sentBody = useRef<CreateCaseBody | null>(null)
+  const busy = sending || uncertain
+  useEffect(() => { onBusyChange?.(busy) }, [busy, onBusyChange])
 
   const finish = (next: Awaited<ReturnType<typeof submit>>) => {
     if (next?.kind === 'succeeded') navigate(caseDetailRoute(next.data.caseId, next.data.eventId))
   }
 
   const onSubmit = () => {
-    if (blockedReason !== null) return
+    if (blockedReason !== null || sourceIssue !== null) return
     const built = buildCreateCaseRequest({ ...sources, reason })
     if (!built.ok) { setErrors(built.errors); return }
     setErrors({})
@@ -68,10 +74,11 @@ export function CreateCasePanel({ context, sources, blockedReason = null, childr
     <Textarea label="생성 사유" required value={reason} maxLength={2000} rows={3} disabled={sending || uncertain || blockedReason !== null}
       onChange={(change) => setReason(change.target.value)} error={errors.reason} placeholder="조사가 필요한 이유를 3자 이상 입력해 주세요" />
     {errors.sources && <p className={styles.fieldError} role="alert">{errors.sources}</p>}
+    {sourceIssue !== null && !uncertain && <p className={styles.fieldError}>{sourceIssue}</p>}
     <div className={styles.formActions}>
       {uncertain
         ? <Button onClick={onReconfirm} loading={sending}>같은 요청 재확인</Button>
-        : <Button onClick={onSubmit} loading={sending} disabled={blockedReason !== null}>{sending ? 'Case 생성 요청 중' : 'Case 생성'}</Button>}
+        : <Button onClick={onSubmit} loading={sending} disabled={blockedReason !== null || sourceIssue !== null}>{sending ? 'Case 생성 요청 중' : 'Case 생성'}</Button>}
     </div>
     <MutationStatus attempt={attempt} successText={null} />
   </Card>

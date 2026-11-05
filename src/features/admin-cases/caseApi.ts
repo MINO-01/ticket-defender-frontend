@@ -77,7 +77,20 @@ const reportSourceSchema = z.object({ ...sourceBase, sourceType: z.literal('FAN_
 const assetSourceSchema = z.object({ ...sourceBase, sourceType: z.literal('EVIDENCE_ASSET') })
   .refine((item) => item.fanReportId !== null && item.evidenceId !== null && clusterFieldsEmpty(item))
 
-export const caseSourceListSchema = z.array(z.union([clusterSourceSchema, reportSourceSchema, assetSourceSchema]))
+// Track 2 후보 실행 출처다. 연결 시점의 실행 상태와 사유를 그대로 보존한 값이며 부정 거래 확정이나 승인 근거가 아니다.
+// candidateApplicability는 조회 시점에 서버가 다시 계산한 값이다. candidateId는 불투명한 내부 참조이며 예매번호나 HMAC 값이 아니다.
+const candidateSourceSchema = z.object({
+  ...sourceBase,
+  sourceType: z.literal('LISTING_CANDIDATE_MATCH'),
+  candidateRunId: uuid.nullable(),
+  candidateStatus: z.string().min(1).nullable(),
+  candidateReason: z.string().min(1).nullable(),
+  candidateCount: z.number().int().nonnegative().nullable(),
+  candidateId: uuid.nullable(),
+  candidateApplicability: z.string().min(1).nullable(),
+}).refine((item) => item.fanReportId !== null && item.evidenceId !== null && item.candidateRunId !== null && clusterFieldsEmpty(item))
+
+export const caseSourceListSchema = z.array(z.union([clusterSourceSchema, reportSourceSchema, assetSourceSchema, candidateSourceSchema]))
 
 const activitySchema = z.object({
   activityId: uuid,

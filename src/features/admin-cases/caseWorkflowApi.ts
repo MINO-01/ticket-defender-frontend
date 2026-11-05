@@ -158,6 +158,8 @@ export type CreateCaseInput = {
   graphClusters: GraphClusterSource[]
   fanReportIds: string[]
   evidenceIds: string[]
+  /** 선택한 Track 2 후보 실행 ID. 서버 이력 응답의 runId만 넣는다. 비어 있으면 요청 본문에 넣지 않는다. */
+  candidateRunIds?: string[]
   reason: string
 }
 
@@ -167,6 +169,8 @@ export type CreateCaseBody = {
   graphClusters: GraphClusterSource[]
   fanReportIds: string[]
   evidenceIds: string[]
+  /** 후보 실행을 선택한 경우에만 보낸다. 선택하지 않은 기존 요청 본문은 바뀌지 않는다. */
+  candidateRunIds?: string[]
   reason: string
   relatedCaseId: null
   relationReason: null
@@ -185,27 +189,34 @@ export function caseTypeFor(input: Pick<CreateCaseInput, 'graphClusters' | 'fanR
 /**
  * CaseSourceVerifier 사전 규칙과 같은 조건으로 생성 요청을 만든다. 출처 존재, 고객사와 공연 범위, 보존 기한, 원본 상태는 서버만 확인한다.
  * 후속 Case(relatedCaseId) 연결은 이번 범위에서 제공하지 않아 항상 null로 보낸다.
+ * 후보 실행은 제보와 증거 출처에 덧붙는 출처일 뿐이라 후보만으로 Case를 만들지 않고, 군집만 있는 GRAPH_CLUSTER에는 연결하지 않는다.
+ * 실행이 종료되었고 CURRENT인지, 소속 제보와 증거가 요청에 함께 있는지는 서버가 다시 확인한다.
  */
 export function buildCreateCaseRequest(input: CreateCaseInput): Validated<CreateCaseBody> {
   const reason = javaTrim(input.reason)
   const type = caseTypeFor(input)
   const clusterKeys = input.graphClusters.map((item) => `${item.analysisRequestId}\u0000${item.clusterId}`)
-  const total = input.graphClusters.length + input.fanReportIds.length + input.evidenceIds.length
+  const candidateRunIds = input.candidateRunIds ?? []
+  const total = input.graphClusters.length + input.fanReportIds.length + input.evidenceIds.length + candidateRunIds.length
   let sources: string | null = null
   if (!isUuid(input.eventId)) sources = '공연 범위를 확인하지 못했습니다.'
   else if (type === null) sources = '연결할 출처가 없습니다.'
   else if (input.evidenceIds.length > 0 && input.fanReportIds.length === 0) sources = '증거 이미지는 소속 제보와 함께만 연결할 수 있습니다.'
+  else if (candidateRunIds.length > 0 && (input.fanReportIds.length === 0 || input.evidenceIds.length === 0)) sources = '후보 실행은 소속 제보와 증거 이미지를 함께 연결할 때만 출처로 추가할 수 있습니다.'
   else if (total > maxCaseSources) sources = `출처는 최대 ${maxCaseSources}개까지 연결할 수 있습니다.`
   else if (input.graphClusters.some((item) => !isCanonicalAnalysisRequestId(item.analysisRequestId))) sources = '분석 요청 ID는 소문자 UUID 형식이어야 Case 출처로 연결할 수 있습니다.'
   else if (input.graphClusters.some((item) => javaTrim(item.clusterId) === '' || item.clusterId.length > 191)) sources = '군집 ID가 비어 있거나 너무 깁니다.'
   else if (input.fanReportIds.some((id) => !isUuid(id)) || input.evidenceIds.some((id) => !isUuid(id))) sources = '제보 또는 증거 ID 형식이 올바르지 않습니다.'
-  else if (new Set(clusterKeys).size !== clusterKeys.length || new Set(input.fanReportIds).size !== input.fanReportIds.length || new Set(input.evidenceIds).size !== input.evidenceIds.length) sources = '같은 출처가 중복되었습니다.'
+  else if (candidateRunIds.some((id) => !isUuid(id))) sources = '후보 실행 ID 형식이 올바르지 않습니다.'
+  else if (new Set(clusterKeys).size !== clusterKeys.length || new Set(input.fanReportIds).size !== input.fanReportIds.length || new Set(input.evidenceIds).size !== input.evidenceIds.length
+    || new Set(candidateRunIds.map((id) => id.toLowerCase())).size !== candidateRunIds.length) sources = '같은 출처가 중복되었습니다.'
   return collect({ sources, reason: textError(reason, 3, 2000) }, () => ({
     eventId: input.eventId.toLowerCase(),
     type: type as CaseType,
     graphClusters: input.graphClusters.map((item) => ({ analysisRequestId: item.analysisRequestId, clusterId: item.clusterId })),
     fanReportIds: input.fanReportIds.map((id) => id.toLowerCase()),
     evidenceIds: input.evidenceIds.map((id) => id.toLowerCase()),
+    ...(candidateRunIds.length > 0 ? { candidateRunIds: candidateRunIds.map((id) => id.toLowerCase()) } : {}),
     reason,
     relatedCaseId: null,
     relationReason: null,
@@ -467,10 +478,10 @@ const stateConflict = (description: string): WorkflowMessage => ({ title: '현�
 
 export const createCaseMessages: OperationMessages = {
   forbidden: { title: 'Case 생성에 필요한 역할이 없습니다', description: `Case 생성은 분석 담당(ANALYST) 또는 검토 담당(REVIEWER) 역할만 실행할 수 있어 서버가 거부했습니다. ${notApplied}` },
-  notFound: { title: '출처를 찾을 수 없거나 접근 범위 밖입니다', description: `출처가 없거나 다른 고객사 또는 다른 공연의 출처입니다. 두 경우는 구분해 안내하지 않습니다. Case를 만들지 않았습니다.` },
+  notFound: { title: '출처를 찾을 수 없거나 접근 범위 밖입니다', description: `출처가 없거나 다른 고객사 또는 다른 공연의 출처이거나, 후보 실행의 소속 제보와 증거가 요청에 함께 있지 않습니다. 각 경우는 구분해 안내하지 않습니다. Case를 만들지 않았습니다.` },
   codes: {
     SOURCE_ALREADY_LINKED: { title: '이미 진행 중인 Case에 연결된 출처입니다', description: '같은 출처를 가진 종결되지 않은 Case가 있어 새 Case를 만들지 않았습니다. Case 목록에서 기존 Case를 확인해 주세요.' },
-    SOURCE_NOT_AVAILABLE: { title: '보존 기한 또는 접수 상태 때문에 연결할 수 없는 출처입니다', description: '제보가 정상 접수 상태가 아니거나 보존 기한이 지났거나 증거 원본 저장이 확인되지 않았습니다. 원본 무결성 실패와는 다른 상태입니다. Case를 만들지 않았습니다.' },
+    SOURCE_NOT_AVAILABLE: { title: '보존 기한 또는 접수 상태 때문에 연결할 수 없는 출처입니다', description: '제보가 정상 접수 상태가 아니거나 보존 기한이 지났거나 증거 원본 저장이 확인되지 않았습니다. 후보 실행을 선택했다면 실행이 아직 진행 중이거나 현재 기준(CURRENT)이 아니게 된 경우도 포함됩니다. 원본 무결성 실패와는 다른 상태입니다. Case를 만들지 않았습니다.' },
     SOURCE_OBJECT_MISMATCH: { title: '증거 원본 상태가 접수 기록과 맞지 않습니다', description: '저장소의 원본 크기, 형식 또는 객체 버전이 접수 기록과 달라 원본 무결성을 확인하지 못했습니다. Case를 만들지 않았습니다.' },
     SOURCE_OBJECT_MISSING: { title: '증거 원본을 저장소에서 찾지 못했습니다', description: '접수 기록은 있지만 원본 객체가 없어 원본 무결성을 확인하지 못했습니다. Case를 만들지 않았습니다.' },
     SOURCE_CHANGED: { title: '확인 중에 출처 상태가 바뀌었습니다', description: '출처 확인과 저장 사이에 출처가 변경되어 Case를 만들지 않았습니다. 출처 상태를 다시 확인한 뒤 요청해 주세요.' },
