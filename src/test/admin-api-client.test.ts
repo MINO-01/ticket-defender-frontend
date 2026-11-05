@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { createAdminApiClient, isAllowedAdminApiPath } from '../api/adminApiClient'
+import { maxOfficialPdfBytes } from '../api/pdfResponse'
 
 // 실제 인증 제공자 없이 합성 토큰과 Mock fetch로 클라이언트 계약만 검증한다.
 const SYNTHETIC_TOKEN = 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJzeW50aGV0aWMtYWRtaW4ifQ.c3ludGhldGljLXNpZ25hdHVyZQ'
@@ -191,5 +192,68 @@ describe('관리자 공통 API 클라이언트', () => {
     const plain = setup(jsonResponse(200, { id: 'x' }))
     await plain.client.request('/api/v1/cases', { schema: itemSchema })
     expect(Object.keys(plain.fetchImpl.mock.calls[0][1]?.headers as Record<string, string>)).not.toContain('Idempotency-Key')
+  })
+
+  describe('공식 PDF 바이너리 요청', () => {
+    const path = '/api/v1/official-pdf-issuances/6b3f1c2e-8a4d-4f5b-9c6d-7e8f9a0b1c2d/download'
+    const pdf = (text: string) => new TextEncoder().encode(text)
+    const pdfResponse = (bytes: Uint8Array, headers: Record<string, string> = {}, status = 200) =>
+      new Response(bytes.slice(), { status, headers: { 'Content-Type': 'application/pdf', ...headers } })
+
+    it('Bearer와 기존 보안 옵션으로 GET하고 application/pdf 200 응답의 바이트만 돌려준다', async () => {
+      const bytes = pdf('%PDF-1.7\n합성 본문\n%%EOF\n')
+      const { client, fetchImpl } = setup(pdfResponse(bytes, { 'Content-Length': String(bytes.byteLength) }))
+      const result = await client.requestPdf(path)
+      expect(result.kind).toBe('success')
+      if (result.kind !== 'success') return
+      expect(result.data.byteSize).toBe(bytes.byteLength)
+      expect(Array.from(result.data.bytes)).toEqual(Array.from(bytes))
+      const [url, init] = fetchImpl.mock.calls[0]
+      expect(url).toBe(path)
+      expect(init?.headers).toMatchObject({ Authorization: `Bearer ${SYNTHETIC_TOKEN}`, Accept: 'application/pdf, application/problem+json' })
+      expect(init).toMatchObject({ method: 'GET', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' })
+    })
+
+    it('끝의 개행, 공백과 매개변수가 있는 Content-Type은 정상 PDF로 받는다', async () => {
+      const { client } = setup(pdfResponse(pdf('%PDF-1.4\nx\n%%EOF\r\n  \n'), { 'Content-Type': 'Application/PDF; charset=binary' }))
+      await expect(client.requestPdf(path)).resolves.toMatchObject({ kind: 'success' })
+    })
+
+    it.each([
+      ['JSON 형식', pdfResponse(pdf('%PDF-1.7\n%%EOF'), { 'Content-Type': 'application/json' })],
+      ['HTML 로그인 화면', new Response('<html>login</html>', { status: 200, headers: { 'Content-Type': 'text/html' } })],
+      ['형식 없음', new Response(pdf('%PDF-1.7\n%%EOF'), { status: 200 })],
+      ['PDF 서명 없음', pdfResponse(pdf('PK\u0003\u0004 not a pdf %%EOF'))],
+      ['끝 표시 없음(잘린 PDF)', pdfResponse(pdf('%PDF-1.7\n1 0 obj'))],
+      ['200이 아닌 2xx', pdfResponse(pdf('%PDF-1.7\n%%EOF'), {}, 206)],
+      ['Content-Length와 실제 크기 불일치', pdfResponse(pdf('%PDF-1.7\n%%EOF'), { 'Content-Length': '999' })],
+    ])('%s 응답은 PDF로 받지 않는다', async (_label, response) => {
+      const { client } = setup(response)
+      await expect(client.requestPdf(path)).resolves.toMatchObject({ kind: 'invalidResponse' })
+    })
+
+    it('Frontend 임시 상한을 넘는 선언 크기는 본문을 읽지 않고 거부한다', async () => {
+      const { client } = setup(pdfResponse(pdf('%PDF-1.7\n%%EOF'), { 'Content-Length': String(maxOfficialPdfBytes + 1) }))
+      await expect(client.requestPdf(path)).resolves.toMatchObject({ kind: 'invalidResponse' })
+    })
+
+    it('401은 세션을 정리하고, 403, 404, 409 코드는 기존 공통 처리로 구분한다', async () => {
+      const unauthorized = setup(new Response(null, { status: 401 }))
+      await expect(unauthorized.client.requestPdf(path)).resolves.toEqual({ kind: 'unauthenticated' })
+      expect(unauthorized.onUnauthorized).toHaveBeenCalledOnce()
+      await expect(setup(new Response(null, { status: 403 })).client.requestPdf(path)).resolves.toEqual({ kind: 'forbidden' })
+      await expect(setup(new Response(null, { status: 404 })).client.requestPdf(path)).resolves.toEqual({ kind: 'notFound' })
+      const conflict = new Response(JSON.stringify({ code: 'OFFICIAL_PDF_NOT_GENERATED' }), { status: 409, headers: { 'Content-Type': 'application/problem+json' } })
+      await expect(setup(conflict).client.requestPdf(path)).resolves.toEqual({ kind: 'problem', status: 409, code: 'OFFICIAL_PDF_NOT_GENERATED' })
+    })
+
+    it('토큰이 없거나 허용되지 않은 경로면 요청하지 않는다', async () => {
+      const anonymous = setup(pdfResponse(pdf('%PDF-1.7\n%%EOF')), null)
+      await expect(anonymous.client.requestPdf(path)).resolves.toEqual({ kind: 'unauthenticated' })
+      expect(anonymous.fetchImpl).not.toHaveBeenCalled()
+      const outside = setup(pdfResponse(pdf('%PDF-1.7\n%%EOF')))
+      await expect(outside.client.requestPdf('https://example.invalid/a.pdf')).rejects.toThrow(TypeError)
+      expect(outside.fetchImpl).not.toHaveBeenCalled()
+    })
   })
 })

@@ -581,7 +581,16 @@ describe('APPROVER 승인과 반려 결정', () => {
     expect(within(result).getByText(`${outcome === 'APPROVE' ? '승인됨' : '반려됨'} (${decided})`)).toBeInTheDocument()
     expect(within(result).getByText('차단 (BLOCKED)')).toBeInTheDocument()
     expect(within(result).getByText(/공식 PDF 발급이 아닙니다/)).toBeInTheDocument()
-    expect(within(await screen.findByRole('region', { name: '승인 요청 개요' })).getByText(new RegExp(`\\(${decided}\\)`))).toBeInTheDocument()
+    // 승인 결정 직후에만 결정 ID로 공식 PDF 화면에 이동하는 링크를 주며, 발급 자체는 보내지 않는다.
+    const pdfLink = within(result).queryByRole('link', { name: '공식 PDF 발급 화면으로 이동' })
+    if (outcome === 'APPROVE') expect(pdfLink).toHaveAttribute('href', `/app/report-center/decisions/${DECISION_1}`)
+    else expect(pdfLink).not.toBeInTheDocument()
+    expect(calls.some((call) => call.url.includes('official-pdf'))).toBe(false)
+    // 결정 POST 성공 뒤 요청 상세를 다시 GET하고, 그 응답의 상태가 개요에 반영될 때까지 기다린다.
+    // 재조회 중에는 이전 상태(PENDING)를 계속 보여 주므로 즉시 검사하지 않는다. 서버가 끝까지 PENDING이면 실패한다.
+    await waitFor(() => expect(gets(calls, requestPath)).toHaveLength(2))
+    await waitFor(() => expect(within(screen.getByRole('region', { name: '승인 요청 개요' })).getByText(new RegExp(`\\(${decided}\\)`))).toBeInTheDocument())
+    expect(within(screen.getByRole('region', { name: '승인 요청 개요' })).queryByText(/\(PENDING\)/)).not.toBeInTheDocument()
     // 사용한 영수증은 버리고 같은 화면에서 두 번째 결정을 보낼 수 없다.
     expect(screen.queryByRole('button', { name: '결정 제출' })).not.toBeInTheDocument()
     expect(document.body.textContent).not.toMatch(/부정 거래 확정|불법 거래 확정|자동 제재/)

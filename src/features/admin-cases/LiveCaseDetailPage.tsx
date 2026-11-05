@@ -26,7 +26,7 @@ import styles from './Cases.module.css'
 // 출처와 활동 이력은 상세 조회가 성공하고 공연이 확인된 뒤에만 요청한다.
 // 상태 변경, 담당자, EvidenceSnapshot, 보고서 초안은 쓰기 성공이나 버전 충돌 뒤 서버의 최신 Case를 다시 조회한다.
 // 재조회 중에는 직전에 확인한 Case를 표시하되 모든 쓰기를 막아 오래된 caseVersion으로 요청하지 않는다.
-// 승인 요청 제출은 이 화면에서, 철회와 승인 결정은 승인 요청 상세에서 한다. 공식 PDF 기능은 연결하지 않는다.
+// 승인 요청 제출은 이 화면에서, 철회와 승인 결정은 승인 요청 상세에서 한다. 공식 PDF는 보고서 센터에서 승인 결정 ID로만 다룬다.
 
 const listLink = '/app/cases'
 
@@ -108,7 +108,7 @@ function CaseDetail({ caseId, eventId }: { caseId: string; eventId: string | nul
         <ActivityPanel key={refreshKey} caseId={item.caseId} />
         <Card className={styles.panel}>
           <h2>후속 단계</h2>
-          <p className={styles.caution}>공식 PDF 발급은 별도 절차이며 이번 범위에서 연결하지 않아 실행할 수 없습니다. 보고서 초안 저장과 승인 결정은 PDF 발급이 아닙니다.</p>
+          <p className={styles.caution}>공식 PDF 발급은 별도 절차입니다. Case 화면에서는 승인 결정 ID를 찾는 계약이 없어 여기서 발급할 수 없고, 보고서 센터에서 승인 결정 ID로 진행합니다. 보고서 초안 저장과 승인 결정은 PDF 발급이 아닙니다.</p>
           <div className={styles.actions}>
             <Button variant="secondary" disabled>공식 PDF 발급</Button>
           </div>
