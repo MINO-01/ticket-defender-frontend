@@ -9,6 +9,7 @@ import { StatusBadge } from '../../components/common/StatusBadge'
 import { statusLabels } from '../../components/common/statusLabels'
 import { useAdminQuery } from '../admin-auth/useAdminQuery'
 import { formatRiskScore, track1DetailRoute } from '../admin-track1/track1Api'
+import { applicabilityLabels, candidateReasonLabels, candidateStatusLabels } from '../admin-track2/candidatePipelineApi'
 import { fanReportDetailRoute, formatUtc } from '../admin-track2/track2Api'
 import { isUuid } from '../fan-report/intakeConfig'
 import {
@@ -195,6 +196,25 @@ function SourceItem({ source, eventId }: { source: CaseSource; eventId: string }
       </dl>
       <p className={styles.caution}>제보 연결은 조사 대상이라는 뜻이며 제보 내용이 사실로 확인되었다는 뜻이 아닙니다.</p>
       <Link className={styles.detailLink} to={fanReportDetailRoute(fanReportId)}>제보 상세 보기</Link>
+    </article>
+  }
+  if (source.sourceType === 'LISTING_CANDIDATE_MATCH') {
+    // 계약 밖의 새 코드는 원래 코드 그대로 표시하고 다른 의미로 바꾸지 않는다.
+    const label = (labels: Record<string, string>, value: string | null) => value === null ? '기록 없음' : `${labels[value] ?? value} (${value})`
+    return <article className={styles.source} aria-label="Track 2 예매 후보 대조 실행">
+      <span className={styles.sourceType}>Track 2 예매 후보 대조 실행</span>
+      <dl className={styles.definition}>
+        <div><dt>소속 제보 ID</dt><dd className={styles.idCell}>{fanReportId}</dd></div>
+        <div><dt>소속 증거 ID</dt><dd className={styles.idCell}>{source.evidenceId}</dd></div>
+        <div><dt>후보 실행 ID</dt><dd className={styles.idCell}>{source.candidateRunId}</dd></div>
+        <div><dt>연결 시점 실행 결과</dt><dd>{label(candidateStatusLabels, source.candidateStatus)}</dd></div>
+        <div><dt>연결 시점 사유</dt><dd>{label(candidateReasonLabels, source.candidateReason)}</dd></div>
+        <div><dt>후보 개수</dt><dd>{source.candidateCount === null ? '조회하지 않음' : `${source.candidateCount}건`}</dd></div>
+        <div><dt>현재 적용 여부</dt><dd>{label(applicabilityLabels, source.candidateApplicability)}</dd></div>
+        {common}
+      </dl>
+      <p className={styles.caution}>연결 시점의 후보 실행 기록이며 조사 참고 자료입니다. 부정 거래나 불법 거래 확정이 아닙니다. 후보 실행이 연결된 Case는 승인 근거 정책이 확정되지 않아 승인 요청과 공식 PDF 발급이 차단됩니다(APPROVAL_BASIS_BLOCKED).</p>
+      <Link className={styles.detailLink} to={fanReportDetailRoute(fanReportId)}>소속 제보 상세 보기</Link>
     </article>
   }
   return <article className={styles.source} aria-label="Track 2 제보 증거 이미지">
