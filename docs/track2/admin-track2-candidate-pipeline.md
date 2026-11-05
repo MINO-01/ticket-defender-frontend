@@ -26,7 +26,8 @@ Backend 계약은 변경하지 않았습니다. 기준 문서는 Backend `docs/a
 
 | 위치 | 내용 |
 | --- | --- |
-| 제보 상세, `검증 회차` | 제보 공연의 회차 목록(ACTIVE/WITHDRAWN, revision, sourceVersion, 검증, 철회 시각), 등록, 근거 수정, 철회 |
+| `/app/verified-performances?eventId=` (관리 메뉴 `검증 회차 관리`) | 기존 접근 가능 공연 선택(AdminEventGate)으로 고른 공연의 회차 조회, 등록, 근거 수정, 철회. 팬 제보 API는 부르지 않습니다. TENANT_ADMIN과 REVIEWER가 씁니다. 팬 제보 목록의 `이 공연의 검증 회차 관리` 링크로도 엽니다. 미리보기에는 안내만 표시합니다. |
+| 제보 상세, `검증 회차` | 같은 회차 관리 영역을 재사용합니다. 제보 공연의 회차 목록(ACTIVE/WITHDRAWN, revision, sourceVersion, 검증, 철회 시각), 등록, 근거 수정, 철회 |
 | 제보 상세, `제보 회차 연결` | 현재 연결, ACTIVE 회차 선택 연결과 교체, 연결 철회, 연결 이력. 사람이 확인한 연결이며 이미지 분석의 공연 관찰값과 다른 기록이라고 표시합니다. |
 | 분석 이력의 각 시도, `예매 후보 대조` | 실행 완료(SUCCEEDED) 분석만 실행 버튼, 모든 분석은 이력 보기. 실행 결과와 후보 실행 이력(상태, 사유, 적용 여부, 후보 개수, 내부 후보 참조, revision, 출처 버전, SHA-256) |
 
@@ -59,7 +60,7 @@ Backend 계약은 변경하지 않았습니다. 기준 문서는 Backend `docs/a
 
 ## 계약 부족과 후속 연동
 
-- TENANT_ADMIN은 Backend 391e285에서 팬 제보 상세 GET이 403입니다. 회차 API는 쓸 수 있지만 현재 회차 관리 화면은 제보 상세 안에 있어 TENANT_ADMIN의 화면 진입점이 없습니다(격리 Chrome E2E에서 확인). 공연 단위 회차 화면이나 상세 조회 역할은 별도 결정이 필요합니다.
+- TENANT_ADMIN은 Backend 391e285에서 팬 제보 상세 GET이 403입니다(`AdminFanReportQueryService`는 ANALYST, REVIEWER만 허용). 이 권한은 확대하지 않았고, TENANT_ADMIN은 공연 단위 `검증 회차 관리` 화면에서 회차를 관리합니다. 제보별 회차 연결과 후보 대조는 제보 상세에 남아 TENANT_ADMIN은 쓸 수 없습니다(연결 API 자체는 TENANT_ADMIN도 허용하지만 연결할 제보를 화면에서 고를 수 없습니다).
 - 회차 조회 응답에 검증 근거가 없어 수정할 때 다시 입력해야 합니다.
 - 관찰값 수동 교정 API가 없어 수동 교정은 제공하지 않습니다.
 - 후보 실행을 Case 출처로 연결하는 기능(Backend #70, 미병합)은 연결하지 않았습니다. Case 생성 화면은 기존 그대로입니다.
@@ -71,13 +72,15 @@ Backend 계약은 변경하지 않았습니다. 기준 문서는 Backend `docs/a
 | --- | --- |
 | `src/features/admin-track2/candidatePipelineApi.ts` | 스키마, 경로, 요청 본문, 상태와 사유, 적용 여부 문구, 쓰기 메시지 |
 | `src/features/admin-track2/usePerformanceWrite.ts` | 키 없는 회차 쓰기 시도 관리 |
-| `src/features/admin-track2/PerformancePanels.tsx` | 검증 회차, 제보 회차 연결 영역 |
+| `src/features/admin-track2/PerformancePanels.tsx` | 재사용 회차 목록 조회(`usePerformanceList`)와 회차 관리 영역(`PerformanceManagementCard`), 제보 회차 연결 영역 |
+| `src/features/admin-track2/LiveVerifiedPerformancePage.tsx` | 공연 단위 검증 회차 관리 화면 |
 | `src/features/admin-track2/candidateMatchRun.ts`, `useCandidateMatchRuns.ts` | 후보 대조 시도 분류와 분석별 시도 관리 |
 | `src/features/admin-track2/CandidateMatchSection.tsx` | 분석별 후보 대조 실행과 이력 |
 
 ## 테스트
 
 - `src/test/admin-track2-candidate.test.tsx`: 스키마와 UTC 해석, 문구 고유성, 회차 등록과 유실, 확정 거부, 수정 PATCH, 철회, 403과 404 영역 분리, 연결과 교체, 동시 변경 재확인 뒤 revision 충돌, 연결 철회와 키 재사용, 연결 이후 회차 변경 안내, 후보 실행과 중복 클릭, NOT_LINKED 분리, 모든 상태, 사유, 적용 여부, 응답 유실과 진행 중, 503 미기록, 403과 404, 다른 분석 응답, 실패 분석, 이력 페이지와 빈 이력, 이력 오류, 수동 교정 비활성
+- `src/test/admin-track2-performance-page.test.tsx`: 메뉴 진입과 공연 선택 전 미조회, 등록, 수정, 철회 계약, 403 역할 안내, 서버 404, 접근 목록 밖 공연 미조회, 다른 공연 응답 거부, 팬 제보 목록 링크, 팬 제보 API 미호출
 - `src/test/admin-api-client.test.ts`: PATCH와 메서드별 보안 옵션, `src/test/admin-case-workflow.test.tsx`: `uncertainCodes` 분류
 
 ## 격리 E2E 결과 (2026-11-05)
@@ -91,3 +94,7 @@ Backend 계약은 변경하지 않았습니다. 기준 문서는 Backend `docs/a
 - 실행 중 확인: Chrome 첫 실행의 B07은 TENANT_ADMIN이 제보 상세를 열 수 있다고 가정한 시험 오류였습니다. 실제 계약(상세 403)을 위 계약 부족으로 기록하고 새 합성 데이터로 HTTP와 Chrome을 다시 실행했습니다.
 
 미검증: `CANDIDATE_LOOKUP_IN_PROGRESS`, `PERFORMANCE_LINK_CONCURRENT_UPDATE`, `CANDIDATE_LOOKUP_FAILED_UNRECORDED`의 실제 서버 발생(Mock 테스트로만 확인), 팬 제보 업로드와 원본 저장, 실제 Python 분석, 실제 Keycloak 로그인, 운영 환경
+
+### 공연 단위 회차 화면 역할 확인 (2026-11-05)
+
+같은 격리 환경(데이터 유지, `ddl-auto=validate`)에서 Chrome 6건 통과: TENANT_ADMIN이 관리 메뉴의 새 화면에서 공연을 골라 회차를 등록(201), 근거 수정(PATCH 200), 철회(200)하고 서버 기록이 WITHDRAWN revision 3이며 팬 제보 API를 부르지 않음, TENANT_ADMIN의 팬 제보 상세는 여전히 403, REVIEWER가 같은 화면에서 조회와 등록, ANALYST는 회차 목록 403 역할 안내와 쓰기 없음, 다른 고객사 검토자는 화면에서 회차 API를 부르지 않고 직접 호출 시 404, 모든 요청 Bearer와 페이지 예외 없음. 첫 실행은 공연 선택 상자가 그려지기 전에 값을 넣은 시험 스크립트 대기 오류로 쓰기 전에 중단되었고, 대기를 고친 뒤 다시 실행했습니다.
