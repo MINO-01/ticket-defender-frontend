@@ -63,7 +63,7 @@ Backend 계약은 변경하지 않았습니다. 기준 문서는 Backend `docs/a
 - TENANT_ADMIN은 Backend 391e285에서 팬 제보 상세 GET이 403입니다(`AdminFanReportQueryService`는 ANALYST, REVIEWER만 허용). 이 권한은 확대하지 않았고, TENANT_ADMIN은 공연 단위 `검증 회차 관리` 화면에서 회차를 관리합니다. 제보별 회차 연결과 후보 대조는 제보 상세에 남아 TENANT_ADMIN은 쓸 수 없습니다(연결 API 자체는 TENANT_ADMIN도 허용하지만 연결할 제보를 화면에서 고를 수 없습니다).
 - 회차 조회 응답에 검증 근거가 없어 수정할 때 다시 입력해야 합니다.
 - 관찰값 수동 교정 API가 없어 수동 교정은 제공하지 않습니다.
-- 후보 실행을 Case 출처로 연결하는 기능(Backend #70, 미병합)은 연결하지 않았습니다. Case 생성 화면은 기존 그대로입니다.
+- 후보 실행의 Case 출처 연결은 Issue #39에서 신규 Case 생성에만 연결했습니다(Backend main 5cacd75의 `candidateRunIds`). 관리자가 이력에서 종료되었고 CURRENT인 실행을 명시적으로 고르고 소속 증거를 함께 선택해야 하며, 선택하지 않은 기존 생성 요청 본문은 바뀌지 않습니다. 기존 Case에 출처를 추가하는 API는 없어 제공하지 않습니다. 후보 출처가 연결된 Case는 승인 근거 정책 미확정으로 승인과 공식 PDF 발급이 차단(APPROVAL_BASIS_BLOCKED)된다고 안내합니다.
 - 승인된 고객사 원본 예매 조회(candidateId 기반)는 계약상 후속 단계이며 제공하지 않습니다.
 
 ## 코드 배치
@@ -75,13 +75,16 @@ Backend 계약은 변경하지 않았습니다. 기준 문서는 Backend `docs/a
 | `src/features/admin-track2/PerformancePanels.tsx` | 재사용 회차 목록 조회(`usePerformanceList`)와 회차 관리 영역(`PerformanceManagementCard`), 제보 회차 연결 영역 |
 | `src/features/admin-track2/LiveVerifiedPerformancePage.tsx` | 공연 단위 검증 회차 관리 화면 |
 | `src/features/admin-track2/candidateMatchRun.ts`, `useCandidateMatchRuns.ts` | 후보 대조 시도 분류와 분석별 시도 관리 |
-| `src/features/admin-track2/CandidateMatchSection.tsx` | 분석별 후보 대조 실행과 이력 |
+| `src/features/admin-track2/CandidateMatchSection.tsx` | 분석별 후보 대조 실행과 이력, 신규 Case 출처 선택과 해제 |
+| `src/features/admin-track2/useCandidateRunSelection.ts` | 제보 상세 안의 후보 실행 선택 목록(실행 ID 기준, 재조회 반영, 생성 요청 중 잠금) |
+| `src/features/admin-track2/FanReportCasePanel.tsx` | 선택한 후보 실행 표시, 소속 증거 누락과 비 CURRENT 실행 차단, `candidateRunIds` 전달 |
 
 ## 테스트
 
 - `src/test/admin-track2-candidate.test.tsx`: 스키마와 UTC 해석, 문구 고유성, 회차 등록과 유실, 확정 거부, 수정 PATCH, 철회, 403과 404 영역 분리, 연결과 교체, 동시 변경 재확인 뒤 revision 충돌, 연결 철회와 키 재사용, 연결 이후 회차 변경 안내, 후보 실행과 중복 클릭, NOT_LINKED 분리, 모든 상태, 사유, 적용 여부, 응답 유실과 진행 중, 503 미기록, 403과 404, 다른 분석 응답, 실패 분석, 이력 페이지와 빈 이력, 이력 오류, 수동 교정 비활성
 - `src/test/admin-track2-performance-page.test.tsx`: 메뉴 진입과 공연 선택 전 미조회, 등록, 수정, 철회 계약, 403 역할 안내, 서버 404, 접근 목록 밖 공연 미조회, 다른 공연 응답 거부, 팬 제보 목록 링크, 팬 제보 API 미호출
 - `src/test/admin-api-client.test.ts`: PATCH와 메서드별 보안 옵션, `src/test/admin-case-workflow.test.tsx`: `uncertainCodes` 분류
+- `src/test/admin-track2-candidate-case.test.tsx`(Issue #39): `candidateRunIds` 본문 생성과 미선택 시 기존 본문 유지, 후보만 있는 요청과 GRAPH_CLUSTER, 증거 누락, UUID, 중복, 30개 제한 거부, CURRENT 실행 선택 후 생성과 실제 Case 상세의 후보 출처 표시, NO_MATCH 선택과 과거, 진행 중 실행 선택 불가, 소속 증거 누락 차단, 페이지 전환 뒤 선택 유지, 재조회로 CURRENT가 아니게 된 실행 차단, 응답 유실 시 선택 잠금과 같은 키, 같은 본문 재확인, 422, 404, 409, 403 안내
 
 ## 격리 E2E 결과 (2026-11-05)
 
