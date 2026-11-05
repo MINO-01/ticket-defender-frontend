@@ -6,9 +6,11 @@ import { Card } from '../../components/common/Card'
 import { EmptyState, ErrorState, LoadingSkeleton } from '../../components/common/Feedback'
 import { PageHeader } from '../../components/common/PageHeader'
 import { useAdminQuery } from '../admin-auth/useAdminQuery'
+import { CandidateMatchSection } from './CandidateMatchSection'
 import { EvidenceContentPreview } from './EvidenceContentPreview'
 import { FanReportCasePanel } from './FanReportCasePanel'
 import { ListingAnalysisRunPanel } from './ListingAnalysisRunPanel'
+import { PerformanceSection } from './PerformancePanels'
 import { StatusPill } from './StatusPill'
 import {
   analysisStatusLabels, candidateMatchReasonLabels, executionStatusLabels, fanReportDetailPath, fanReportDetailSchema, fanReportListRoute, fieldStateLabels,
@@ -18,11 +20,13 @@ import {
 import type { FanReportDetail, FanReportEvidence, ListingAnalysis, ListingField, ListingFieldName } from './track2Api'
 import { reportTypeLabels } from './track2Model'
 import styles from './Track2.module.css'
+import { useCandidateMatchRuns } from './useCandidateMatchRuns'
 import { useListingAnalysisRuns } from './useListingAnalysisRuns'
 
 // 인증된 관리자의 Track 2 팬 제보 상세다. 주소의 제보 ID로 조회하며 다른 고객사나 권한 없는 공연의 제보는 서버가 404로 숨긴다.
 // 팬 입력값은 검증되지 않은 문자열이므로 일반 텍스트로만 표시하고, listingUrl에 접속하거나 미리보기, 임베드를 만들지 않는다.
-// 분석 이력, 원본 미리보기, 분석 실행, Case 생성은 상세 응답에 있는 제보와 증거 ID로만 요청한다. 원본 다운로드, 예매 대조, 수동 교정은 제공하지 않는다.
+// 분석 이력, 원본 미리보기, 분석 실행, 후보 대조, 회차 연결, Case 생성은 상세 응답과 서버 응답의 ID로만 요청한다. 원본 다운로드와 수동 교정은 제공하지 않는다.
+// 이미지 분석 응답의 candidateMatch(NOT_LINKED)는 분석 시점의 기존 표시이며 후보 대조 실행 이력과 섞지 않는다.
 
 const listLink = '/app/fan-reports'
 
@@ -68,13 +72,13 @@ function ReportDetail({ fanReportId }: { fanReportId: string }) {
       <FanInputPanel report={report} />
       <EvidencePanel fanReportId={report.fanReportId} evidence={report.evidence} />
     </div>
+    <PerformanceSection report={report} />
     <Card className={styles.panel}>
       <h2>후속 기능</h2>
       <div className={styles.followUp}>
-        <Button disabled>예매 후보 대조</Button>
         <Button disabled>관찰값 수동 교정</Button>
       </div>
-      <p className={styles.subtleNote}>이미지 분석 실행은 증거 영역에서 증거별로 요청합니다. 예매 후보 대조, 수동 교정, 승인과 공식 PDF 발급은 연결하지 않았습니다.</p>
+      <p className={styles.subtleNote}>이미지 분석 실행과 예매 후보 대조는 증거 영역의 분석 이력에서 분석별로 요청합니다. 관찰값을 고치는 API가 없어 수동 교정은 제공하지 않으며, 후보 실행을 Case 출처로 연결하는 기능은 아직 없습니다.</p>
     </Card>
     <FanReportCasePanel report={report} />
   </div>
@@ -109,6 +113,7 @@ function EvidencePanel({ fanReportId, evidence }: { fanReportId: string; evidenc
   const selectedIndex = evidence.findIndex((item) => item.evidenceId === selectedId)
   const selected = evidence[selectedIndex]
   const runs = useListingAnalysisRuns(fanReportId)
+  const candidates = useCandidateMatchRuns(fanReportId)
   return <Card className={styles.panel}>
     <div className={styles.panelHeading}><h2>증거</h2><span>{evidence.length}개 접수, 원본 저장 확인 {evidence.filter((item) => item.originalStored).length}개</span></div>
     {selected ? <>
@@ -123,7 +128,7 @@ function EvidencePanel({ fanReportId, evidence }: { fanReportId: string; evidenc
       <ListingAnalysisRunPanel evidence={selected} attempt={runs.attempts[selected.evidenceId]}
         onStart={() => runs.start(selected.evidenceId)} onReconfirm={() => runs.reconfirm(selected.evidenceId)} onRefreshHistory={() => runs.refreshHistory(selected.evidenceId)} />
       {/* 분석 시도가 끝나거나 재조회를 누르면 새로 만들어 최신 첫 페이지를 다시 조회한다. */}
-      <ListingAnalysisHistory key={`${selected.evidenceId}:${runs.historyVersions[selected.evidenceId] ?? 0}`} fanReportId={fanReportId} evidenceId={selected.evidenceId} originalStored={selected.originalStored} />
+      <ListingAnalysisHistory key={`${selected.evidenceId}:${runs.historyVersions[selected.evidenceId] ?? 0}`} fanReportId={fanReportId} evidenceId={selected.evidenceId} originalStored={selected.originalStored} candidates={candidates} />
     </> : <EmptyState title="접수된 증거가 없습니다" description="이 제보에는 증거 파일이 없어 이미지 분석 이력도 없습니다." />}
   </Card>
 }
@@ -141,7 +146,9 @@ function EvidenceMetadata({ evidence }: { evidence: FanReportEvidence }) {
   </section>
 }
 
-function ListingAnalysisHistory({ fanReportId, evidenceId, originalStored }: { fanReportId: string; evidenceId: string; originalStored: boolean }) {
+type CandidateRuns = ReturnType<typeof useCandidateMatchRuns>
+
+function ListingAnalysisHistory({ fanReportId, evidenceId, originalStored, candidates }: { fanReportId: string; evidenceId: string; originalStored: boolean; candidates: CandidateRuns }) {
   const [page, setPage] = useState(0)
   const { result, retry } = useAdminQuery(listingAnalysesPath(fanReportId, evidenceId, page), listingAnalysisPageSchema)
   const heading = <div className={styles.panelHeading}><h3>이미지 분석 이력</h3><span>최신 시도 순</span></div>
@@ -163,7 +170,7 @@ function ListingAnalysisHistory({ fanReportId, evidenceId, originalStored }: { f
       ? page === 0
         ? <EmptyState title="아직 분석 이력이 없습니다" description={originalStored ? '이 증거로 이미지 분석을 실행한 기록이 없습니다. 분석 실패 기록과는 다른 상태입니다.' : '원본 저장이 확인되지 않은 증거이며 분석 기록이 없습니다.'} />
         : <><EmptyState title="이 페이지에 표시할 분석 이력이 없습니다" description="요청한 페이지가 이력 범위를 벗어났습니다." /><Button variant="secondary" size="small" onClick={() => setPage(0)}>첫 페이지로 이동</Button></>
-      : <ol className={styles.attempts}>{data.items.map((item) => <li key={item.analysisId}><AnalysisAttempt analysis={item} /></li>)}</ol>}
+      : <ol className={styles.attempts}>{data.items.map((item) => <li key={item.analysisId}><AnalysisAttempt analysis={item} candidates={candidates} /></li>)}</ol>}
     {(page > 0 || data.hasNext) && <nav className={styles.pagination} aria-label="분석 이력 페이지"><Button variant="secondary" size="small" disabled={page === 0} onClick={() => setPage(page - 1)}>이전 이력</Button><span>{page + 1} 페이지</span><Button variant="secondary" size="small" disabled={!data.hasNext} onClick={() => setPage(page + 1)}>다음 이력</Button></nav>}
   </section>
 }
@@ -183,7 +190,7 @@ function inputCheck(input: ListingAnalysis['input']) {
   return input.verifiedSha256 === input.expectedSha256 ? '접수 원본과 SHA-256 일치' : '접수 원본과 SHA-256 다름'
 }
 
-function AnalysisAttempt({ analysis }: { analysis: ListingAnalysis }) {
+function AnalysisAttempt({ analysis, candidates }: { analysis: ListingAnalysis; candidates: CandidateRuns }) {
   const failed = analysis.executionStatus !== 'SUCCEEDED' && analysis.executionStatus !== 'IN_PROGRESS'
   return <article className={styles.attempt} aria-label={`분석 시도 ${formatUtc(analysis.createdAt)}`}>
     <div className={styles.attemptHeading}>
@@ -198,7 +205,7 @@ function AnalysisAttempt({ analysis }: { analysis: ListingAnalysis }) {
       <div><dt>분석 시각</dt><dd>{analysis.analyzedAt === null ? '기록 없음' : formatUtc(analysis.analyzedAt)}</dd></div>
       <div><dt>입력 확인</dt><dd>{inputCheck(analysis.input)}</dd></div>
       {failed && <div><dt>실패 분류 코드</dt><dd>{formatCode(analysis.errorCode)}{analysis.analyzerErrorCode !== null && `, 분석 서버 ${formatCode(analysis.analyzerErrorCode)}`}{analysis.analyzerHttpStatus !== null && ` (HTTP ${analysis.analyzerHttpStatus})`}</dd></div>}
-      <div><dt>예매 후보 대조</dt><dd>{analysis.candidateMatch === null ? '대조 기록 없음' : `예매 대조 미연결 (${candidateMatchReasonLabels[analysis.candidateMatch.reason]})`}</dd></div>
+      <div><dt>분석 응답의 기존 대조 표시 (후보 실행과 별개)</dt><dd>{analysis.candidateMatch === null ? '표시 없음' : `분석 시점 미연결 (${candidateMatchReasonLabels[analysis.candidateMatch.reason]})`}</dd></div>
     </dl>
     {analysis.fields === null
       ? analysis.executionStatus === 'IN_PROGRESS'
@@ -206,6 +213,9 @@ function AnalysisAttempt({ analysis }: { analysis: ListingAnalysis }) {
         : <ErrorState title="이 시도는 관찰값이 없습니다" description="분석이 실패해 관찰값을 만들지 못했습니다. 정상적인 빈 추출 결과가 아닙니다." />
       : <div className={styles.fields}>{listingFieldNames.map((name) => <ObservedField key={name} name={name} field={analysis.fields![name]} />)}</div>}
     {analysis.reviewRequired && <p className={styles.caution}>관찰값은 모델이 이미지에서 읽은 후보이며 사람의 확인이 필요합니다. 사실 확인, 예매 일치, 부정 거래 판정이 아닙니다.</p>}
+    <CandidateMatchSection fanReportId={analysis.fanReportId} evidenceId={analysis.evidenceId} analysis={analysis} attempt={candidates.attempts[analysis.analysisId]}
+      historyVersion={candidates.historyVersions[analysis.analysisId] ?? 0} onStart={() => candidates.start(analysis.evidenceId, analysis.analysisId)}
+      onReconfirm={() => candidates.reconfirm(analysis.evidenceId, analysis.analysisId)} onRefreshHistory={() => candidates.refreshHistory(analysis.analysisId)} />
   </article>
 }
 
