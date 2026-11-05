@@ -107,6 +107,11 @@ export function performanceWithdrawPath(eventId: string, performanceId: string) 
   return `/api/v1/admin/events/${eventId}/verified-performances/${performanceId}/withdrawals`
 }
 
+/** 공연 단위 검증 회차 관리 화면 주소다. 공연은 AdminEventGate가 접근 가능 목록으로 다시 확인한다. */
+export function verifiedPerformanceRoute(eventId: string) {
+  return `/app/verified-performances?${new URLSearchParams({ eventId })}`
+}
+
 export function performanceLinkPath(fanReportId: string) {
   return `/api/v1/admin/fan-reports/${fanReportId}/performance-link`
 }

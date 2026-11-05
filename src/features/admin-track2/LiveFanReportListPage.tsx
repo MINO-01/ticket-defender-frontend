@@ -8,6 +8,7 @@ import { PageHeader } from '../../components/common/PageHeader'
 import { useAdminQuery } from '../admin-auth/useAdminQuery'
 import { AdminEventGate } from '../admin-events/AdminEventGate'
 import type { AdminEvent } from '../admin-events/adminEventsApi'
+import { verifiedPerformanceRoute } from './candidatePipelineApi'
 import { StatusPill } from './StatusPill'
 import {
   fanReportDetailRoute, fanReportListPath, fanReportPageSchema, formatUtc, intakeStatusLabels, intakeStatuses, intakeTone, readIntakeStatusParam, readPageParam,
@@ -50,6 +51,7 @@ function ReportList({ event }: { event: AdminEvent }) {
         <option value="">전체 접수 상태</option>
         {intakeStatuses.map((status) => <option key={status} value={status}>{intakeStatusLabels[status]}</option>)}
       </select></label>
+      <Link className={styles.detailLink} to={verifiedPerformanceRoute(event.id)}>이 공연의 검증 회차 관리</Link>
     </div>
   </Card>
 

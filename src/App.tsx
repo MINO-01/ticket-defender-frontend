@@ -24,6 +24,7 @@ const Track1ListRoute = lazy(() => import('./features/admin-track1/Track1Routes'
 const Track1DetailRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1DetailRoute })))
 const Track1DemoDetailRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1DemoDetailRoute })))
 const Track2ListRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.Track2ListRoute })))
+const VerifiedPerformanceRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.VerifiedPerformanceRoute })))
 const Track2DetailRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.Track2DetailRoute })))
 const CaseListRoute = lazy(() => import('./features/admin-cases/CaseRoutes').then((module) => ({ default: module.CaseListRoute })))
 const CaseDetailRoute = lazy(() => import('./features/admin-cases/CaseRoutes').then((module) => ({ default: module.CaseDetailRoute })))
@@ -63,6 +64,7 @@ export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuth
       <Route path="analysis/findings/detail" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings/:clusterId" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DemoDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="fan-reports" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="팬 제보 목록을 여는 중" />}><Track2ListRoute /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="verified-performances" element={<AdminRouteErrorBoundary backTo="/app/fan-reports" backLabel="팬 제보 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="검증 회차 관리를 여는 중" />}><VerifiedPerformanceRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="fan-reports/:reportId" element={<AdminRouteErrorBoundary backTo="/app/fan-reports" backLabel="제보 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="제보 상세를 여는 중" />}><Track2DetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="cases" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="사건 목록을 여는 중" />}><CaseListRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="cases/:caseId" element={<AdminRouteErrorBoundary backTo="/app/cases" backLabel="사건 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="사건 상세를 여는 중" />}><CaseDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
@@ -70,7 +72,7 @@ export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuth
       <Route path="approvals/:approvalRequestId" element={<AdminRouteErrorBoundary backTo="/app/approvals" backLabel="승인 검토 화면으로 이동"><Suspense fallback={<LoadingSkeleton label="승인 요청을 여는 중" />}><ApprovalDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="report-center" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><ReportCenterRoute title={reportCenterPage.label} description={reportCenterPage.description} /></AdminRouteErrorBoundary>} />
       <Route path="report-center/decisions/:approvalDecisionId" element={<AdminRouteErrorBoundary backTo="/app/report-center" backLabel="보고서 센터로 이동"><OfficialPdfDecisionRoute title={reportCenterPage.label} description={reportCenterPage.description} /></AdminRouteErrorBoundary>} />
-      {adminPages.filter((page) => page.path !== 'analysis/findings' && page.path !== 'fan-reports' && page.path !== 'cases' && page.path !== 'approvals' && page.path !== 'report-center').map((page) => <Route key={page.path} path={page.path} element={<><AdminPagePlaceholder title={page.label} description={page.description} />{page.path === 'settings' && <BackendAuthCheckPanel />}</>} />)}
+      {adminPages.filter((page) => page.path !== 'analysis/findings' && page.path !== 'fan-reports' && page.path !== 'verified-performances' && page.path !== 'cases' && page.path !== 'approvals' && page.path !== 'report-center').map((page) => <Route key={page.path} path={page.path} element={<><AdminPagePlaceholder title={page.label} description={page.description} />{page.path === 'settings' && <BackendAuthCheckPanel />}</>} />)}
     </Route>
     <Route path="/fan" element={<FanLayout />}>
       <Route index element={<Navigate to="guide" replace />} />
