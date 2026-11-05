@@ -194,6 +194,27 @@ describe('관리자 공통 API 클라이언트', () => {
     expect(Object.keys(plain.fetchImpl.mock.calls[0][1]?.headers as Record<string, string>)).not.toContain('Idempotency-Key')
   })
 
+  it('PATCH는 JSON 본문과 기존 보안 옵션으로 보내고 키를 지정하지 않으면 Idempotency-Key를 붙이지 않는다', async () => {
+    const { client, fetchImpl } = setup(jsonResponse(200, { id: 'p-1' }))
+    const result = await client.request('/api/v1/admin/events/e-1/verified-performances/p-1', { method: 'PATCH', body: { sourceVersion: 'v2' }, successStatus: 200, schema: itemSchema })
+    expect(result).toEqual({ kind: 'success', status: 200, data: { id: 'p-1' } })
+    const [, init] = fetchImpl.mock.calls[0]
+    expect(init).toMatchObject({ method: 'PATCH', body: JSON.stringify({ sourceVersion: 'v2' }), credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' })
+    expect(init?.headers).toMatchObject({ Authorization: `Bearer ${SYNTHETIC_TOKEN}`, 'Content-Type': 'application/json' })
+    expect(Object.keys(init?.headers as Record<string, string>)).not.toContain('Idempotency-Key')
+  })
+
+  it('GET, POST, PUT, PATCH 모두 401이면 세션을 정리하고 허용되지 않은 경로에는 보내지 않는다', async () => {
+    for (const method of ['GET', 'POST', 'PUT', 'PATCH'] as const) {
+      const unauthorized = setup(new Response(null, { status: 401 }))
+      await expect(unauthorized.client.request('/api/v1/admin/events/e-1/verified-performances', { method, schema: itemSchema }), method).resolves.toEqual({ kind: 'unauthenticated' })
+      expect(unauthorized.onUnauthorized, method).toHaveBeenCalledOnce()
+      const outside = setup(jsonResponse(200, { id: 'x' }))
+      await expect(outside.client.request('https://example.invalid/api/v1/cases', { method, schema: itemSchema }), method).rejects.toThrow(TypeError)
+      expect(outside.fetchImpl, method).not.toHaveBeenCalled()
+    }
+  })
+
   describe('공식 PDF 바이너리 요청', () => {
     const path = '/api/v1/official-pdf-issuances/6b3f1c2e-8a4d-4f5b-9c6d-7e8f9a0b1c2d/download'
     const pdf = (text: string) => new TextEncoder().encode(text)

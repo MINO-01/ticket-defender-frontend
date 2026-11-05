@@ -226,6 +226,20 @@ describe('Case 쓰기 계약 경로와 스키마', () => {
     expect(retention).toMatchObject({ kind: 'rejected', message: { title: expect.stringContaining('보존 기한') } })
     expect(integrity).toMatchObject({ kind: 'rejected', message: { title: expect.stringContaining('원본 상태') } })
   })
+
+  it('uncertainCodes에 지정한 409 코드만 결과 미확인으로 분류하고 나머지 확정 충돌과 기존 분류는 바꾸지 않는다', () => {
+    const verify = () => true
+    const pending = { title: '합성 진행 중 안내', description: '같은 키로 재확인합니다.' }
+    const messages = { ...transitionMessages, codes: { ...transitionMessages.codes, SYNTHETIC_REJECTED: { title: '합성 거부', description: '거부' } }, uncertainCodes: { SYNTHETIC_PENDING: pending } }
+    expect(classifyMutation({ kind: 'problem', status: 409, code: 'SYNTHETIC_PENDING' }, messages, verify)).toEqual({ kind: 'uncertain', message: pending })
+    expect(classifyMutation({ kind: 'problem', status: 409, code: 'SYNTHETIC_REJECTED' }, messages, verify).kind).toBe('rejected')
+    expect(classifyMutation({ kind: 'problem', status: 409, code: 'IDEMPOTENCY_KEY_REUSED' }, messages, verify).kind).toBe('rejected')
+    expect(classifyMutation({ kind: 'problem', status: 409, code: 'CASE_VERSION_CONFLICT' }, messages, verify).kind).toBe('conflict')
+    // 409가 아닌 상태의 같은 코드는 uncertainCodes를 적용하지 않는다.
+    expect(classifyMutation({ kind: 'problem', status: 422, code: 'SYNTHETIC_PENDING' }, messages, verify)).toMatchObject({ kind: 'uncertain', message: { title: '서버가 결과를 확정하지 않은 오류를 반환했습니다' } })
+    // uncertainCodes가 없는 기존 메시지는 이전과 같이 분류한다.
+    expect(classifyMutation({ kind: 'problem', status: 409, code: 'IDEMPOTENCY_KEY_REUSED' }, transitionMessages, verify).kind).toBe('rejected')
+  })
 })
 
 describe('Track 1 군집에서 Case 생성', () => {

@@ -411,6 +411,8 @@ export type OperationMessages = {
   forbidden: WorkflowMessage
   /** 403 중 공통 클라이언트가 읽은 안정 코드별 안내다. 없거나 모르는 코드는 forbidden 문구를 쓴다. */
   forbiddenCodes?: Record<string, WorkflowMessage>
+  /** 409 중 서버가 결과를 아직 확정하지 않아 같은 키와 같은 본문으로 재확인해야 하는 코드별 안내다. 지정한 코드만 결과 미확인으로 분류한다. */
+  uncertainCodes?: Record<string, WorkflowMessage>
   notFound: WorkflowMessage
   codes: Record<string, WorkflowMessage>
 }
@@ -443,6 +445,8 @@ export function classifyMutation<T>(result: AdminApiResult<T>, messages: Operati
       return { kind: 'rejected', forbidden: false, message: messages.notFound }
     case 'problem': {
       if (result.status === 409 && result.code === 'CASE_VERSION_CONFLICT') return { kind: 'conflict', message: versionConflict }
+      const pending = result.status === 409 ? messages.uncertainCodes?.[result.code] : undefined
+      if (pending) return { kind: 'uncertain', message: pending }
       const known = messages.codes[result.code] ?? commonCodes[result.code]
       if (known && result.status < 500) return { kind: 'rejected', forbidden: false, message: known }
       if (known && result.status === 503) return { kind: 'uncertain', message: known }
