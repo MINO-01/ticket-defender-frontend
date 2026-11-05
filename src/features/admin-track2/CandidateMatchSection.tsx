@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { describeAdminApiFailure } from '../../api/adminApiFailure'
 import { Button } from '../../components/common/Button'
 import { EmptyState, ErrorState, LoadingSkeleton } from '../../components/common/Feedback'
@@ -7,6 +7,8 @@ import { applicabilityLabels, candidateHistoryPath, candidateReasonLabels, candi
 import type { CandidateRun } from './candidatePipelineApi'
 import type { CandidateAttempt } from './candidateMatchRun'
 import { StatusPill } from './StatusPill'
+import { isLinkableCandidateRun } from './useCandidateRunSelection'
+import type { CandidateRunSelection } from './useCandidateRunSelection'
 import { formatUtc } from './track2Api'
 import type { ListingAnalysis } from './track2Api'
 import styles from './Track2.module.css'
@@ -15,6 +17,7 @@ import styles from './Track2.module.css'
 // 관리자가 버튼을 누를 때만 실행하고 자동 실행, 자동 재시도는 하지 않는다. 이력 조회도 관리자가 열 때만 요청한다.
 // 실행 결과는 사람이 조사할 후보이며 부정 거래 확정이 아니다. 과거 실행은 바꾸지 않고 서버의 적용 여부(applicability)만 따로 표시한다.
 // candidateId는 서버 내부의 불투명한 참조이며 예매번호나 계정이 아니다. 예매번호 원문, HMAC 값, 계정 정보는 응답에 없고 화면도 만들지 않는다.
+// 관리자는 종료되었고 CURRENT인 실행만 신규 Case 출처로 명시적으로 고를 수 있다. 선택은 Case를 만들지 않으며 Case 생성 영역에서 따로 요청한다.
 
 type Props = {
   fanReportId: string
@@ -25,9 +28,11 @@ type Props = {
   onStart: () => void
   onReconfirm: () => void
   onRefreshHistory: () => void
+  /** 신규 Case 출처 선택. 없으면 선택 기능을 표시하지 않는다. */
+  selection?: CandidateRunSelection
 }
 
-export function CandidateMatchSection({ fanReportId, evidenceId, analysis, attempt, historyVersion, onStart, onReconfirm, onRefreshHistory }: Props) {
+export function CandidateMatchSection({ fanReportId, evidenceId, analysis, attempt, historyVersion, onStart, onReconfirm, onRefreshHistory, selection }: Props) {
   const [open, setOpen] = useState(false)
   const runnable = analysis.executionStatus === 'SUCCEEDED'
   const sending = attempt?.phase === 'sending'
@@ -64,13 +69,19 @@ export function CandidateMatchSection({ fanReportId, evidenceId, analysis, attem
         ? <Button size="small" variant="secondary" onClick={onRefreshHistory}>후보 실행 이력 다시 조회</Button>
         : <Button size="small" variant="secondary" onClick={() => setOpen(true)}>후보 실행 이력 보기</Button>}
     </div>
-    {showHistory && <CandidateRunHistory key={historyVersion} fanReportId={fanReportId} evidenceId={evidenceId} analysisId={analysis.analysisId} />}
+    {showHistory && <CandidateRunHistory key={historyVersion} fanReportId={fanReportId} evidenceId={evidenceId} analysisId={analysis.analysisId} selection={selection} />}
   </section>
 }
 
-function CandidateRunHistory({ fanReportId, evidenceId, analysisId }: { fanReportId: string; evidenceId: string; analysisId: string }) {
+function CandidateRunHistory({ fanReportId, evidenceId, analysisId, selection }: { fanReportId: string; evidenceId: string; analysisId: string; selection?: CandidateRunSelection }) {
   const [page, setPage] = useState(0)
   const { result, retry } = useAdminQuery(candidateHistoryPath(fanReportId, evidenceId, analysisId, page), candidateRunPageSchema)
+  // 검증을 통과한 이력만 선택 목록의 최신 상태로 반영한다. 다른 제보, 증거, 분석의 실행은 반영하지 않는다.
+  const verifiedItems = result?.kind === 'success' && result.data.page === page
+    && result.data.items.every((item) => item.fanReportId === fanReportId && item.evidenceId === evidenceId && item.analysisId === analysisId)
+    ? result.data.items : null
+  const sync = selection?.sync
+  useEffect(() => { if (verifiedItems && sync) sync(verifiedItems) }, [verifiedItems, sync])
   const heading = <div className={styles.panelHeading}><h4>후보 실행 이력</h4><span>최신 실행 순, 과거 결과를 덮어쓰지 않음</span></div>
   if (result === null) return <section className={styles.history} aria-label="후보 실행 이력">{heading}<LoadingSkeleton label="후보 실행 이력을 불러오는 중" /></section>
 
@@ -92,7 +103,7 @@ function CandidateRunHistory({ fanReportId, evidenceId, analysisId }: { fanRepor
       ? page === 0
         ? <EmptyState title="아직 후보 실행 이력이 없습니다" description="이 분석으로 후보 대조를 실행한 기록이 없습니다. 후보 없음(NO_MATCH) 결과와는 다른 상태입니다." />
         : <><EmptyState title="이 페이지에 표시할 후보 실행이 없습니다" description="요청한 페이지가 이력 범위를 벗어났습니다." /><Button variant="secondary" size="small" onClick={() => setPage(0)}>첫 페이지로 이동</Button></>
-      : <ol className={styles.attempts}>{data.items.map((item) => <li key={item.runId}><CandidateRunItem run={item} /></li>)}</ol>}
+      : <ol className={styles.attempts}>{data.items.map((item) => <li key={item.runId}><CandidateRunItem run={item} selection={selection} /></li>)}</ol>}
     {(page > 0 || data.hasNext) && <nav className={styles.pagination} aria-label="후보 실행 이력 페이지"><Button variant="secondary" size="small" disabled={page === 0} onClick={() => setPage(page - 1)}>이전 실행</Button><span>{page + 1} 페이지</span><Button variant="secondary" size="small" disabled={!data.hasNext} onClick={() => setPage(page + 1)}>다음 실행</Button></nav>}
   </section>
 }
@@ -109,8 +120,10 @@ function statusNote(run: CandidateRun) {
   }
 }
 
-function CandidateRunItem({ run }: { run: CandidateRun }) {
+function CandidateRunItem({ run, selection }: { run: CandidateRun; selection?: CandidateRunSelection }) {
   const current = run.applicability === 'CURRENT'
+  const selected = selection?.selected.some((item) => item.runId === run.runId) ?? false
+  const linkable = isLinkableCandidateRun(run)
   return <article className={styles.attempt} aria-label={`후보 실행 ${formatUtc(run.createdAt)}`}>
     <div className={styles.attemptHeading}>
       <strong><time dateTime={run.createdAt}>{formatUtc(run.createdAt)}</time> 실행</strong>
@@ -133,5 +146,9 @@ function CandidateRunItem({ run }: { run: CandidateRun }) {
       <div><dt>분석 응답 SHA-256</dt><dd className={styles.idCell}>{run.analysisResponseSha256 ?? '기록 없음'}</dd></div>
       <div><dt>완료 시각</dt><dd>{run.completedAt === null ? '완료되지 않음' : <time dateTime={run.completedAt}>{formatUtc(run.completedAt)}</time>}</dd></div>
     </dl>
+    {selection && <div className={styles.previewActions}>
+      {(linkable || selected) && <Button size="small" variant="secondary" aria-pressed={selected} disabled={selection.locked} onClick={() => selection.toggle(run)}>{selected ? '신규 Case 출처 선택 해제' : '신규 Case 출처로 선택'}</Button>}
+      {!linkable && <span className={styles.subtleNote}>{run.status === 'IN_PROGRESS' ? '진행 중인 실행은 Case 출처로 선택할 수 없습니다.' : '현재 기준(CURRENT)이 아닌 실행은 이력으로만 표시하며 Case 출처로 선택할 수 없습니다.'}</span>}
+    </div>}
   </article>
 }
