@@ -22,7 +22,8 @@ import styles from './Track2.module.css'
 import { usePerformanceWrite } from './usePerformanceWrite'
 import type { PerformanceWriteState } from './usePerformanceWrite'
 
-// 제보 상세의 검증 회차 관리와 제보 회차 연결 영역이다. 제보 응답의 공연 ID로만 조회하고, 다른 공연이나 다른 제보의 응답은 표시하지 않는다.
+// 검증 회차 관리 영역과 제보 회차 연결 영역이다. 회차 관리는 제보 상세와 공연 단위 회차 화면에서 함께 쓴다.
+// 제보 상세에서는 제보 응답의 공연 ID로, 공연 단위 화면에서는 서버가 확인한 접근 가능 공연 ID로만 조회하고, 다른 공연이나 다른 제보의 응답은 표시하지 않는다.
 // 회차 목록, 쓰기, 연결은 REVIEWER, TENANT_ADMIN만 허용된다. 403은 이 영역에만 안내하고 제보 상세나 후보 대조 영역을 막지 않는다.
 // 팬 입력 공연 일시나 이미지 분석의 공연 일시 관찰값으로 회차를 자동 선택하거나 연결하지 않는다. 연결은 관리자가 회차를 고르고 명시적으로 요청할 때만 보낸다.
 
@@ -31,42 +32,61 @@ function failureOf<T>(result: { kind: 'success'; status: number; data: T } | Adm
   return valid(result.data) ? null : { kind: 'invalidResponse', status: result.status }
 }
 
-function manageFailure(failure: AdminApiFailure, notFoundTitle: string) {
-  if (failure.kind === 'forbidden') return { title: '이 영역에 필요한 역할이 없습니다', description: '검증 회차와 회차 연결은 검토 담당(REVIEWER) 또는 고객사 관리자(TENANT_ADMIN)만 조회하고 변경할 수 있습니다. 아래 증거와 후보 대조 영역은 역할에 따라 따로 동작합니다.' }
+const roleRequired = '검증 회차와 회차 연결은 검토 담당(REVIEWER) 또는 고객사 관리자(TENANT_ADMIN)만 조회하고 변경할 수 있습니다.'
+
+function manageFailure(failure: AdminApiFailure, notFoundTitle: string, roleNote: string) {
+  if (failure.kind === 'forbidden') return { title: '이 영역에 필요한 역할이 없습니다', description: `${roleRequired} ${roleNote}`.trim() }
   return describeAdminApiFailure(failure, notFoundTitle)
 }
 
+/** 공연 하나의 검증 회차 목록 조회다. 쓰기 뒤 다시 조회하는 동안에는 직전 목록을 유지한다. */
+export function usePerformanceList(eventId: string) {
+  const [version, setVersion] = useState(0)
+  const list = useAdminQuery(performancesPath(eventId), performanceListSchema, version)
+  const failure = list.result === null ? null : failureOf(list.result, (items) => items.every((item) => item.eventId === eventId))
+  const fresh = list.result?.kind === 'success' && failure === null ? list.result.data : null
+  // 화면을 다시 만들면 쓰기 결과 안내와 결과 미확인 차단 상태가 사라지므로 재조회 중에는 직전 목록을 계속 보여 준다.
+  const [last, setLast] = useState<VerifiedPerformance[] | null>(null)
+  if (fresh !== null && fresh !== last) setLast(fresh)
+  const performances = fresh ?? (list.result === null ? last : null)
+  return { performances, failure, loading: performances === null && list.result === null, retry: list.retry, refresh: () => setVersion((value) => value + 1) }
+}
+
+type PerformanceList = ReturnType<typeof usePerformanceList>
+
+/** 검증 회차 조회, 등록, 수정, 철회 영역이다. roleNote는 403 안내에 덧붙일 화면별 설명이다. */
+export function PerformanceManagementCard({ eventId, eventName, list, roleNote }: { eventId: string; eventName: string; list: PerformanceList; roleNote: string }) {
+  return <Card className={styles.panel} aria-label="검증 회차">
+    <div className={styles.panelHeading}><h2>검증 회차</h2><span>{eventName}, 검토 담당 또는 고객사 관리자</span></div>
+    <p className={styles.subtleNote}>관리자가 고객사 공연의 회차 식별자를 직접 확인해 등록합니다. 팬 입력 공연 일시와 이미지 분석의 공연 일시 관찰값은 참고일 뿐 회차를 자동으로 확정하지 않습니다.</p>
+    {list.loading ? <LoadingSkeleton label="검증 회차를 불러오는 중" />
+      : list.performances === null ? (() => { const message = manageFailure(list.failure!, '공연을 찾을 수 없거나 접근 범위 밖입니다', roleNote); return <ErrorState title={message.title} description={message.description} onRetry={list.retry} /> })()
+        : <PerformanceManager eventId={eventId} performances={list.performances} onChanged={list.refresh} />}
+  </Card>
+}
+
+const detailRoleNote = '아래 증거와 후보 대조 영역은 역할에 따라 따로 동작합니다.'
+
 export function PerformanceSection({ report }: { report: FanReportDetail }) {
   const eventId = report.event.id
-  const [listVersion, setListVersion] = useState(0)
   const [linkVersion, setLinkVersion] = useState(0)
-  const list = useAdminQuery(performancesPath(eventId), performanceListSchema, listVersion)
+  const list = usePerformanceList(eventId)
   const links = useAdminQuery(performanceLinkPath(report.fanReportId), performanceLinkHistorySchema, linkVersion)
-  const listFailure = list.result === null ? null : failureOf(list.result, (items) => items.every((item) => item.eventId === eventId))
-  const freshPerformances = list.result?.kind === 'success' && listFailure === null ? list.result.data : null
+  const performances = list.performances
   const linkFailure = links.result === null ? null : failureOf(links.result, (data) => data.items.every((item) => item.fanReportId === report.fanReportId))
   const freshLinks = links.result?.kind === 'success' && linkFailure === null ? links.result.data.items : null
-  // 쓰기 뒤 다시 조회하는 동안에는 직전 목록을 계속 보여 준다. 화면을 다시 만들면 쓰기 결과 안내와 결과 미확인 차단 상태가 사라지기 때문이다.
-  const [lastPerformances, setLastPerformances] = useState<VerifiedPerformance[] | null>(null)
+  // 쓰기 뒤 다시 조회하는 동안에는 직전 연결 이력을 계속 보여 준다.
   const [lastLinks, setLastLinks] = useState<PerformanceLink[] | null>(null)
-  if (freshPerformances !== null && freshPerformances !== lastPerformances) setLastPerformances(freshPerformances)
   if (freshLinks !== null && freshLinks !== lastLinks) setLastLinks(freshLinks)
-  const performances = freshPerformances ?? (list.result === null ? lastPerformances : null)
   const linkItems = freshLinks ?? (links.result === null ? lastLinks : null)
 
   return <>
-    <Card className={styles.panel} aria-label="검증 회차">
-      <div className={styles.panelHeading}><h2>검증 회차</h2><span>{report.event.name}, 검토 담당 또는 고객사 관리자</span></div>
-      <p className={styles.subtleNote}>관리자가 고객사 공연의 회차 식별자를 직접 확인해 등록합니다. 팬 입력 공연 일시와 이미지 분석의 공연 일시 관찰값은 참고일 뿐 회차를 자동으로 확정하지 않습니다.</p>
-      {performances === null && list.result === null ? <LoadingSkeleton label="검증 회차를 불러오는 중" />
-        : performances === null ? (() => { const message = manageFailure(listFailure!, '공연을 찾을 수 없거나 접근 범위 밖입니다'); return <ErrorState title={message.title} description={message.description} onRetry={list.retry} /> })()
-          : <PerformanceManager eventId={eventId} performances={performances} onChanged={() => setListVersion((value) => value + 1)} />}
-    </Card>
+    <PerformanceManagementCard eventId={eventId} eventName={report.event.name} list={list} roleNote={detailRoleNote} />
     <Card className={styles.panel} aria-label="제보 회차 연결">
       <div className={styles.panelHeading}><h2>제보 회차 연결</h2><span>사람이 확인한 연결</span></div>
       <p className={styles.subtleNote}>사람이 확인한 회차 연결입니다. 이미지 분석이 읽은 공연명, 공연 일시 관찰값과는 다른 기록이며 후보 대조는 이 연결만 사용합니다.</p>
       {linkItems === null && links.result === null ? <LoadingSkeleton label="회차 연결 이력을 불러오는 중" />
-        : linkItems === null ? (() => { const message = manageFailure(linkFailure!, '제보를 찾을 수 없거나 접근 범위 밖입니다'); return <ErrorState title={message.title} description={message.description} onRetry={links.retry} /> })()
+        : linkItems === null ? (() => { const message = manageFailure(linkFailure!, '제보를 찾을 수 없거나 접근 범위 밖입니다', detailRoleNote); return <ErrorState title={message.title} description={message.description} onRetry={links.retry} /> })()
           : <LinkManager fanReportId={report.fanReportId} items={linkItems} performances={performances} onChanged={() => setLinkVersion((value) => value + 1)} />}
     </Card>
   </>
