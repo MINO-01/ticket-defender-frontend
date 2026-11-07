@@ -4,6 +4,9 @@ import { Card } from '../../components/common/Card'
 import { DataTable } from '../../components/common/DataTable'
 import { EmptyState, ErrorState, LoadingSkeleton } from '../../components/common/Feedback'
 import { PageHeader } from '../../components/common/PageHeader'
+import { TechnicalDetails, WorkGuide } from '../../components/common/WorkGuide'
+import type { GuideItem } from '../../components/common/WorkGuide'
+import { terms } from '../../app/terms'
 import { useAdminQuery } from '../admin-auth/useAdminQuery'
 import { CreateCasePanel } from '../admin-cases/CreateCasePanel'
 import { isCanonicalAnalysisRequestId } from '../admin-cases/caseWorkflowApi'
@@ -39,7 +42,7 @@ export function LiveClusterDetailPage() {
 // Backend Track 1 API는 다중 고객사 계정을 409로 막지 않으므로, 공연 목록의 409 차단(DEC-02)을 상세에서도 유지하기 위해서다.
 function VerifiedClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey }) {
   const { state, retry } = useAccessibleEvents(clusterKey.eventId)
-  const backLink = <Link className={styles.backLink} to={track1ListRoute(clusterKey.eventId)}>← 군집 목록</Link>
+  const backLink = <Link className={styles.backLink} to={track1ListRoute(clusterKey.eventId)}>← 예매 그룹 목록</Link>
   if (state.status === 'loading') return <div className={styles.page}>{backLink}<LoadingSkeleton label="공연 접근 권한을 확인하는 중" /></div>
   if (state.status === 'failed') {
     const message = describeAdminApiFailure(state.failure, '공연 목록을 찾을 수 없습니다')
@@ -53,7 +56,7 @@ function VerifiedClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey })
 
 function ClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey }) {
   const { result, retry } = useAdminQuery(track1ClusterDetailPath(clusterKey), track1ClusterDetailSchema)
-  const backLink = <Link className={styles.backLink} to={track1ListRoute(clusterKey.eventId)}>← 군집 목록</Link>
+  const backLink = <Link className={styles.backLink} to={track1ListRoute(clusterKey.eventId)}>← 예매 그룹 목록</Link>
   if (result === null) return <div className={styles.page}>{backLink}<LoadingSkeleton label="군집 상세를 불러오는 중" /></div>
 
   // 요청한 세 식별자와 다른 군집이 돌아오면 다른 범위의 증거가 섞일 수 있으므로 표시하지 않는다.
@@ -67,43 +70,65 @@ function ClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey }) {
 
   const { event, cluster, members } = result.data
   const memberColumns = [
-    { key: 'auditId', header: '감사 ID', render: (member: Member) => member.auditId },
-    { key: 'account', header: '계정 참조', render: (member: Member) => member.accountId ?? '기록 없음' },
-    { key: 'reservation', header: '예매 참조', render: (member: Member) => member.reservationNo ?? '기록 없음' },
+    { key: 'auditId', header: '저장 기록 번호', render: (member: Member) => member.auditId },
+    { key: 'account', header: '계정 참조 (가명 처리)', render: (member: Member) => member.accountId ?? '기록 없음' },
+    { key: 'reservation', header: '예매 참조 (가명 처리)', render: (member: Member) => member.reservationNo ?? '기록 없음' },
+  ]
+  const confirmed: GuideItem[] = [
+    { key: 'event', content: <>대상 공연: {event.name}</> },
+    { key: 'members', content: <>이 그룹에 속한 것으로 저장된 예매 기록 {cluster.storedMemberCount}건 (화면 표시 {members.length}건)</> },
+    { key: 'priority', content: <>조사 우선순위 {formatRiskScore(cluster.riskScore)} (0~1, 먼저 살펴볼 순서이며 불법 확률이 아님)</> },
+    { key: 'analysis', content: <>분석 방법 {formatAlgorithm(cluster)}, 분석 시각 {formatAnalyzedAt(cluster.analyzedAt)}</> },
+  ]
+  const unconfirmed: GuideItem[] = [
+    { key: 'signals', content: '예매 기록끼리 어떤 정보를 공유하는지(공유 근거)는 서버가 아직 제공하지 않아 표시하지 않습니다.' },
+    { key: 'identity', content: '같은 사람인지, 부정 거래인지는 확인되지 않았습니다.' },
+    { key: 'coverage', content: '중복 저장 방지로 일부 예매 기록이 저장되지 않았을 수 있습니다.' },
+  ]
+  const next: GuideItem[] = [
+    { key: 'members', content: <><a href="#cluster-members">저장된 예매 기록</a>을 확인합니다.</> },
+    { key: 'case', content: <>조사가 필요하면 <a href="#cluster-case">{terms.case} 생성</a>에서 사유를 적고 사건을 만듭니다.</> },
+    { key: 'list', content: <><Link to={track1ListRoute(event.id)}>다른 그룹</Link>과 우선순위를 비교합니다.</> },
   ]
   return <div className={styles.page}>
     {backLink}
-    <PageHeader eyebrow="Track 1 저장 증거 조회" title={`군집 ${cluster.clusterId}`} description="저장된 구성원과 분석 정보를 확인합니다. 구성원 관계는 추가 조사 대상이며 동일인 또는 위법성의 확정 근거가 아닙니다." />
+    <PageHeader eyebrow="예매 관계 분석" title={`연결된 예매 그룹 ${cluster.clusterId}`} description="저장된 예매 기록과 분석 정보를 확인합니다. 그룹 관계는 추가 조사 대상이며 동일인 또는 위법성의 확정 근거가 아닙니다." />
+    <WorkGuide confirmed={confirmed} unconfirmed={unconfirmed} next={next} />
+    <TechnicalDetails summary="기술 상세 (분석 요청 ID, 그룹 참조, 근거 범위)">
+      <div>분석 요청 ID <span>{cluster.analysisRequestId}</span></div>
+      <div>분석 내 그룹 참조 <span>{cluster.clusterId}</span> (분석 요청 안에서만 유효하며 조사 사건 식별자가 아님)</div>
+      <div>근거 범위 STORED_EVIDENCE_ONLY</div>
+    </TechnicalDetails>
     <div className={styles.detailGrid}>
       <div className={styles.detailColumn}>
-        <Card className={styles.panel}><h2>군집 개요</h2><dl className={styles.factList}>
+        <Card className={styles.panel}><h2>그룹 개요</h2><dl className={styles.factList}>
           <div><dt>대상 공연</dt><dd>{event.name}</dd></div>
           <div><dt>조사 우선순위 (0~1)</dt><dd>{formatRiskScore(cluster.riskScore)}</dd></div>
-          <div><dt>저장 구성원</dt><dd>{cluster.storedMemberCount}건</dd></div>
-          <div><dt>증거 범위</dt><dd>저장 증거만 (STORED_EVIDENCE_ONLY)</dd></div>
+          <div><dt>저장된 예매 기록</dt><dd>{cluster.storedMemberCount}건</dd></div>
+          <div><dt>근거 범위</dt><dd>저장된 근거만</dd></div>
         </dl></Card>
         <Card className={styles.panel}><h2>분석 정보</h2><dl className={styles.factList}>
-          <div><dt>분석 요청 ID</dt><dd>{cluster.analysisRequestId}</dd></div>
           <div><dt>분석 시각</dt><dd>{formatAnalyzedAt(cluster.analyzedAt)}</dd></div>
           <div><dt>방법과 버전</dt><dd>{formatAlgorithm(cluster)}</dd></div>
-        </dl><p className={styles.muted}>군집 ID는 분석 요청 안에서만 유효하며 영속적인 Case 식별자가 아닙니다.</p></Card>
+        </dl><p className={styles.muted}>그룹 참조는 분석 요청 안에서만 유효하며 영속적인 조사 사건 식별자가 아닙니다.</p></Card>
       </div>
       <div className={styles.detailColumn}>
         <Card className={`${styles.panel} ${styles.graphPanel}`}>
-          <div className={styles.sectionHeading}><div><h2>연결 관계 그래프</h2><p>실제 저장 증거로 구성할 수 있는 관계만 표시합니다.</p></div></div>
-          <EmptyState title="연결 관계 그래프를 표시할 수 없습니다" description="현재 서버 응답은 저장된 구성원 식별자만 제공하며 공유 신호, 신호별 연결 관계, 그래프 간선, 좌석 정보를 제공하지 않습니다. 관계를 임의로 만들지 않기 위해 그래프를 표시하지 않습니다." />
+          <div className={styles.sectionHeading}><div><h2>공유 근거와 연결 관계</h2><p>실제 저장된 관계 근거만 표시합니다.</p></div></div>
+          <EmptyState title="공유 근거를 표시할 수 없습니다" description="현재 서버 응답은 저장된 예매 기록 참조만 제공하며 공유 신호, 신호별 연결 관계, 그래프 간선, 좌석 정보를 제공하지 않습니다. 관계를 임의로 만들지 않기 위해 그래프를 표시하지 않습니다. 공유 근거 조회는 Backend 계약을 준비 중입니다." />
         </Card>
-        <Card className={styles.tableCard}>
-          <div className={styles.sectionHeading}><h2>저장된 구성원</h2><span>{members.length}건</span></div>
+        <Card id="cluster-members" className={styles.tableCard}>
+          <div className={styles.sectionHeading}><h2>저장된 예매 기록</h2><span>{members.length}건</span></div>
           {members.length === 0
-            ? <EmptyState title="저장된 구성원이 없습니다" description="이 군집에 저장된 구성원 증거가 없습니다." />
-            : <DataTable caption="저장된 군집 구성원" columns={memberColumns} rows={members} getRowKey={(member) => member.auditId} />}
+            ? <EmptyState title="저장된 예매 기록이 없습니다" description="이 그룹에 저장된 예매 기록이 없습니다." />
+            : <DataTable caption="저장된 그룹 구성원" columns={memberColumns} rows={members} getRowKey={(member) => member.auditId} />}
+          <p className={styles.muted}>계정 참조와 예매 참조는 가명 처리된 값이며 실제 예매번호나 신원이 아닙니다.</p>
         </Card>
       </div>
-      <div className={styles.detailColumn}>
-        <Card className={styles.panel}><h2>확인된 사실과 검토 사항</h2><h3>저장 증거로 확인되는 사실</h3><p>분석 요청에서 이 군집에 속한 것으로 저장된 계정과 예매 참조만 표시했습니다.</p><h3>추가 검토 사항</h3><p>중복 저장 방지로 일부 구성원이 저장되지 않았을 수 있습니다. 전체 분석 스냅샷이나 확정 판정으로 해석하지 마세요.</p><p className={styles.warning}>군집 소속이나 조사 우선순위만으로 동일인 또는 부정 거래를 판단하지 마세요.</p></Card>
-        <CreateCasePanel context="Track 1 저장 군집" sources={{ eventId: event.id, graphClusters: [{ analysisRequestId: cluster.analysisRequestId, clusterId: cluster.clusterId }], fanReportIds: [], evidenceIds: [] }}
-          blockedReason={isCanonicalAnalysisRequestId(cluster.analysisRequestId) ? null : '이 군집의 분석 요청 ID가 소문자 UUID 형식이 아니어서 서버 계약상 Case 출처로 연결할 수 없습니다. 분석 결과를 다시 반입해야 하며 화면에서 ID를 바꾸지 않습니다.'} />
+      <div id="cluster-case" className={styles.detailColumn}>
+        <Card className={styles.panel}><h2>판단 시 주의</h2><p>분석 요청에서 이 그룹에 속한 것으로 저장된 계정과 예매 참조만 표시했습니다. 전체 분석 스냅샷이나 확정 판정으로 해석하지 마세요.</p><p className={styles.warning}>그룹 소속이나 조사 우선순위만으로 동일인 또는 부정 거래를 판단하지 마세요.</p></Card>
+        <CreateCasePanel context="연결된 예매 그룹" sources={{ eventId: event.id, graphClusters: [{ analysisRequestId: cluster.analysisRequestId, clusterId: cluster.clusterId }], fanReportIds: [], evidenceIds: [] }}
+          blockedReason={isCanonicalAnalysisRequestId(cluster.analysisRequestId) ? null : '이 그룹의 분석 요청 ID가 소문자 UUID 형식이 아니어서 서버 계약상 조사 사건 출처로 연결할 수 없습니다. 분석 결과를 다시 반입해야 하며 화면에서 ID를 바꾸지 않습니다.'} />
       </div>
     </div>
   </div>
