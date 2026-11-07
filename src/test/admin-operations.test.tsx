@@ -62,6 +62,23 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+describe('업무 중심 관리자 메뉴', () => {
+  it('업무 시작, 조사, 검토, 운영 그룹으로 기존 주소를 유지하고 접수 완료 바로가기는 서버 필터로 이동한다', async () => {
+    stubFetch({})
+    renderApp(`/app/fan-reports?eventId=${EVENT_A}&intakeStatus=RECEIVED`)
+    const nav = await screen.findByRole('navigation', { name: '관리자 탐색' })
+    for (const group of ['업무 시작', '조사', '검토', '운영']) expect(within(nav).getByText(group)).toBeInTheDocument()
+    expect(within(nav).getByRole('link', { name: '팬 제보 조사' })).toHaveAttribute('href', '/app/fan-reports')
+    expect(within(nav).getByRole('link', { name: '예매 관계 분석' })).toHaveAttribute('href', '/app/analysis/findings')
+    expect(within(nav).getByRole('link', { name: '조사 사건' })).toHaveAttribute('href', '/app/cases')
+    const shortcut = within(nav).getByRole('link', { name: '접수 완료된 제보' })
+    expect(shortcut).toHaveAttribute('href', '/app/fan-reports?intakeStatus=RECEIVED')
+    expect(shortcut).toHaveAttribute('aria-current', 'page')
+    // 서버 지원이 일부인 메뉴는 표시를 붙여 완료 기능처럼 보이지 않게 한다.
+    expect(within(nav).getByRole('link', { name: /^감사 기록/ })).toHaveTextContent('일부 지원')
+  })
+})
+
 describe('운영 메뉴 실제 조회', () => {
   it('분석 작업은 공연별 접수 상태 건수를 상태마다 한 번씩만 조회하고 공연 단위 작업 목록은 계약 대기로 표시한다', async () => {
     const urls = stubFetch({

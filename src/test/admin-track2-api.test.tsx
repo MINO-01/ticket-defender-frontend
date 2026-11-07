@@ -365,6 +365,25 @@ describe('Track 2 팬 제보 상세 실제 API', () => {
     expect(requestedUrls(fetchMock)).toEqual([detailPath(), historyPath()])
   })
 
+  it('상단 조사 진행 요약은 상세 응답만으로 확인한 사실과 미확인 내용을 나누고 접수번호를 만들지 않는다', async () => {
+    stubFetch(detailRoute())
+    const view = renderApp(`/app/fan-reports/${REPORT_1}`)
+    const guide = await screen.findByRole('region', { name: '조사 진행 요약' })
+    expect(within(guide).getByRole('region', { name: '확인한 사실' })).toHaveTextContent('접수 상태: 접수 완료')
+    expect(within(guide).getByRole('region', { name: '아직 확인되지 않은 내용' })).toHaveTextContent('판매자 표시는 확인된 신원이 아니며')
+    expect(within(guide).getByRole('region', { name: '다음 작업' })).toHaveTextContent('이미지 정보 추출')
+    expect(within(screen.getByRole('navigation', { name: '팬 제보 조사 단계' })).getAllByRole('link')).toHaveLength(5)
+    // 관리자 API가 접수번호를 주지 않으면 번호를 만들지 않고 제보 ID 앞부분과 미제공 안내를 보여 준다.
+    expect(screen.getByText('관리자 API가 접수번호를 아직 제공하지 않아 제보 ID 앞부분으로 표시합니다')).toBeInTheDocument()
+    expect(screen.getByText(`제보 ${REPORT_1.slice(0, 8)}`)).toBeInTheDocument()
+    view.unmount()
+
+    stubFetch(detailRoute(undefined, detail({ receiptNumber: 'TD-SYN-0001' })))
+    renderApp(`/app/fan-reports/${REPORT_1}`)
+    expect(await screen.findByText('TD-SYN-0001')).toBeInTheDocument()
+    expect(screen.queryByText('관리자 API가 접수번호를 아직 제공하지 않아 제보 ID 앞부분으로 표시합니다')).not.toBeInTheDocument()
+  })
+
   it('URL의 제보 ID가 UUID가 아니면 API를 호출하지 않고, 데모 제보 주소도 실제 화면에서 열지 않는다', async () => {
     const fetchMock = stubFetch(() => undefined)
     const view = renderApp('/app/fan-reports/DEMO-REP-008')

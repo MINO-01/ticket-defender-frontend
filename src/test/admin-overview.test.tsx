@@ -107,6 +107,12 @@ describe('관리자 전체 현황', () => {
     fireEvent.change(screen.getByRole('combobox', { name: '조회할 공연' }), { target: { value: EVENT_A } })
     const fan = await section('팬 제보 (팬 제보 조사)')
     expect(await within(fan).findByText('37')).toBeInTheDocument()
+    // 다음 업무 바로가기는 건수를 추정하지 않고 실제 화면으로만 이동한다.
+    const next = screen.getByRole('navigation', { name: '다음 업무' })
+    expect(within(next).getByRole('link', { name: /접수 완료된 제보 확인/ })).toHaveAttribute('href', `/app/fan-reports?eventId=${EVENT_A}&intakeStatus=RECEIVED`)
+    expect(within(next).getByRole('link', { name: /조사 사건 확인/ })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
+    expect(within(next).getByRole('link', { name: /보고서 승인 요청 검토/ })).toHaveAttribute('href', '/app/approvals')
+    expect(next).not.toHaveTextContent(/\d+건/)
     expect(within(await section('연결된 예매 그룹 (예매 관계 분석)')).getByText('12')).toBeInTheDocument()
     expect(screen.getByTestId('location').textContent).toBe(ROUTE)
     // 페이지 순회, 상세 N+1 조회, 자동 재조회를 하지 않는다.

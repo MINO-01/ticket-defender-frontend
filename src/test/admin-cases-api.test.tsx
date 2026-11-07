@@ -382,6 +382,12 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     const fetchMock = stubFetch(detailRoute())
     renderApp(`/app/cases/${CASE_1}?eventId=${EVENT_A}`)
     const overview = await screen.findByRole('region', { name: 'Case 개요' })
+    // 상단 진행 요약은 저장된 상태로 다음 작업만 안내하고 공식 PDF 발급 가능 여부를 추측하지 않는다.
+    const guide = screen.getByRole('region', { name: '조사 사건 진행 요약' })
+    expect(within(guide).getByRole('region', { name: '확인한 사실' })).toHaveTextContent('현재 상태: 검토 중 (서버 저장 값)')
+    expect(within(guide).getByRole('region', { name: '다음 작업' })).toHaveTextContent('조사 근거 묶음을 만들고')
+    expect(within(guide).getByRole('region', { name: '아직 확인되지 않은 내용' })).toHaveTextContent('발급 가능 여부는 승인 결정 기준으로 서버가 확인하기 전까지 알 수 없습니다')
+    expect(guide).not.toHaveTextContent('발급 가능합니다')
     expect(within(overview).getByText(CASE_1)).toBeInTheDocument()
     expect(within(overview).getByText(EVENT_A)).toBeInTheDocument()
     expect(within(overview).getByText('복합 검토')).toBeInTheDocument()
