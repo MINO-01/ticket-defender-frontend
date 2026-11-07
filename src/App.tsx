@@ -4,14 +4,12 @@ import type { ReactNode } from 'react'
 import { adminPages, fanPages } from './app/router/navigation'
 import { AdminLayout } from './layouts/admin/AdminLayout'
 import { FanLayout } from './layouts/fan/FanLayout'
-import { AdminPagePlaceholder } from './pages/admin/AdminPagePlaceholder'
 import { LoadingSkeleton } from './components/common/Feedback'
 import { AdminRouteErrorBoundary } from './features/admin-track1/AdminRouteErrorBoundary'
 import { AdminAuthProvider } from './features/admin-auth/AdminAuthProvider'
 import { ApprovalAttemptProvider } from './features/admin-approvals/approvalAttempts'
 import { RequireAdminAuth } from './features/admin-auth/RequireAdminAuth'
 import type { AdminAuthAdapter } from './features/admin-auth/authAdapter'
-import { BackendAuthCheckPanel } from './features/admin-settings/BackendAuthCheckPanel'
 import { OfficialPdfDecisionRoute, ReportCenterRoute } from './features/admin-reports/ReportCenterRoutes'
 import { GuidePage } from './features/fan-report/GuidePage'
 import { WritePage } from './features/fan-report/WritePage'
@@ -31,6 +29,9 @@ const ReservationImportRoute = lazy(() => import('./features/admin-imports/LiveR
 const CaseListRoute = lazy(() => import('./features/admin-cases/CaseRoutes').then((module) => ({ default: module.CaseListRoute })))
 const CaseDetailRoute = lazy(() => import('./features/admin-cases/CaseRoutes').then((module) => ({ default: module.CaseDetailRoute })))
 const ApprovalListRoute = lazy(() => import('./features/admin-approvals/ApprovalRoutes').then((module) => ({ default: module.ApprovalListRoute })))
+const AnalysisJobsRoute = lazy(() => import('./features/admin-operations/LiveOperationsPages').then((module) => ({ default: module.AnalysisJobsRoute })))
+const AuditRoute = lazy(() => import('./features/admin-operations/LiveOperationsPages').then((module) => ({ default: module.AuditRoute })))
+const SettingsRoute = lazy(() => import('./features/admin-operations/LiveOperationsPages').then((module) => ({ default: module.SettingsRoute })))
 const ApprovalDetailRoute = lazy(() => import('./features/admin-approvals/ApprovalRoutes').then((module) => ({ default: module.ApprovalDetailRoute })))
 
 // 보고서 센터는 실제 세션에서 승인 결정 ID 기반 공식 PDF 화면을, 미리보기에서 기존 비활성 안내를 연다.
@@ -76,7 +77,9 @@ export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuth
       <Route path="approvals/:approvalRequestId" element={<AdminRouteErrorBoundary backTo="/app/approvals" backLabel="승인 검토 화면으로 이동"><Suspense fallback={<LoadingSkeleton label="승인 요청을 여는 중" />}><ApprovalDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="report-center" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><ReportCenterRoute title={reportCenterPage.label} description={reportCenterPage.description} /></AdminRouteErrorBoundary>} />
       <Route path="report-center/decisions/:approvalDecisionId" element={<AdminRouteErrorBoundary backTo="/app/report-center" backLabel="보고서 센터로 이동"><OfficialPdfDecisionRoute title={reportCenterPage.label} description={reportCenterPage.description} /></AdminRouteErrorBoundary>} />
-      {adminPages.filter((page) => page.path !== 'overview' && page.path !== 'analysis/findings' && page.path !== 'imports' && page.path !== 'fan-reports' && page.path !== 'verified-performances' && page.path !== 'cases' && page.path !== 'approvals' && page.path !== 'report-center').map((page) => <Route key={page.path} path={page.path} element={<><AdminPagePlaceholder title={page.label} description={page.description} />{page.path === 'settings' && <BackendAuthCheckPanel />}</>} />)}
+      <Route path="analysis/jobs" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="분석 작업 화면을 여는 중" />}><AnalysisJobsRoute /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="audit" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="감사 기록 화면을 여는 중" />}><AuditRoute /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="settings" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="설정 화면을 여는 중" />}><SettingsRoute /></Suspense></AdminRouteErrorBoundary>} />
     </Route>
     <Route path="/fan" element={<FanLayout />}>
       <Route index element={<Navigate to="guide" replace />} />
