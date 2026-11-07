@@ -14,10 +14,11 @@ function renderRoute(path: string) {
 }
 
 describe('주요 화면 경로', () => {
-  it('관리자 화면에는 관리자 메뉴와 본문을 표시한다', () => {
+  it('관리자 화면에는 관리자 메뉴와 본문을 표시한다', async () => {
     renderRoute('/app/overview')
     expect(screen.getByRole('navigation', { name: '관리자 탐색' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '전체 현황' })).toBeInTheDocument()
+    // 전체 현황은 지연 로딩 화면이라 본문 제목이 나타날 때까지 기다린다.
+    expect(await screen.findByRole('heading', { name: '전체 현황' })).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: '팬 제보 탐색' })).not.toBeInTheDocument()
   })
 

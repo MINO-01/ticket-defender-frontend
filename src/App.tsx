@@ -26,6 +26,7 @@ const Track1DemoDetailRoute = lazy(() => import('./features/admin-track1/Track1R
 const Track2ListRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.Track2ListRoute })))
 const VerifiedPerformanceRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.VerifiedPerformanceRoute })))
 const Track2DetailRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.Track2DetailRoute })))
+const OverviewRoute = lazy(() => import('./features/admin-overview/LiveOverviewPage').then((module) => ({ default: module.OverviewRoute })))
 const ReservationImportRoute = lazy(() => import('./features/admin-imports/LiveReservationImportPage').then((module) => ({ default: module.ReservationImportRoute })))
 const CaseListRoute = lazy(() => import('./features/admin-cases/CaseRoutes').then((module) => ({ default: module.CaseListRoute })))
 const CaseDetailRoute = lazy(() => import('./features/admin-cases/CaseRoutes').then((module) => ({ default: module.CaseDetailRoute })))
@@ -48,10 +49,10 @@ function Home() {
   return <main className={styles.home}>
     <span className={styles.brand}>Ticket Defender</span>
     <h1>필요한 화면으로 이동하세요</h1>
-    <p>초기 화면 구조를 확인할 수 있습니다. 실제 서비스 인증과 업무 기능은 아직 연결되지 않았습니다.</p>
+    <p>관리자 화면은 관리자 계정으로 로그인한 뒤 서버가 허용한 공연의 실제 조회 결과만 표시합니다. 팬 제보 접수는 시연 환경에 접수 공연이 설정된 경우에만 동작합니다.</p>
     <div className={styles.choices}>
-      <Link to="/app/overview"><span>관리자</span><strong>운영 화면 살펴보기</strong><small>공통 메뉴와 화면 이동</small></Link>
-      <Link to="/fan/guide"><span>팬 제보</span><strong>제보 화면 살펴보기</strong><small>안내부터 조회 화면까지</small></Link>
+      <Link to="/app/overview"><span>관리자</span><strong>관리자 화면으로 이동</strong><small>로그인 후 공연별 전체 현황</small></Link>
+      <Link to="/fan/guide"><span>팬 제보</span><strong>팬 제보 화면으로 이동</strong><small>제보 안내와 작성</small></Link>
     </div>
   </main>
 }
@@ -61,6 +62,7 @@ export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuth
     <Route path="/" element={<Home />} />
     <Route path="/app" element={<RequireAdminAuth><ApprovalAttemptProvider><AdminLayout /></ApprovalAttemptProvider></RequireAdminAuth>}>
       <Route index element={<Navigate to="overview" replace />} />
+      <Route path="overview" element={<AdminRouteErrorBoundary backTo="/" backLabel="첫 화면으로 이동"><Suspense fallback={<LoadingSkeleton label="전체 현황을 여는 중" />}><OverviewRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 목록을 여는 중" />}><Track1ListRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings/detail" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings/:clusterId" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DemoDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
@@ -74,7 +76,7 @@ export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuth
       <Route path="approvals/:approvalRequestId" element={<AdminRouteErrorBoundary backTo="/app/approvals" backLabel="승인 검토 화면으로 이동"><Suspense fallback={<LoadingSkeleton label="승인 요청을 여는 중" />}><ApprovalDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="report-center" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><ReportCenterRoute title={reportCenterPage.label} description={reportCenterPage.description} /></AdminRouteErrorBoundary>} />
       <Route path="report-center/decisions/:approvalDecisionId" element={<AdminRouteErrorBoundary backTo="/app/report-center" backLabel="보고서 센터로 이동"><OfficialPdfDecisionRoute title={reportCenterPage.label} description={reportCenterPage.description} /></AdminRouteErrorBoundary>} />
-      {adminPages.filter((page) => page.path !== 'analysis/findings' && page.path !== 'imports' && page.path !== 'fan-reports' && page.path !== 'verified-performances' && page.path !== 'cases' && page.path !== 'approvals' && page.path !== 'report-center').map((page) => <Route key={page.path} path={page.path} element={<><AdminPagePlaceholder title={page.label} description={page.description} />{page.path === 'settings' && <BackendAuthCheckPanel />}</>} />)}
+      {adminPages.filter((page) => page.path !== 'overview' && page.path !== 'analysis/findings' && page.path !== 'imports' && page.path !== 'fan-reports' && page.path !== 'verified-performances' && page.path !== 'cases' && page.path !== 'approvals' && page.path !== 'report-center').map((page) => <Route key={page.path} path={page.path} element={<><AdminPagePlaceholder title={page.label} description={page.description} />{page.path === 'settings' && <BackendAuthCheckPanel />}</>} />)}
     </Route>
     <Route path="/fan" element={<FanLayout />}>
       <Route index element={<Navigate to="guide" replace />} />
