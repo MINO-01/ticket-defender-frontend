@@ -425,7 +425,7 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     expect(screen.getByRole('region', { name: '승인 요청 제출' })).toBeInTheDocument()
     for (const name of ['상태 변경', '담당자 변경', 'EvidenceSnapshot', '보고서 초안']) expect(screen.getByRole('region', { name })).toBeInTheDocument()
     expect(screen.queryByText(/DEMO-|합성 데모 데이터|시연 담당/)).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '← Case 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
+    expect(screen.getByRole('link', { name: '← 조사 사건 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
     expect(requestedUrls(fetchMock)).toEqual([detailPath(), sourcesPath(), snapshotsPath(), reportVersionsPath(), activitiesPath()])
   })
 
@@ -443,7 +443,7 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     expect(screen.queryByRole('region', { name: '활동 이력' })).not.toBeInTheDocument()
     expect(screen.queryByText(/SQLSTATE|내부 고객사/)).not.toBeInTheDocument()
     expect(requestedUrls(fetchMock)).toEqual([detailPath()])
-    expect(screen.getByRole('link', { name: '← Case 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
+    expect(screen.getByRole('link', { name: '← 조사 사건 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
   })
 
   it('주소의 공연과 다른 공연의 Case 응답은 표시하지 않고 출처를 요청하지 않는다', async () => {
@@ -465,7 +465,7 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     const fetchMock = stubFetch(detailRoute())
     renderApp(`/app/cases/${CASE_1}`)
     expect(await screen.findByRole('region', { name: 'Case 개요' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '← Case 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
+    expect(screen.getByRole('link', { name: '← 조사 사건 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
     await screen.findByRole('region', { name: '활동 이력' })
     expect(requestedUrls(fetchMock)).toEqual([detailPath(), sourcesPath(), snapshotsPath(), reportVersionsPath(), activitiesPath()])
   })
@@ -508,7 +508,7 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     stubFetch(detailRoute({ [sourcesPath()]: () => json(200, [{ ...clusterSource, riskScore: null, analysisAlgorithm: null, analysisAlgorithmVersion: null, analysisCompletedAt: null }]) }))
     renderApp(`/app/cases/${CASE_1}?eventId=${EVENT_A}`)
     const cluster = await screen.findByRole('article', { name: 'Track 1 저장 군집 증거' })
-    expect(within(cluster).getByText('Risk Score').nextElementSibling).toHaveTextContent('값 없음')
+    expect(within(cluster).getByText('조사 우선순위 (Risk Score)').nextElementSibling).toHaveTextContent('값 없음')
     expect(within(cluster).getByText('분석 알고리즘').nextElementSibling).toHaveTextContent('기록 없음')
     expect(within(cluster).getByText('분석 완료 시각').nextElementSibling).toHaveTextContent('기록 없음')
     expect(within(cluster).queryByText('0.00')).not.toBeInTheDocument()

@@ -286,7 +286,7 @@ describe('Track 1 군집에서 Case 생성', () => {
     expect(within(region()).getByRole('button', { name: /Case 생성 요청 중/ })).toBeDisabled()
     await act(async () => { pending.resolve(json(201, caseView())) })
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`/app/cases/${CASE_1}?eventId=${EVENT_A}`))
-    expect(await screen.findByRole('heading', { name: 'Case 상세' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '조사 사건 상세' })).toBeInTheDocument()
     expect(JSON.stringify({ ...sessionStorage, ...localStorage })).not.toContain(post.headers['Idempotency-Key'])
   })
 
