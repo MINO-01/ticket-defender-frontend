@@ -39,7 +39,7 @@ export function FanReportListPage({ data = demoTrack2Data, state = 'ready' }: { 
   ]
 
   return <div className={styles.page}>
-    <PageHeader eyebrow="Track 2 · 합성 데모 데이터" title="팬 제보 검토" description="증거 관찰 내용과 예매 대조 후보를 살펴봅니다. 실제 접수·분석 조회 기능은 아직 연결되지 않았습니다." />
+    <PageHeader eyebrow="팬 제보 조사 (합성 데모 데이터)" title="팬 제보 조사" description="증거 관찰 내용과 예매 대조 후보를 살펴봅니다. 실제 접수와 분석 조회는 인증된 관리자 세션에서 제공합니다." />
     <div className={styles.metrics} aria-label="현재 필터 결과 요약">
       <Card><span>검색 결과</span><strong>{matching.length}건</strong></Card>
       <Card><span>추출 완료</span><strong>{matching.filter((report) => extraction(report).status === 'COMPLETED').length}건</strong></Card>
