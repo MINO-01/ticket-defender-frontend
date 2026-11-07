@@ -5,6 +5,9 @@ import { Button } from '../../components/common/Button'
 import { Card } from '../../components/common/Card'
 import { ErrorState, LoadingSkeleton } from '../../components/common/Feedback'
 import { PageHeader } from '../../components/common/PageHeader'
+import { TechnicalDetails, WorkGuide } from '../../components/common/WorkGuide'
+import type { GuideItem } from '../../components/common/WorkGuide'
+import { roleLabels, terms } from '../../app/terms'
 import { Textarea } from '../../components/common/FormControls'
 import { statusLabels } from '../../components/common/statusLabels'
 import { useAdminApiClient } from '../admin-auth/AdminAuthProvider'
@@ -77,9 +80,10 @@ function ApprovalRequestDetail({ requestId }: { requestId: string }) {
   const reviewBlocked = reentry === 'checking' || reentry === 'pending'
   return <div className={styles.page}>
     {back}
-    <PageHeader eyebrow="승인 검토" title="승인 요청 상세" description="검토 담당이 고정한 증거와 보고서 개정을 독립된 승인 담당이 검토하고 승인 또는 반려를 기록합니다. 승인 결정은 부정 거래 판정이나 공식 PDF 발급이 아닙니다." />
+    <PageHeader eyebrow="검토" title="승인 요청 상세" description="검토 담당이 고정한 조사 근거 묶음과 조사 보고서 초안을, 요청자와 다른 승인 담당이 독립적으로 검토하고 승인 또는 반려를 기록합니다. 승인 결정은 부정 거래 판정이나 공식 PDF 발급이 아닙니다." />
     {refreshing && <p className={styles.caution} role="status">서버의 최신 요청 상태를 다시 불러오는 중입니다. 완료될 때까지 변경 요청을 막습니다.</p>}
     {reentry !== null && <ReentryNotice reentry={reentry} onRecheck={refresh} onAcknowledge={() => { attempts.unmark(requestId); setReentry(null) }} />}
+    <ApprovalGuide request={request} />
     <RequestOverview request={request} />
     <div className={styles.detailGrid}>
       <div className={styles.mainColumn}>
@@ -89,8 +93,8 @@ function ApprovalRequestDetail({ requestId }: { requestId: string }) {
         <WithdrawPanel request={request} locked={refreshing} onRefresh={refresh} />
         <Card className={styles.panel}>
           <h2>후속 단계</h2>
-          <p className={styles.caution}>공식 PDF 발급은 승인 결정과 별도 절차입니다. 보고서 센터에서 승인 결정 ID로 서버의 발급 적격성을 확인한 뒤 고객사 관리자가 요청합니다. 이 요청 상세에서는 결정 ID를 다시 조회할 수 없어 결정 직후 결과의 링크나 결정 ID를 사용해야 합니다.</p>
-          <Link className={styles.detailLink} to={reportCenterRoute}>보고서 센터로 이동</Link>
+          <p className={styles.caution}>공식 보고서 PDF 발급은 승인 결정과 별도 절차입니다. 조사 보고서 발급 화면에서 승인 결정 ID로 서버의 발급 가능 여부를 확인한 뒤 고객사 관리자가 요청합니다. 이 요청 상세에서는 결정 ID를 다시 조회할 수 없어 결정 직후 결과의 링크나 결정 ID를 사용해야 합니다.</p>
+          <Link className={styles.detailLink} to={reportCenterRoute}>조사 보고서 발급 화면으로 이동</Link>
         </Card>
       </aside>
     </div>
@@ -120,18 +124,64 @@ function ReentryNotice({ reentry, onRecheck, onAcknowledge }: { reentry: Exclude
   </div>
 }
 
+// 승인 요청의 서버 상태별 안내다. 승인 완료여도 공식 PDF 발급 가능 여부는 보고서 발급 화면에서 서버가 다시 확인하므로 여기서 추측하지 않는다.
+const approvalNext: Record<ApprovalRequestView['status'], string[]> = {
+  PENDING: ['승인 담당(요청자 본인 제외)이 아래 독립 검토에서 검토 자료를 열고 승인 또는 반려를 결정합니다.', '요청자는 근거를 바꿔야 하면 결정 전에 요청을 철회할 수 있습니다.'],
+  APPROVED: ['결정 직후 결과의 공식 PDF 발급 화면 링크나, 조사 보고서 발급 화면에서 승인 결정 ID로 발급 가능 여부를 확인합니다.'],
+  REJECTED: ['조사 사건으로 돌아가 근거나 보고서 초안을 보완한 뒤 새 승인 요청을 만듭니다.'],
+  WITHDRAWN: ['요청이 철회되었습니다. 조사 사건에서 근거를 정리한 뒤 새 승인 요청을 만듭니다.'],
+  INVALIDATED: ['근거나 요청자 권한 변경으로 무효화되었습니다. 조사 사건을 다시 검토한 뒤 새 승인 요청을 만듭니다.'],
+}
+
+const approvalStages = [
+  { key: 'requested', title: '승인 요청', done: () => true },
+  { key: 'decided', title: '독립 검토와 결정', done: (status: ApprovalRequestView['status']) => status === 'APPROVED' || status === 'REJECTED' },
+  { key: 'pdf', title: '발급 가능 여부 확인', done: () => false },
+] as const
+
+function ApprovalGuide({ request }: { request: ApprovalRequestView }) {
+  const confirmed: GuideItem[] = [
+    { key: 'status', content: <>요청 상태: {approvalStatusLabels[request.status]} (서버 값)</> },
+    { key: 'basis', content: `요청 시점의 ${terms.evidenceSnapshot}(증거 개정 ${request.evidenceRevision})과 ${terms.reportVersion}(개정 ${request.reportRevision})이 고정되어 있습니다.` },
+    { key: 'requested', content: <>요청 시각 {formatUtc(request.requestedAt)}</> },
+  ]
+  const unconfirmed: GuideItem[] = [
+    { key: 'pdf', content: '공식 보고서 PDF 발급 가능 여부는 승인 결정 이후 서버가 발급 시점에 다시 확인합니다.' },
+    { key: 'judgement', content: '승인은 보고서 내용을 검토한 결과이며 부정 거래 여부를 정하는 판정이 아닙니다.' },
+  ]
+  const next: GuideItem[] = approvalNext[request.status].map((text, index) => ({ key: `next-${index}`, content: text }))
+  return <>
+    <WorkGuide title="승인 진행 요약" confirmed={confirmed} unconfirmed={unconfirmed} next={next} />
+    <Card className={styles.panel} aria-label="역할 안내">
+      <h2>누가 무엇을 하나요</h2>
+      <dl className={styles.definition}>
+        <div><dt>승인 요청</dt><dd>{roleLabels.REVIEWER}가 조사 사건에서 요청합니다.</dd></div>
+        <div><dt>독립 검토와 결정</dt><dd>{roleLabels.APPROVER}가 결정합니다. 요청자 본인은 결정할 수 없습니다(자기 승인 금지).</dd></div>
+        <div><dt>공식 PDF 발급</dt><dd>{roleLabels.TENANT_ADMIN}가 승인 결정 기준으로 요청하며, 서버가 발급 시점에 근거를 다시 확인합니다.</dd></div>
+      </dl>
+      <ol className={styles.stageList} aria-label="승인 단계">
+        {approvalStages.map((stage) => <li key={stage.key} data-done={stage.done(request.status)}>{stage.title}: {stage.done(request.status) ? '완료' : stage.key === 'pdf' ? '보고서 발급 화면에서 서버 확인' : '대기 또는 종료'}</li>)}
+      </ol>
+    </Card>
+  </>
+}
+
 function RequestOverview({ request }: { request: ApprovalRequestView }) {
   return <Card className={styles.overview} aria-label="승인 요청 개요">
     <div className={styles.panelHeading}><h2>승인 요청 개요</h2><strong>{approvalStatusLabels[request.status]}</strong></div>
+    <dl className={styles.overviewGrid}>
+      <div><dt>요청 시각</dt><dd><time dateTime={request.requestedAt}>{formatUtc(request.requestedAt)}</time></dd></div>
+      <div><dt>대상 조사 사건</dt><dd>사건 {request.caseId.slice(0, 8)}</dd></div>
+      <div><dt>승인 적격성 (서버 값)</dt><dd>차단 (BLOCKED)</dd></div>
+    </dl>
+    <TechnicalDetails summary="기술 상세 (요청 ID, 버전, 고정된 근거 SHA-256)">
     <dl className={styles.overviewGrid}>
       <div><dt>승인 요청 ID</dt><dd className={styles.idCell}>{request.approvalRequestId}</dd></div>
       <div><dt>Case ID</dt><dd className={styles.idCell}>{request.caseId}</dd></div>
       <div><dt>공연 ID</dt><dd className={styles.idCell}>{request.eventId}</dd></div>
       <div><dt>요청자 멤버십 ID</dt><dd className={styles.idCell}>{request.requestedBy}</dd></div>
-      <div><dt>요청 시각</dt><dd><time dateTime={request.requestedAt}>{formatUtc(request.requestedAt)}</time></dd></div>
       <div><dt>요청 버전</dt><dd>{request.version}</dd></div>
       <div><dt>요청 시점 Case 버전</dt><dd>{request.caseVersionAtSubmit}</dd></div>
-      <div><dt>승인 적격성 (서버 값)</dt><dd>차단 (BLOCKED)</dd></div>
     </dl>
     <h3>고정된 근거</h3>
     <dl className={styles.definition}>
@@ -144,10 +194,11 @@ function RequestOverview({ request }: { request: ApprovalRequestView }) {
       <div><dt>템플릿</dt><dd>{request.reportTemplateVersion}</dd></div>
       <div><dt>템플릿 SHA-256</dt><dd className={styles.idCell}>{request.reportTemplateSha256}</dd></div>
     </dl>
+    </TechnicalDetails>
     <p className={styles.linkReason}><strong>요청 사유</strong><span className={styles.plainText}>{request.reason}</span></p>
     {request.status === 'INVALIDATED' && <p className={styles.blocked} role="note">서버가 영수증 발급이나 결정 시점의 재검증에서 근거 또는 요청자 권한 변경을 확인해 이 요청을 무효화했습니다. 서버는 근거 변경을 실시간으로 감지하지 않습니다. 새 승인 요청은 Case를 다시 검토한 뒤 만들어야 합니다.</p>}
     <p className={styles.caution}>승인 적격성은 서버가 돌려준 값이며 화면에서 계산하지 않습니다. 멤버십 ID를 이름으로 바꾸는 API가 없어 ID로만 표시합니다.</p>
-    <Link className={styles.detailLink} to={caseDetailRoute(request.caseId, request.eventId)}>Case 상세 보기</Link>
+    <Link className={styles.detailLink} to={caseDetailRoute(request.caseId, request.eventId)}>조사 사건으로 이동</Link>
   </Card>
 }
 

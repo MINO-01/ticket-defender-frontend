@@ -74,3 +74,6 @@
 @media(max-width:1100px){.filters{grid-template-columns:repeat(3,minmax(0,1fr))}.filters .search{grid-column:span 2}.detailGrid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:680px){.page{gap:16px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metrics>section{padding:16px}.metrics strong{font-size:24px}.filterCard,.tableCard,.panel,.overview{padding:18px}.filters{grid-template-columns:repeat(2,minmax(0,1fr))}.filters .search{grid-column:1/-1}.filters>button{grid-column:1/-1}.overviewGrid,.source .definition{grid-template-columns:repeat(2,minmax(0,1fr))}.reviewGrid{grid-template-columns:minmax(0,1fr)}.reviewGrid .unknowns{grid-column:auto}.actions{grid-template-columns:minmax(0,1fr)}.pagination{justify-content:center}}
 @media(max-width:420px){.overviewGrid,.source .definition{grid-template-columns:minmax(0,1fr)}.filters{grid-template-columns:minmax(0,1fr)}.filters .search{grid-column:auto}}
+
+.stageList { display: grid; gap: 6px; margin: 12px 0 0; padding-left: 20px; font-size: 13px; }
+.stageList li[data-done='true'] { color: var(--color-success); font-weight: 700; }
