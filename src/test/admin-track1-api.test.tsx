@@ -394,7 +394,7 @@ describe('Track 1 군집 상세 실제 API', () => {
     expect(screen.queryByRole('combobox', { name: '연결 신호 필터' })).not.toBeInTheDocument()
     expect(screen.queryByText(/DEMO-/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Case 생성' })).toBeDisabled()
-    expect(screen.getByRole('link', { name: '← 군집 목록' })).toHaveAttribute('href', `/app/analysis/findings?eventId=${EVENT_A}`)
+    expect(screen.getByRole('link', { name: '← 예매 그룹 목록' })).toHaveAttribute('href', `/app/analysis/findings?eventId=${EVENT_A}`)
   })
 
   it('목록에서 상세로 이동할 때 식별자를 유지한다', async () => {
