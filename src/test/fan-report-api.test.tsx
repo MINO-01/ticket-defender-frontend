@@ -213,6 +213,10 @@ describe('팬 제보 실제 제출 화면', () => {
     expect(screen.getByText(RECEIPT.lookupCode)).toBeInTheDocument()
     expect(screen.getByText('접수됨')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /안전하게 보관해 주세요/ })).toBeInTheDocument()
+    // 접수번호, 조회 코드, 판매자 표시 이름, 예매자 식별 정보가 서로 다른 개념임을 안내한다.
+    const identifiers = screen.getByRole('region', { name: '번호와 정보의 차이' })
+    expect(identifiers).toHaveTextContent('본인 확인용 비밀 코드입니다')
+    expect(identifiers).toHaveTextContent('확인된 신원이 아닙니다')
     expect(screen.queryByText('DEMO-ONLY-0001')).not.toBeInTheDocument()
     expect(calls[0].files).toEqual([])
     expectNoLeak(calls[0].headers['Report-Recovery-Secret'], RECEIPT.lookupCode)

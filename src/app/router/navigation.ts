@@ -30,8 +30,8 @@ export const supportLabels: Record<AdminSupport, string> = { live: '', partial: 
 export const fanPages = [
   { path: 'guide', label: '제보 안내', description: '제보 절차와 준비할 내용을 안내합니다.', step: 0 },
   { path: 'write', label: '제보 작성', description: '제보 내용을 작성하고 증거파일을 선택합니다.', step: 1 },
-  { path: 'review', label: '최종 확인', description: '입력한 내용을 확인합니다. 실제 접수는 아직 할 수 없습니다.', step: 2 },
-  { path: 'complete', label: '접수 완료', description: '실제 접수 API 연결 후에만 완료 상태를 표시합니다.', step: null },
-  { path: 'lookup', label: '내 제보 조회 인증', description: '안전한 조회 인증 방식이 확정되면 이 화면을 제공할 예정입니다.', step: null },
+  { path: 'review', label: '최종 확인', description: '입력한 내용을 확인하고 제출합니다. 접수 공연이 설정된 환경에서만 제출할 수 있습니다.', step: 2 },
+  { path: 'complete', label: '접수 완료', description: '서버가 접수를 확인한 경우에만 접수번호와 조회 코드를 표시합니다.', step: null },
+  { path: 'lookup', label: '내 제보 조회 인증', description: '접수번호와 조회 코드로 본인 제보를 확인합니다.', step: null },
   { path: 'status', label: '내 제보 상태', description: '조회 인증 전에는 제보 상세 내용과 이미지를 표시하지 않습니다.', step: null },
 ] as const
