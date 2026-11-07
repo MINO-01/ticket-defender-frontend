@@ -20,7 +20,7 @@ Backend 계약은 변경하지 않았습니다. 기준 문서는 Backend `docs/a
 | 후보 실행 이력 | `GET .../candidate-matches?page&pageSize=20` | ANALYST, REVIEWER | 200 페이지 | 없음 |
 
 - 시각은 오프셋 없는 LocalDateTime이며 서버가 UTC로 만듭니다(격리 E2E에서 확인). 화면은 기존 `utcDateTime` 스키마로 UTC로만 해석합니다.
-- 합성 예매 적재(`reservation-imports`) 화면은 만들지 않았습니다. 서버 기본 차단 상태를 그대로 둡니다.
+- 합성 예매 적재(`reservation-imports`)는 Issue #42에서 별도 화면(`/app/imports`)으로 연결했습니다. 사용 조건은 [admin-reservation-import.md](admin-reservation-import.md)를 봅니다. 서버 기본 차단 상태는 그대로 둡니다.
 
 ## 화면 구성
 
