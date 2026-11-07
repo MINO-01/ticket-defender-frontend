@@ -1,5 +1,5 @@
 export const adminPages = [
-  { path: 'overview', label: '전체 현황', group: '운영', description: '작업 현황을 확인하는 화면입니다.' },
+  { path: 'overview', label: '전체 현황', group: '운영', description: '선택한 공연의 팬 제보, 저장된 군집, 최근 Case 현황을 확인하는 화면입니다.' },
   { path: 'imports', label: '데이터 반입', group: '운영', description: '합성 격리 테스트 환경에서 예매 스냅샷을 반입하는 화면입니다.' },
   { path: 'analysis/jobs', label: '분석 작업', group: '운영', description: '분석 작업의 실행 상태를 확인하는 화면입니다.' },
   { path: 'analysis/findings', label: '연관 예매 분석', group: '조사', description: '연관 예매 조사 결과를 살펴보는 화면입니다.' },

@@ -1,0 +1,23 @@
+.page { display: grid; gap: 24px; min-width: 0; }
+.page :is(button, a, select):focus-visible { outline: 3px solid var(--color-primary-500); outline-offset: 2px; }
+.notice { margin: 0; padding: 14px 18px; border: 1px solid #c6dcf6; border-radius: var(--radius-control); background: #eef6ff; color: var(--color-navy-800); font-size: 13px; line-height: 1.6; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grid > :last-child { grid-column: 1 / -1; }
+.section { display: grid; align-content: start; gap: 14px; min-width: 0; padding: 18px; overflow-wrap: anywhere; }
+.heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.heading h2 { margin: 0; font-size: 17px; }
+.heading > span { color: var(--color-text-secondary); font-size: 12px; }
+.count { display: grid; gap: 4px; margin: 0; }
+.count strong { color: var(--color-navy-900); font-size: 30px; }
+.count span, .note, .empty { color: var(--color-text-secondary); font-size: 13px; line-height: 1.55; }
+.note, .empty { margin: 0; }
+.links { display: flex; flex-wrap: wrap; gap: 12px; font-size: 14px; font-weight: 700; }
+.links a { color: var(--color-primary-700); text-underline-offset: 3px; }
+.caseList { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.caseList li { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--color-border); font-size: 13px; }
+.caseList li:last-child { border-bottom: 0; }
+.caseId { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }
+@media (max-width: 860px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .caseList li { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
