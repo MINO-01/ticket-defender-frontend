@@ -38,14 +38,14 @@ const notice = '이 화면은 합성 격리 환경(A3 SYNTHETIC_ISOLATED)의 테
 export function ReservationImportRoute() {
   const { state } = useAdminAuth()
   return state.status === 'preview'
-    ? <AdminPagePlaceholder title="데이터 반입" description="합성 예매 스냅샷 반입은 인증된 관리자 세션에서만 실제 API로 제공합니다." />
+    ? <AdminPagePlaceholder title="예매 자료 준비" description="합성 예매 스냅샷 반입은 인증된 관리자 세션에서만 실제 API로 제공합니다." />
     : <LiveReservationImportPage />
 }
 
 export function LiveReservationImportPage() {
   const enabled = isSyntheticImportUiEnabled()
   return <div className={trackStyles.page}>
-    <PageHeader eyebrow="Track 2 합성 격리 테스트" title="데이터 반입" description="검증된 회차에 합성 예매 스냅샷을 반입합니다. 반입한 스냅샷은 예매 후보 대조의 기준 자료이며 부정 거래 판정이 아닙니다." />
+    <PageHeader eyebrow="운영 (합성 격리 테스트)" title="예매 자료 준비" description="검증된 회차에 합성 예매 스냅샷을 반입합니다. 반입한 스냅샷은 예매 기록 비교의 기준 자료이며 부정 거래 판정이 아닙니다." />
     <p className={styles.testOnly} role="note"><strong>테스트 전용</strong> {notice}</p>
     {enabled
       ? <AdminEventGate>{(event) => <EventImport key={event.id} event={event} />}</AdminEventGate>
