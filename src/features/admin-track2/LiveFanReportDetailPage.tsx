@@ -68,7 +68,7 @@ function ReportDetail({ fanReportId }: { fanReportId: string }) {
     <Link className={styles.backLink} to={fanReportListRoute(report.event.id)}>← 제보 목록</Link>
     <PageHeader eyebrow="팬 제보 조사" title="팬 제보 상세" description="제보 내용과 저장된 증거를 확인하고, 이미지 정보 추출, 검증 회차 연결, 예매 기록 비교를 거쳐 조사 사건을 만듭니다. 추출 관찰값과 일치 예매 후보는 사실 확인이나 부정 거래 판정이 아닙니다." />
     <Card className={styles.summary}>
-      <div><span>접수번호</span><strong>{report.receiptNumber ?? fanReportReference(report)}</strong>{!report.receiptNumber && <small className={styles.cellSub}>관리자 API가 접수번호를 아직 제공하지 않아 제보 ID 앞부분으로 표시합니다</small>}</div>
+      <div><span>접수번호</span><strong>{report.receiptNumber ?? fanReportReference(report)}</strong>{!report.receiptNumber && <small className={styles.cellSub}>서버 응답에 접수번호가 없어 제보 ID 앞부분으로 표시합니다</small>}</div>
       <div><span>대상 공연</span><strong>{report.event.name}</strong></div>
       <div><span>제보 유형</span><strong>{reportTypeLabels[report.reportType]}</strong></div>
       <div><span>접수 상태</span><StatusPill label={intakeStatusLabels[report.intakeStatus]} tone={intakeTone(report.intakeStatus)} /></div>

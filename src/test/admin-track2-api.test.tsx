@@ -155,6 +155,19 @@ afterEach(() => {
 })
 
 describe('Track 2 팬 제보 목록 실제 API', () => {
+  it('서버 접수번호가 있으면 접수번호를, null이면 번호를 만들지 않고 없음 안내를 표시한다', async () => {
+    stubFetch((url) => {
+      if (url === EVENTS_PATH) return json(200, eventPage())
+      if (url === listPath(EVENT_A)) return json(200, reportPage(eventA, [summary({ receiptNumber: 'TD-SYN-0002' }), summary({ fanReportId: REPORT_2, receiptNumber: null })], { totalItems: 2 }))
+      return undefined
+    })
+    renderApp(`/app/fan-reports?eventId=${EVENT_A}`)
+    const table = await screen.findByRole('table')
+    expect(within(table).getByText('TD-SYN-0002')).toBeInTheDocument()
+    expect(within(table).getByText(`제보 ${REPORT_2.slice(0, 8)}`)).toBeInTheDocument()
+    expect(within(table).getAllByText('서버 응답에 접수번호 없음')).toHaveLength(1)
+  })
+
   it('인증된 관리자는 선택한 공연의 서버 목록만 Bearer 토큰으로 조회하고 데모 데이터를 섞지 않는다', async () => {
     const fetchMock = stubFetch((url) => {
       if (url === EVENTS_PATH) return json(200, eventPage())
@@ -374,14 +387,14 @@ describe('Track 2 팬 제보 상세 실제 API', () => {
     expect(within(guide).getByRole('region', { name: '다음 작업' })).toHaveTextContent('이미지 정보 추출')
     expect(within(screen.getByRole('navigation', { name: '팬 제보 조사 단계' })).getAllByRole('link')).toHaveLength(5)
     // 관리자 API가 접수번호를 주지 않으면 번호를 만들지 않고 제보 ID 앞부분과 미제공 안내를 보여 준다.
-    expect(screen.getByText('관리자 API가 접수번호를 아직 제공하지 않아 제보 ID 앞부분으로 표시합니다')).toBeInTheDocument()
+    expect(screen.getByText('서버 응답에 접수번호가 없어 제보 ID 앞부분으로 표시합니다')).toBeInTheDocument()
     expect(screen.getByText(`제보 ${REPORT_1.slice(0, 8)}`)).toBeInTheDocument()
     view.unmount()
 
     stubFetch(detailRoute(undefined, detail({ receiptNumber: 'TD-SYN-0001' })))
     renderApp(`/app/fan-reports/${REPORT_1}`)
     expect(await screen.findByText('TD-SYN-0001')).toBeInTheDocument()
-    expect(screen.queryByText('관리자 API가 접수번호를 아직 제공하지 않아 제보 ID 앞부분으로 표시합니다')).not.toBeInTheDocument()
+    expect(screen.queryByText('서버 응답에 접수번호가 없어 제보 ID 앞부분으로 표시합니다')).not.toBeInTheDocument()
   })
 
   it('URL의 제보 ID가 UUID가 아니면 API를 호출하지 않고, 데모 제보 주소도 실제 화면에서 열지 않는다', async () => {

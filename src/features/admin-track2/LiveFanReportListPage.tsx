@@ -24,7 +24,7 @@ export function LiveFanReportListPage() {
   return <div className={styles.page}>
     <PageHeader eyebrow="조사" title="팬 제보 조사" description="선택한 공연에 접수된 팬 제보를 최근 접수 순으로 확인하고, 제보를 열어 이미지 정보 추출부터 조사 사건 생성까지 진행합니다. 접수 상태는 분석 결과나 부정 거래 판정이 아닙니다." />
     <AdminEventGate>{(event) => <ReportList key={event.id} event={event} />}</AdminEventGate>
-    <p className={styles.notice}>접수 상태는 증거 저장 여부를 나타내며 이미지 정보 추출 결과가 아닙니다. 접수 완료는 담당자가 아직 보지 않은 새 제보라는 뜻도 아닙니다. 추출 이력과 관찰값은 제보를 열어 증거별로 확인합니다. 검색, 추출 상태 필터, 예매 기록 비교 필터는 서버가 지원하지 않아 제공하지 않습니다. 접수번호는 관리자 API가 반환할 때만 표시합니다.</p>
+    <p className={styles.notice}>접수 상태는 증거 저장 여부를 나타내며 이미지 정보 추출 결과가 아닙니다. 접수 완료는 담당자가 아직 보지 않은 새 제보라는 뜻도 아닙니다. 추출 이력과 관찰값은 제보를 열어 증거별로 확인합니다. 검색, 추출 상태 필터, 예매 기록 비교 필터는 서버가 지원하지 않아 제공하지 않습니다. 접수번호는 서버가 반환한 값만 표시하며 제보자 신원이 아닙니다.</p>
   </div>
 }
 
@@ -73,7 +73,7 @@ function ReportList({ event }: { event: AdminEvent }) {
   const columns = [
     { key: 'reference', header: '접수번호', render: (report: FanReportSummary) => report.receiptNumber
       ? <strong>{report.receiptNumber}</strong>
-      : <span>{fanReportReference(report)}<small className={styles.cellSub}>접수번호 미제공 (관리자 API)</small></span> },
+      : <span>{fanReportReference(report)}<small className={styles.cellSub}>서버 응답에 접수번호 없음</small></span> },
     { key: 'event', header: '공연', render: () => event.name },
     { key: 'type', header: '제보 유형', render: (report: FanReportSummary) => reportTypeLabels[report.reportType] },
     { key: 'received', header: '접수일', render: (report: FanReportSummary) => <time dateTime={report.receivedAt}>{formatUtc(report.receivedAt)}</time> },

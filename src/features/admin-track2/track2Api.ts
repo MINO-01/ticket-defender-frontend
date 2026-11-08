@@ -14,8 +14,8 @@ export const intakeStatuses = ['PENDING_STORAGE', 'RECEIVED', 'STORAGE_FAILED', 
 export type IntakeStatus = (typeof intakeStatuses)[number]
 const reportTypes = ['PREMIUM_RESALE', 'AUTOMATION_OFFER', 'FAKE_TICKET', 'OTHER'] as const
 const storageStatuses = ['PENDING', 'STORED', 'FAILED'] as const
-const executionStatuses = ['IN_PROGRESS', 'SUCCEEDED', 'INPUT_REJECTED', 'STORAGE_FAILED', 'ANALYZER_FAILED', 'ABANDONED'] as const
-const analysisStatuses = ['COMPLETED', 'PARTIAL', 'UNVERIFIABLE', 'FAILED'] as const
+export const executionStatuses = ['IN_PROGRESS', 'SUCCEEDED', 'INPUT_REJECTED', 'STORAGE_FAILED', 'ANALYZER_FAILED', 'ABANDONED'] as const
+export const analysisStatuses = ['COMPLETED', 'PARTIAL', 'UNVERIFIABLE', 'FAILED'] as const
 const fieldStates = ['FOUND', 'UNKNOWN', 'AMBIGUOUS'] as const
 const unknownReasons = ['ABSENT', 'UNREADABLE', 'NOT_CONFIRMED'] as const
 const candidateMatchReasons = ['PERFORMANCE_REF_UNVERIFIED', 'SEAT_NOT_FOUND', 'MATCH_SCORE_UNAVAILABLE', 'ANALYSIS_NOT_SUCCEEDED'] as const
@@ -37,8 +37,9 @@ const uuid = z.string().refine(isUuid).transform((value) => value.toLowerCase())
 
 const eventSchema = z.object({ id: uuid, externalEventId: z.string(), name: z.string().min(1) })
 
-// 접수번호는 팬이 받은 receiptNumber와 같은 값이다. 관리자 API가 아직 반환하지 않으면 없음으로 두고 화면이 임의 번호를 만들지 않는다.
-const receiptNumber = z.string().trim().min(1).max(40).optional()
+// 접수번호는 팬이 받은 receiptNumber와 같은 업무용 번호이며 제보자 신원이 아니다.
+// 서버가 null을 주거나 필드가 없는 이전 서버 응답이면 없음으로 두고 화면이 임의 번호를 만들지 않는다.
+const receiptNumber = z.string().trim().min(1).max(64).nullable().optional()
 
 const summarySchema = z.object({
   fanReportId: uuid,
@@ -249,7 +250,7 @@ export const intakeStatusHelp: Record<IntakeStatus, string> = {
 }
 
 /** 관리자 화면의 제보 표시 이름이다. 서버 접수번호가 있으면 그것을, 없으면 UUID 앞부분을 참조용으로 쓴다. 번호를 새로 만들지 않는다. */
-export function fanReportReference(report: { fanReportId: string; receiptNumber?: string }) {
+export function fanReportReference(report: { fanReportId: string; receiptNumber?: string | null }) {
   return report.receiptNumber ?? `제보 ${report.fanReportId.slice(0, 8)}`
 }
 
