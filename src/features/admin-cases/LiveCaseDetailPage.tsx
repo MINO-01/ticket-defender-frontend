@@ -21,6 +21,7 @@ import {
 } from './caseApi'
 import type { CaseActivity, CaseSource, CaseStatus, CaseView } from './caseApi'
 import { ApprovalSubmitPanel } from '../admin-approvals/ApprovalSubmitPanel'
+import { ApprovalAuditPanel, CaseWorkflowPanel } from './CaseLinkPanels'
 import { AssigneePanel, PreparationPanels, TransitionPanel } from './CaseWorkflowPanels'
 import type { WorkflowOutcome } from './CaseWorkflowPanels'
 import styles from './Cases.module.css'
@@ -100,6 +101,7 @@ function CaseDetail({ caseId, eventId }: { caseId: string; eventId: string | nul
     <CaseOverview item={item} />
     <div className={styles.detailGrid}>
       <div className={styles.mainColumn}>
+        <CaseWorkflowPanel caseId={item.caseId} refreshKey={refreshKey} />
         <div id="case-sources"><SourcePanel caseId={item.caseId} eventId={item.eventId} /></div>
         <div id="case-preparation" />
         <PreparationPanels view={item} locked={locked} onOutcome={onOutcome} refreshKey={refreshKey}
@@ -112,9 +114,10 @@ function CaseDetail({ caseId, eventId }: { caseId: string; eventId: string | nul
         <AssigneePanel view={item} locked={locked} onOutcome={onOutcome} />
         {/* 활동 이력은 변경 성공이나 충돌 뒤 첫 페이지부터 다시 조회한다. */}
         <div id="case-activities"><ActivityPanel key={refreshKey} caseId={item.caseId} /></div>
+        <ApprovalAuditPanel key={`approval-audit:${refreshKey}`} caseId={item.caseId} />
         <Card className={styles.panel}>
           <h2>후속 단계</h2>
-          <p className={styles.caution}>공식 보고서 PDF 발급은 별도 절차입니다. 조사 사건 화면에서는 승인 결정 ID를 찾는 계약이 없어 여기서 발급할 수 없고, 승인 결정 직후 화면의 링크나 보고서 센터에서 승인 결정 ID로 진행합니다. 보고서 초안 저장과 승인 결정은 PDF 발급이 아닙니다.</p>
+          <p className={styles.caution}>공식 보고서 PDF 발급은 별도 절차입니다. 승인 결정이 있으면 위 업무 연결의 링크로 발급 화면을 열고, 서버가 그 화면에서 발급 가능 여부를 다시 확인합니다. 보고서 초안 저장과 승인 결정은 PDF 발급이 아닙니다.</p>
           <div className={styles.actions}>
             <Button variant="secondary" disabled>공식 PDF 발급</Button>
             <Link className={styles.detailLink} to="/app/report-center">조사 보고서 발급 화면으로 이동</Link>
@@ -150,7 +153,7 @@ function CaseGuide({ item }: { item: CaseView }) {
   ]
   const unconfirmed: GuideItem[] = [
     { key: 'judgement', content: '부정 거래 여부는 확인되지 않았습니다. 사건 상태는 조사 진행 단계입니다.' },
-    { key: 'approval', content: '승인 요청의 진행 상태는 보고서 승인 요청 화면에서 서버 값으로 확인합니다.' },
+    { key: 'approval', content: '승인 요청과 결정의 현재 상태는 아래 업무 연결과 승인 요청 화면에서 서버 값으로 확인합니다.' },
     { key: 'pdf', content: '공식 보고서 PDF 발급 가능 여부는 승인 결정 기준으로 서버가 확인하기 전까지 알 수 없습니다.' },
     { key: 'names', content: '담당자와 수행자 이름은 조회 API가 없어 표시하지 않습니다.' },
   ]
