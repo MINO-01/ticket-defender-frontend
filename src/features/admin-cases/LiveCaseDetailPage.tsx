@@ -22,6 +22,7 @@ import {
 import type { CaseActivity, CaseSource, CaseStatus, CaseView } from './caseApi'
 import { ApprovalSubmitPanel } from '../admin-approvals/ApprovalSubmitPanel'
 import { ApprovalAuditPanel, CaseWorkflowPanel } from './CaseLinkPanels'
+import { Track1CandidateLinkPanel } from './Track1CandidateLinkPanel'
 import { AssigneePanel, PreparationPanels, TransitionPanel } from './CaseWorkflowPanels'
 import type { WorkflowOutcome } from './CaseWorkflowPanels'
 import styles from './Cases.module.css'
@@ -103,6 +104,7 @@ function CaseDetail({ caseId, eventId }: { caseId: string; eventId: string | nul
       <div className={styles.mainColumn}>
         <CaseWorkflowPanel caseId={item.caseId} refreshKey={refreshKey} />
         <div id="case-sources"><SourcePanel caseId={item.caseId} eventId={item.eventId} /></div>
+        <Track1CandidateLinkPanel caseId={item.caseId} refreshKey={refreshKey} />
         <div id="case-preparation" />
         <PreparationPanels view={item} locked={locked} onOutcome={onOutcome} refreshKey={refreshKey}
           approvalPanel={(drafts) => <ApprovalSubmitPanel view={item} locked={locked} drafts={drafts} onOutcome={onOutcome} onRefresh={refresh} />} />
