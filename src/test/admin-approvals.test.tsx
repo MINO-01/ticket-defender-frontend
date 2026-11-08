@@ -50,7 +50,7 @@ describe('승인 검토 후보 목록', () => {
   it('메뉴와 지연 로딩 경로에서 후보 1건과 실제 출처·미확인 수를 표시한다', async () => {
     render(<MemoryRouter initialEntries={['/app/approvals']}><App /></MemoryRouter>)
     expect(await screen.findByRole('heading', { name: '승인 검토 후보' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '승인 검토' })).toHaveAttribute('href', '/app/approvals')
+    expect(screen.getByRole('link', { name: /^보고서 승인 요청/ })).toHaveAttribute('href', '/app/approvals')
     const summary = screen.getByRole('region', { name: '현재 필터 결과 요약' })
     expect(within(summary).getAllByText('1건')).toHaveLength(2)
     expect(within(summary).getAllByText('1개')).toHaveLength(2)

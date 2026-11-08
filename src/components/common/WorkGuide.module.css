@@ -1,0 +1,22 @@
+.guide { display: grid; gap: 14px; padding: 18px; }
+.title { margin: 0; font-size: 17px; color: var(--color-navy-900); }
+.columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.column { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-subtle); overflow-wrap: anywhere; }
+.column h3 { margin: 0; font-size: 13px; }
+.column ul { display: grid; gap: 6px; margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.55; }
+.confirmed { border-top: 3px solid var(--color-success); }
+.unconfirmed { border-top: 3px solid var(--color-warning); }
+.next { border-top: 3px solid var(--color-primary-500); }
+.empty { margin: 0; color: var(--color-text-secondary); font-size: 13px; }
+.steps ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.steps a { display: flex; align-items: flex-start; gap: 10px; height: 100%; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-card); color: var(--color-text); text-decoration: none; }
+.steps a:hover { border-color: var(--color-primary-500); }
+.steps a:focus-visible { outline: 3px solid var(--color-primary-500); outline-offset: 2px; }
+.steps strong { display: block; font-size: 13px; }
+.steps small { display: block; margin-top: 2px; color: var(--color-text-secondary); font-size: 12px; line-height: 1.4; }
+.stepNo { display: grid; flex: 0 0 24px; place-items: center; height: 24px; border-radius: 999px; background: var(--color-navy-800); color: white; font-size: 12px; font-weight: 800; }
+.technical { border: 1px dashed var(--color-border); border-radius: var(--radius-control); padding: 10px 14px; background: var(--color-card); font-size: 13px; }
+.technical summary { cursor: pointer; color: var(--color-text-secondary); font-weight: 700; }
+.technical summary:focus-visible { outline: 3px solid var(--color-primary-500); outline-offset: 2px; }
+.technicalBody { display: grid; gap: 6px; margin-top: 10px; overflow-wrap: anywhere; }
+@media (max-width: 860px) { .columns { grid-template-columns: minmax(0, 1fr); } }

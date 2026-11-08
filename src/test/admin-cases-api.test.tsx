@@ -88,6 +88,18 @@ const sourcesPath = (id = CASE_1) => `/api/v1/cases/${id}/sources`
 const activitiesPath = (id = CASE_1, page = 0) => `/api/v1/cases/${id}/activities?page=${page}&pageSize=20`
 const snapshotsPath = (id = CASE_1, page = 0) => `/api/v1/cases/${id}/evidence-snapshots?page=${page}&pageSize=20`
 const reportVersionsPath = (id = CASE_1, page = 0) => `/api/v1/cases/${id}/report-versions?page=${page}&pageSize=20`
+const workflowPath = (id = CASE_1) => `/api/v1/cases/${id}/workflow`
+const approvalAuditPath = (id = CASE_1, page = 0) => `/api/v1/cases/${id}/approval-audit-events?page=${page}&pageSize=20`
+const REPORT_VERSION_1 = '77777777-7777-4777-8777-777777777771'
+const SNAPSHOT_1 = '77777777-7777-4777-8777-777777777772'
+const APPROVAL_REQUEST_1 = '88888888-8888-4888-8888-888888888881'
+const APPROVAL_DECISION_1 = '88888888-8888-4888-8888-888888888882'
+const APPROVAL_AUDIT_1 = '88888888-8888-4888-8888-888888888883'
+
+/** 연결 기록이 없는 조사 사건의 workflow 응답이다. report, approval, officialPdf는 null이다. */
+function workflowView(overrides: Record<string, unknown> = {}) {
+  return { investigation: caseView(), nextStep: { code: 'EVIDENCE_AND_REPORT_PREPARATION', description: '합성 다음 단계 설명' }, report: null, approval: null, officialPdf: null, ...overrides }
+}
 
 const clusterSource = {
   sourceReferenceId: SOURCE_CLUSTER, sourceType: 'STORED_CLUSTER_EVIDENCE', analysisRequestId: 'synthetic-run/2026-11', clusterId: 'cluster-7',
@@ -130,6 +142,8 @@ function detailRoute(overrides: Partial<Record<string, () => Response | Promise<
     [sourcesPath()]: () => json(200, [clusterSource, reportSource, assetSource]),
     [snapshotsPath()]: () => json(200, { items: [], page: 0, pageSize: 20, hasNext: false }),
     [reportVersionsPath()]: () => json(200, { items: [], page: 0, pageSize: 20, hasNext: false }),
+    [workflowPath()]: () => json(200, workflowView()),
+    [approvalAuditPath()]: () => json(200, { items: [], page: 0, pageSize: 20, hasNext: false }),
     [activitiesPath()]: () => json(200, activityPage([
       activity(),
       activity({ activityId: ACTIVITY_2, eventType: 'CASE_TRIAGED', reason: '합성 분류 사유', fromStatus: 'OPEN', toStatus: 'TRIAGED', versionBefore: 1, versionAfter: 2, occurredAt: '2026-11-01T11:00:00Z' }),
@@ -378,10 +392,67 @@ describe('Case 목록 실제 API', () => {
 })
 
 describe('Case 상세, 출처, 활동 이력 실제 API', () => {
+  it('업무 연결이 없으면 각 기록을 없음으로 표시하고 다음 단계는 안내로만 보여 준다', async () => {
+    stubFetch(detailRoute())
+    renderApp(`/app/cases/${CASE_1}?eventId=${EVENT_A}`)
+    const panel = await screen.findByRole('region', { name: '업무 연결' })
+    expect(await within(panel).findByText('저장된 초안 없음')).toBeInTheDocument()
+    expect(within(panel).getByText('승인 요청 없음')).toBeInTheDocument()
+    expect(within(panel).getByText('결정 기록 없음')).toBeInTheDocument()
+    expect(within(panel).getByText('발급 기록 없음')).toBeInTheDocument()
+    expect(within(panel).getByRole('heading', { name: '다음 단계: 조사 근거 묶음과 보고서 초안 준비' })).toBeInTheDocument()
+    expect(within(panel).getByText('합성 다음 단계 설명')).toBeInTheDocument()
+    expect(within(panel).queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('업무 연결의 승인 요청과 승인 결정은 기존 상세와 발급 화면 주소로 연결하고 발급 가능 여부는 추정하지 않는다', async () => {
+    stubFetch(detailRoute({
+      [detailPath()]: () => json(200, caseView({ status: 'APPROVED_FOR_REPORT' })),
+      [workflowPath()]: () => json(200, workflowView({
+        investigation: caseView({ status: 'APPROVED_FOR_REPORT' }),
+        nextStep: { code: 'OFFICIAL_PDF_POLICY_GATE', description: '합성 발급 게이트 안내' },
+        report: { reportVersionId: REPORT_VERSION_1, evidenceSnapshotId: SNAPSHOT_1, evidenceRevision: 2, revision: 1, version: 3, status: 'APPROVED' },
+        approval: { approvalRequestId: APPROVAL_REQUEST_1, requestStatus: 'APPROVED', approvalDecisionId: APPROVAL_DECISION_1, decisionOutcome: 'APPROVE', decidedAt: '2026-11-07T10:00:00Z' },
+      })),
+      [approvalAuditPath()]: () => json(200, { items: [{
+        approvalAuditEventId: APPROVAL_AUDIT_1, approvalRequestId: APPROVAL_REQUEST_1, approvalDecisionId: APPROVAL_DECISION_1, reportVersionId: REPORT_VERSION_1,
+        evidenceSnapshotId: SNAPSHOT_1, actorMembershipId: MEMBER_ASSIGNEE, eventType: 'APPROVAL_DECIDED', fromStatus: 'PENDING', toStatus: 'APPROVED',
+        evidenceRevision: 2, caseVersionBefore: 5, caseVersionAfter: 6, reason: '<b>합성 결정 사유</b>', occurredAt: '2026-11-07T10:00:00Z',
+      }], page: 0, pageSize: 20, hasNext: false }),
+    }))
+    renderApp(`/app/cases/${CASE_1}?eventId=${EVENT_A}`)
+    const panel = await screen.findByRole('region', { name: '업무 연결' })
+    expect(await within(panel).findByRole('link', { name: '승인 요청 열기' })).toHaveAttribute('href', `/app/approvals/${APPROVAL_REQUEST_1}`)
+    expect(within(panel).getByRole('link', { name: '공식 PDF 발급 화면 열기' })).toHaveAttribute('href', `/app/report-center/decisions/${APPROVAL_DECISION_1}`)
+    expect(within(panel).getByText('발급 기록 없음')).toBeInTheDocument()
+    expect(panel).toHaveTextContent('승인 결정만으로 발급되지 않습니다')
+    expect(panel).not.toHaveTextContent('발급 가능 (CURRENT)')
+    const audit = screen.getByRole('region', { name: '승인 감사 이력' })
+    expect(await within(audit).findByText('승인 결정 기록')).toBeInTheDocument()
+    expect(within(audit).getByText('<b>합성 결정 사유</b>')).toBeInTheDocument()
+    expect(audit).toHaveTextContent('둘을 합친 전체 감사 기록이 아닙니다')
+    expect(audit).not.toHaveTextContent(/전체 \d+건/)
+  })
+
+  it('업무 연결 조회가 실패하거나 다른 사건 응답이면 그 영역만 오류로 표시한다', async () => {
+    stubFetch(detailRoute({ [workflowPath()]: () => json(200, workflowView({ investigation: caseView({ caseId: CASE_2 }) })) }))
+    renderApp(`/app/cases/${CASE_1}?eventId=${EVENT_A}`)
+    const panel = await screen.findByRole('region', { name: '업무 연결' })
+    expect(await within(panel).findByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+    expect(within(panel).queryByText('승인 요청 없음')).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Case 개요' })).toBeInTheDocument()
+  })
+
   it('상세 필드와 출처 유형별 정보, 서버 순서의 활동 이력을 실제 응답 값으로 표시한다', async () => {
     const fetchMock = stubFetch(detailRoute())
     renderApp(`/app/cases/${CASE_1}?eventId=${EVENT_A}`)
     const overview = await screen.findByRole('region', { name: 'Case 개요' })
+    // 상단 진행 요약은 저장된 상태로 다음 작업만 안내하고 공식 PDF 발급 가능 여부를 추측하지 않는다.
+    const guide = screen.getByRole('region', { name: '조사 사건 진행 요약' })
+    expect(within(guide).getByRole('region', { name: '확인한 사실' })).toHaveTextContent('현재 상태: 검토 중 (서버 저장 값)')
+    expect(within(guide).getByRole('region', { name: '다음 작업' })).toHaveTextContent('조사 근거 묶음을 만들고')
+    expect(within(guide).getByRole('region', { name: '아직 확인되지 않은 내용' })).toHaveTextContent('발급 가능 여부는 승인 결정 기준으로 서버가 확인하기 전까지 알 수 없습니다')
+    expect(guide).not.toHaveTextContent('발급 가능합니다')
     expect(within(overview).getByText(CASE_1)).toBeInTheDocument()
     expect(within(overview).getByText(EVENT_A)).toBeInTheDocument()
     expect(within(overview).getByText('복합 검토')).toBeInTheDocument()
@@ -425,8 +496,8 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     expect(screen.getByRole('region', { name: '승인 요청 제출' })).toBeInTheDocument()
     for (const name of ['상태 변경', '담당자 변경', 'EvidenceSnapshot', '보고서 초안']) expect(screen.getByRole('region', { name })).toBeInTheDocument()
     expect(screen.queryByText(/DEMO-|합성 데모 데이터|시연 담당/)).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '← Case 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
-    expect(requestedUrls(fetchMock)).toEqual([detailPath(), sourcesPath(), snapshotsPath(), reportVersionsPath(), activitiesPath()])
+    expect(screen.getByRole('link', { name: '← 조사 사건 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
+    expect([...requestedUrls(fetchMock)].sort()).toEqual([detailPath(), workflowPath(), sourcesPath(), snapshotsPath(), reportVersionsPath(), activitiesPath(), approvalAuditPath()].sort())
   })
 
   it.each([
@@ -443,7 +514,7 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     expect(screen.queryByRole('region', { name: '활동 이력' })).not.toBeInTheDocument()
     expect(screen.queryByText(/SQLSTATE|내부 고객사/)).not.toBeInTheDocument()
     expect(requestedUrls(fetchMock)).toEqual([detailPath()])
-    expect(screen.getByRole('link', { name: '← Case 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
+    expect(screen.getByRole('link', { name: '← 조사 사건 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
   })
 
   it('주소의 공연과 다른 공연의 Case 응답은 표시하지 않고 출처를 요청하지 않는다', async () => {
@@ -465,9 +536,10 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     const fetchMock = stubFetch(detailRoute())
     renderApp(`/app/cases/${CASE_1}`)
     expect(await screen.findByRole('region', { name: 'Case 개요' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '← Case 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
+    expect(screen.getByRole('link', { name: '← 조사 사건 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
     await screen.findByRole('region', { name: '활동 이력' })
-    expect(requestedUrls(fetchMock)).toEqual([detailPath(), sourcesPath(), snapshotsPath(), reportVersionsPath(), activitiesPath()])
+    await screen.findByText('승인 감사 이력이 없습니다')
+    expect([...requestedUrls(fetchMock)].sort()).toEqual([detailPath(), workflowPath(), sourcesPath(), snapshotsPath(), reportVersionsPath(), activitiesPath(), approvalAuditPath()].sort())
   })
 
   it('UUID가 아닌 Case 주소나 잘못된 공연 값은 API를 호출하지 않는다', async () => {
@@ -508,7 +580,7 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     stubFetch(detailRoute({ [sourcesPath()]: () => json(200, [{ ...clusterSource, riskScore: null, analysisAlgorithm: null, analysisAlgorithmVersion: null, analysisCompletedAt: null }]) }))
     renderApp(`/app/cases/${CASE_1}?eventId=${EVENT_A}`)
     const cluster = await screen.findByRole('article', { name: 'Track 1 저장 군집 증거' })
-    expect(within(cluster).getByText('Risk Score').nextElementSibling).toHaveTextContent('값 없음')
+    expect(within(cluster).getByText('조사 우선순위 (Risk Score)').nextElementSibling).toHaveTextContent('값 없음')
     expect(within(cluster).getByText('분석 알고리즘').nextElementSibling).toHaveTextContent('기록 없음')
     expect(within(cluster).getByText('분석 완료 시각').nextElementSibling).toHaveTextContent('기록 없음')
     expect(within(cluster).queryByText('0.00')).not.toBeInTheDocument()

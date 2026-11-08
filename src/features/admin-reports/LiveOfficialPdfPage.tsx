@@ -7,6 +7,7 @@ import { Card } from '../../components/common/Card'
 import { DataTable } from '../../components/common/DataTable'
 import { ErrorState, LoadingSkeleton } from '../../components/common/Feedback'
 import { PageHeader } from '../../components/common/PageHeader'
+import { WorkGuide } from '../../components/common/WorkGuide'
 import { useAdminApiClient } from '../admin-auth/AdminAuthProvider'
 import { useAdminQuery } from '../admin-auth/useAdminQuery'
 import type { WorkflowMessage } from '../admin-cases/caseWorkflowApi'
@@ -117,6 +118,7 @@ function OfficialPdfWorkspace({ decisionId }: { decisionId: string }) {
     </>
   } else {
     body = <>
+      <PdfStageGuide eligibility={eligibility} />
       <EligibilityFacts eligibility={eligibility} />
       <IssuanceArea
         eligibility={eligibility} historyResult={historyQuery.result} historyItems={historyItems} onHistoryRetry={historyQuery.retry} record={record} shown={shown}
@@ -131,7 +133,7 @@ function OfficialPdfWorkspace({ decisionId }: { decisionId: string }) {
   }
 
   return <div className={styles.page}>
-    <PageHeader eyebrow="보고서 센터" title="공식 PDF 발급" description="사람의 승인 결정 뒤 서버가 다시 검증한 경우에만 공식 PDF를 발급합니다. 승인 결정과 공식 PDF 발급은 별도 동작이며, 공식 PDF는 부정 거래 판정이나 제재 결정이 아닙니다." />
+    <PageHeader eyebrow="조사 보고서 발급" title="공식 PDF 발급" description="사람의 승인 결정 뒤 서버가 다시 검증한 경우에만 공식 PDF를 발급합니다. 승인 결정과 공식 PDF 발급은 별도 동작이며, 공식 PDF는 부정 거래 판정이나 제재 결정이 아닙니다." />
     <Card className={styles.panel} aria-label="공식 PDF 발급">
       <div className={styles.panelHeading}><h2>공식 PDF 발급</h2><span>고객사 관리자</span></div>
       <dl className={styles.definition}><div><dt>승인 결정 ID</dt><dd className={styles.idCell}>{decisionId}</dd></div></dl>
@@ -143,6 +145,27 @@ function OfficialPdfWorkspace({ decisionId }: { decisionId: string }) {
       <DownloadStatus state={download.state} />
     </Card>
   </div>
+}
+
+// 서버가 돌려준 적격성 상태만으로 단계를 보여 준다. 발급 완료는 아래 발급 기록의 서버 상태로만 표시한다.
+const eligibilityNext: Record<Eligibility['state'], string> = {
+  CURRENT: '고객사 관리자가 아래에서 발급을 요청합니다. 서버가 발급 시점에 근거를 다시 확인하며, 실패하면 성공으로 표시하지 않습니다.',
+  STALE: '승인 이후 근거나 보고서가 바뀌어 이 승인으로는 발급할 수 없습니다. 조사 사건에서 다시 검토한 뒤 새 승인 요청이 필요합니다.',
+  BLOCKED: '서버 정책에 따라 발급이 차단되었습니다. 아래 사유를 확인해 주세요. 화면에서 차단을 풀 수 없습니다.',
+}
+
+function PdfStageGuide({ eligibility }: { eligibility: Eligibility }) {
+  const stateText = eligibility.state === 'CURRENT' ? '발급 가능' : eligibility.state === 'STALE' ? '발급 불가 (근거 변경)' : '발급 차단'
+  return <WorkGuide title="발급 진행 요약"
+    confirmed={[
+      { key: 'decision', content: '이 승인 결정 ID로 서버가 발급 가능 여부를 확인했습니다.' },
+      { key: 'state', content: <>현재 발급 가능 여부: {stateText} (서버 값)</> },
+    ]}
+    unconfirmed={[
+      { key: 'issued', content: '발급 완료 여부는 아래 발급 기록의 서버 상태로만 확인합니다.' },
+      { key: 'judgement', content: '공식 PDF는 조사 지원 문서이며 부정 거래 판정이나 제재 결정이 아닙니다.' },
+    ]}
+    next={[{ key: 'next', content: eligibilityNext[eligibility.state] }]} />
 }
 
 function EligibilityFacts({ eligibility }: { eligibility: Eligibility }) {

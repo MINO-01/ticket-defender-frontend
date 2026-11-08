@@ -5,6 +5,9 @@ import { Button } from '../../components/common/Button'
 import { Card } from '../../components/common/Card'
 import { EmptyState, ErrorState, LoadingSkeleton } from '../../components/common/Feedback'
 import { PageHeader } from '../../components/common/PageHeader'
+import { StepNav, TechnicalDetails, WorkGuide } from '../../components/common/WorkGuide'
+import type { GuideItem } from '../../components/common/WorkGuide'
+import { terms } from '../../app/terms'
 import { useAdminQuery } from '../admin-auth/useAdminQuery'
 import { CandidateMatchSection } from './CandidateMatchSection'
 import { EvidenceContentPreview } from './EvidenceContentPreview'
@@ -15,7 +18,7 @@ import { StatusPill } from './StatusPill'
 import {
   analysisStatusLabels, candidateMatchReasonLabels, executionStatusLabels, fanReportDetailPath, fanReportDetailSchema, fanReportListRoute, fieldStateLabels,
   formatBytes, formatCode, formatUtc, intakeStatusLabels, intakeTone, listingAnalysesPath, listingAnalysisPageSchema, listingFieldLabels, listingFieldNames,
-  readFanReportId, storageStatusLabels, unknownReasonLabels,
+  readFanReportId, storageStatusLabels, unknownReasonLabels, fanReportReference, intakeStatusHelp,
 } from './track2Api'
 import type { FanReportDetail, FanReportEvidence, ListingAnalysis, ListingField, ListingFieldName } from './track2Api'
 import { reportTypeLabels } from './track2Model'
@@ -63,29 +66,69 @@ function ReportDetail({ fanReportId }: { fanReportId: string }) {
   const report = result.data
   return <div className={styles.page}>
     <Link className={styles.backLink} to={fanReportListRoute(report.event.id)}>← 제보 목록</Link>
-    <PageHeader eyebrow="Track 2 팬 제보 조회" title="팬 제보 상세" description="팬이 제출한 정보와 저장된 증거, 증거별 이미지 분석 이력을 확인합니다. 분석 관찰값은 사실 확인이나 부정 거래 판정이 아닙니다." />
+    <PageHeader eyebrow="팬 제보 조사" title="팬 제보 상세" description="제보 내용과 저장된 증거를 확인하고, 이미지 정보 추출, 검증 회차 연결, 예매 기록 비교를 거쳐 조사 사건을 만듭니다. 추출 관찰값과 일치 예매 후보는 사실 확인이나 부정 거래 판정이 아닙니다." />
     <Card className={styles.summary}>
-      <div><span>제보 ID</span><strong className={styles.idCell}>{report.fanReportId}</strong></div>
+      <div><span>접수번호</span><strong>{report.receiptNumber ?? fanReportReference(report)}</strong>{!report.receiptNumber && <small className={styles.cellSub}>서버 응답에 접수번호가 없어 제보 ID 앞부분으로 표시합니다</small>}</div>
       <div><span>대상 공연</span><strong>{report.event.name}</strong></div>
       <div><span>제보 유형</span><strong>{reportTypeLabels[report.reportType]}</strong></div>
       <div><span>접수 상태</span><StatusPill label={intakeStatusLabels[report.intakeStatus]} tone={intakeTone(report.intakeStatus)} /></div>
       <div><span>접수 시각</span><strong><time dateTime={report.receivedAt}>{formatUtc(report.receivedAt)}</time></strong></div>
       <div><span>보존 기한</span><strong><time dateTime={report.retentionUntil}>{formatUtc(report.retentionUntil)}</time></strong></div>
     </Card>
-    <div className={styles.liveGrid}>
+    <ReportGuide report={report} />
+    <TechnicalDetails summary="기술 상세 (제보 ID, 공연 ID)">
+      <div>제보 ID <span className={styles.idCell}>{report.fanReportId}</span></div>
+      <div>공연 ID <span className={styles.idCell}>{report.event.id}</span></div>
+    </TechnicalDetails>
+    <div id="step-evidence" className={styles.liveGrid}>
       <FanInputPanel report={report} />
       <EvidencePanel fanReportId={report.fanReportId} evidence={report.evidence} selection={selection} />
     </div>
-    <PerformanceSection report={report} />
+    <div id="step-performance"><PerformanceSection report={report} /></div>
     <Card className={styles.panel}>
       <h2>후속 기능</h2>
       <div className={styles.followUp}>
         <Button disabled>관찰값 수동 교정</Button>
       </div>
-      <p className={styles.subtleNote}>이미지 분석 실행과 예매 후보 대조는 증거 영역의 분석 이력에서 분석별로 요청합니다. 관찰값을 고치는 API가 없어 수동 교정은 제공하지 않습니다. 후보 실행은 이력에서 선택해 아래 신규 Case 생성에만 연결하며, 기존 Case에 출처를 추가하는 기능은 없습니다.</p>
+      <p className={styles.subtleNote}>이미지 정보 추출과 예매 기록 비교는 증거 영역의 추출 이력에서 추출 결과별로 요청합니다. 관찰값을 고치는 API가 없어 수동 교정은 제공하지 않습니다. 비교 실행은 이력에서 선택해 아래 신규 조사 사건 생성에만 연결하며, 기존 조사 사건에 출처를 추가하는 기능은 없습니다.</p>
     </Card>
-    <FanReportCasePanel report={report} selection={selection} />
+    <div id="step-case"><FanReportCasePanel report={report} selection={selection} /></div>
   </div>
+}
+
+/** 제보 상세 응답만으로 만든 조사 진행 요약이다. 추출, 회차 연결, 비교 결과는 각 영역이 따로 조회하므로 여기서 완료 여부를 추정하지 않는다. */
+function ReportGuide({ report }: { report: FanReportDetail }) {
+  const stored = report.evidence.filter((item) => item.originalStored).length
+  const total = report.evidence.length
+  const confirmed: GuideItem[] = [
+    { key: 'event', content: <>서버가 연결한 공연: {report.event.name}</> },
+    { key: 'intake', content: <>접수 상태: {intakeStatusLabels[report.intakeStatus]}. {intakeStatusHelp[report.intakeStatus]}</> },
+    { key: 'evidence', content: <>증거 {total}개 중 원본 저장과 SHA-256 기록이 확인된 증거 {stored}개</> },
+  ]
+  const unconfirmed: GuideItem[] = [
+    { key: 'fan-input', content: '팬이 입력한 공연 일시, 좌석, 판매 플랫폼, 가격은 검증되지 않은 값입니다.' },
+    { key: 'seller', content: '판매자 표시는 확인된 신원이 아니며, 제보자 본인이나 예매자 식별자와 다른 정보입니다.' },
+    { key: 'extract', content: `${terms.listingAnalysis} 결과는 증거별 이력에서 확인합니다. 관찰값은 사람이 확인하기 전까지 후보입니다.` },
+    { key: 'compare', content: `${terms.candidateMatch} 결과의 ${terms.matchCandidate}는 위반 확정이 아닙니다.` },
+  ]
+  const next: GuideItem[] = stored === 0
+    ? [{ key: 'no-original', content: '원본 저장이 확인된 증거가 없어 이미지 정보 추출을 실행할 수 없습니다. 접수 상태와 증거 저장 상태를 먼저 확인하세요.' }]
+    : [
+      { key: 'extract', content: <><a href="#step-evidence">증거 영역</a>에서 증거를 골라 {terms.listingAnalysis} 이력을 확인하거나 실행합니다.</> },
+      { key: 'performance', content: <><a href="#step-performance">검증 회차 연결</a>에서 이 제보의 공연 회차를 사람이 확인해 연결합니다.</> },
+      { key: 'compare', content: `추출 결과별로 ${terms.candidateMatch}를 실행하고, 근거로 쓸 비교 실행을 선택합니다.` },
+      { key: 'case', content: <><a href="#step-case">{terms.case} 생성</a>에서 선택한 근거로 조사 사건을 만듭니다.</> },
+    ]
+  return <>
+    <WorkGuide confirmed={confirmed} unconfirmed={unconfirmed} next={next} />
+    <StepNav label="팬 제보 조사 단계" steps={[
+      { key: 'evidence', title: '증거 확인', href: '#step-evidence', status: `원본 저장 확인 ${stored} / ${total}개` },
+      { key: 'extract', title: terms.listingAnalysis, href: '#step-evidence', status: '증거별 이력에서 실행과 결과 확인' },
+      { key: 'performance', title: '검증 회차 연결', href: '#step-performance', status: '사람이 확인한 회차 연결' },
+      { key: 'compare', title: terms.candidateMatch, href: '#step-evidence', status: '추출 결과별로 실행' },
+      { key: 'case', title: `${terms.case} 생성`, href: '#step-case', status: '선택한 근거로 생성' },
+    ]} />
+  </>
 }
 
 function textOrNone(value: string | null) {
@@ -155,8 +198,8 @@ type CandidateRuns = ReturnType<typeof useCandidateMatchRuns>
 function ListingAnalysisHistory({ fanReportId, evidenceId, originalStored, candidates, selection }: { fanReportId: string; evidenceId: string; originalStored: boolean; candidates: CandidateRuns; selection: CandidateRunSelection }) {
   const [page, setPage] = useState(0)
   const { result, retry } = useAdminQuery(listingAnalysesPath(fanReportId, evidenceId, page), listingAnalysisPageSchema)
-  const heading = <div className={styles.panelHeading}><h3>이미지 분석 이력</h3><span>최신 시도 순</span></div>
-  if (result === null) return <section className={styles.history}>{heading}<LoadingSkeleton label="분석 이력을 불러오는 중" /></section>
+  const heading = <div className={styles.panelHeading}><h3>이미지 정보 추출 이력</h3><span>최신 시도 순</span></div>
+  if (result === null) return <section className={styles.history}>{heading}<LoadingSkeleton label="이미지 정보 추출 이력을 불러오는 중" /></section>
 
   // 다른 제보나 다른 증거의 이력, 요청과 다른 페이지가 섞이면 표시하지 않는다.
   const mismatched = result.kind === 'success' && (result.data.page !== page

@@ -29,8 +29,23 @@ export function CompletePage() {
       </dl>
     </Card>
     <Card className={styles.privacyCard}><h2>접수번호와 조회 코드를 안전하게 보관해 주세요</h2><ul className={styles.list}><li>조회 코드는 이 화면에서만 확인할 수 있으며 다시 발급되지 않습니다.</li><li>이 정보는 브라우저에 저장되지 않으므로 화면을 벗어나기 전에 따로 기록해 주세요.</li><li>조회 코드는 다른 사람과 공유하지 마세요.</li></ul></Card>
+    <IdentifierGuide />
     <div className={styles.actions}><Link className={styles.primaryLink} to="/fan/lookup">접수 상태 조회하기</Link><Link className={styles.secondaryLink} to="/fan/guide">제보 안내로 돌아가기</Link></div>
   </div>
+}
+
+/** 팬이 받는 번호와 제보에 적는 정보가 서로 다른 개념임을 안내한다. 화면은 이 정보를 서로 연결하거나 추정하지 않는다. */
+export function IdentifierGuide() {
+  return <Card aria-label="번호와 정보의 차이">
+    <h2>번호와 정보는 이렇게 다릅니다</h2>
+    <dl className={styles.summaryList}>
+      <div className={styles.summaryRow}><dt>접수번호</dt><dd>내 제보를 구분하는 번호입니다. 문의할 때 알려 주셔도 됩니다.</dd></div>
+      <div className={styles.summaryRow}><dt>조회 코드</dt><dd>본인 확인용 비밀 코드입니다. 다른 사람에게 알려 주지 마세요.</dd></div>
+      <div className={styles.summaryRow}><dt>판매자 표시 이름</dt><dd>게시물에 보이는 판매자 이름이나 닉네임입니다. 확인된 신원이 아닙니다.</dd></div>
+      <div className={styles.summaryRow}><dt>예매자 식별 정보</dt><dd>예매번호 등 예매한 사람의 정보입니다. 제보자 본인 정보나 접수번호와 다르며, 실제 예매번호는 적지 않아도 됩니다.</dd></div>
+    </dl>
+    <p className={styles.note}>제보자 본인의 이름이나 연락처는 접수에 필요하지 않습니다. 이미지에 보이는 개인정보는 가린 뒤 첨부해 주세요.</p>
+  </Card>
 }
 
 export function StatusPage() {

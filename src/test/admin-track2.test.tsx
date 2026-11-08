@@ -63,7 +63,7 @@ describe('Track 2 합성 데이터', () => {
 describe('Track 2 제보 목록', () => {
   it('합성 집계를 계산하고 다음 페이지에서 상세 화면으로 이동한다', async () => {
     renderApp('/app/fan-reports')
-    expect(await screen.findByRole('heading', { name: '팬 제보 검토' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '팬 제보 조사' })).toBeInTheDocument()
     expect(screen.getByText('6건')).toBeInTheDocument()
     expect(screen.getAllByText('4건')).toHaveLength(2)
     expect(screen.getByText('2건')).toBeInTheDocument()

@@ -3,7 +3,8 @@ import { adminApiPath } from '../../api/adminApiClient'
 import { isUuid } from '../fan-report/intakeConfig'
 
 // Backend track1-admin-evidence-read-v1 계약이다. 응답은 저장된 증거만 담는 STORED_EVIDENCE_ONLY이며
-// 좌석, 공유 신호, 신호별 연결 관계, 그래프 간선, 결제/주소/기기/IP 토큰은 제공하지 않는다.
+// 좌석, 그래프 간선, 결제/주소/기기/IP 신호 원문이나 HMAC 값은 제공하지 않는다.
+// 상세의 relationship(capstone-demo-integration-v1)은 저장된 기기와 IP 신호의 공유 요약 수치만 담는다. 이전 서버 응답에는 없을 수 있다.
 
 export const track1PageSize = 20
 export const track1Sorts = ['priority-desc', 'priority-asc', 'recent'] as const
@@ -44,14 +45,35 @@ export const track1ClusterPageSchema = z.object({
   coverage: coverageSchema,
 })
 
+export const sharedSignalTypes = ['DEVICE_ID_HASH', 'IP_HASH'] as const
+export type SharedSignalType = (typeof sharedSignalTypes)[number]
+
+// sharedMemberCount는 같은 저장 신호값을 가진 구성원 수(2 이상), verifiedConnectionCount는 신호별 비순서 구성원 쌍의 합이다.
+// 전체 verifiedConnectionCount는 신호별 합계라 같은 두 예매가 여러 신호를 공유하면 중복으로 셀 수 있다.
+const relationshipSchema = z.object({
+  sharedSignals: z.array(z.object({
+    type: z.enum(sharedSignalTypes),
+    sharedMemberCount: z.number().int().min(2),
+    verifiedConnectionCount: z.number().int().min(1),
+  })).max(sharedSignalTypes.length),
+  verifiedConnectionCount: z.number().int().nonnegative(),
+  unavailableSignalTypes: z.array(z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/)).max(20),
+  investigationPrioritySource: z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/),
+  normalSharingNotice: z.string().min(1).max(500),
+  memberCoverage: z.literal('STORED_CLUSTER_MEMBERS_ONLY'),
+}).refine((value) => new Set(value.sharedSignals.map((signal) => signal.type)).size === value.sharedSignals.length)
+  .refine((value) => value.sharedSignals.reduce((sum, signal) => sum + signal.verifiedConnectionCount, 0) === value.verifiedConnectionCount)
+
 export const track1ClusterDetailSchema = z.object({
   event: eventSchema,
   cluster: summarySchema,
   members: z.array(memberSchema),
+  relationship: relationshipSchema.optional(),
   coverage: coverageSchema,
 })
 
 export type Track1ClusterSummary = z.infer<typeof summarySchema>
+export type Track1Relationship = z.infer<typeof relationshipSchema>
 export type Track1ClusterPage = z.infer<typeof track1ClusterPageSchema>
 export type Track1ClusterDetail = z.infer<typeof track1ClusterDetailSchema>
 export type Track1ClusterKey = { eventId: string; analysisRequestId: string; clusterId: string }

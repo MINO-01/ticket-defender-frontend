@@ -1,0 +1,27 @@
+.page { display: grid; gap: 20px; min-width: 0; }
+.page :is(button, a):focus-visible { outline: 3px solid var(--color-primary-500); outline-offset: 2px; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; align-items: start; }
+.panel { display: grid; align-content: start; gap: 12px; min-width: 0; padding: 18px; overflow-wrap: anywhere; }
+.panel h2, .pending h2 { margin: 0; font-size: 17px; }
+.note { margin: 0; color: var(--color-text-secondary); font-size: 13px; line-height: 1.6; }
+.note p { margin: 0; }
+.list { display: grid; gap: 6px; margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.55; }
+.count { display: grid; gap: 4px; margin: 0; }
+.count strong { color: var(--color-navy-900); font-size: 28px; }
+.count span { color: var(--color-text-secondary); font-size: 12px; }
+.link { color: var(--color-primary-700); font-size: 14px; font-weight: 700; text-underline-offset: 3px; }
+.pending { display: grid; gap: 8px; padding: 18px; border-style: dashed; }
+.pendingTag { justify-self: start; margin: 0; padding: 3px 10px; border-radius: 999px; background: #fff4e5; color: #8a4b00; font-size: 12px; font-weight: 800; }
+.caseList { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.caseList button { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 10px; align-items: center; width: 100%; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-card); color: var(--color-text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.caseList button[aria-pressed='true'] { border-color: var(--color-primary-500); box-shadow: inset 3px 0 var(--color-primary-500); }
+.caseList time { grid-column: 1 / -1; color: var(--color-text-secondary); font-size: 12px; }
+.pagination { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.subheading { margin: 4px 0 0; font-size: 17px; }
+.sub { display: block; margin-top: 2px; color: var(--color-text-secondary); font-size: 12px; }
+.facts { display: grid; gap: 8px; margin: 0; }
+.facts div { display: grid; grid-template-columns: minmax(140px, 220px) minmax(0, 1fr); gap: 12px; font-size: 14px; }
+.facts dt { color: var(--color-text-secondary); }
+.facts dd { margin: 0; font-weight: 700; }
+@media (max-width: 960px) { .grid, .split { grid-template-columns: minmax(0, 1fr); } }

@@ -19,9 +19,9 @@ import styles from './Track1.module.css'
 
 export function LiveClusterListPage() {
   return <div className={styles.page}>
-    <PageHeader eyebrow="Track 1 저장 증거 조회" title="연관 예매 군집" description="선택한 공연에 저장된 군집 증거를 조사 우선순위 순으로 살펴봅니다. 점수는 불법 가능성을 뜻하지 않습니다." />
+    <PageHeader eyebrow="예매 관계 분석" title="연결된 예매 그룹" description="선택한 공연에서 저장된 관계 근거로 묶인 예매 그룹을 조사 우선순위 순으로 확인하고, 필요한 그룹을 조사 사건으로 연결합니다. 우선순위는 먼저 살펴볼 순서이며 불법 가능성을 뜻하지 않습니다." />
     <AdminEventGate>{(event) => <ClusterList key={event.id} event={event} />}</AdminEventGate>
-    <p className={styles.notice}>Risk Score는 0~1 사이의 조사 우선순위 신호이며 부정 거래 확률이 아닙니다. 저장된 증거만 표시하므로 전체 분석 결과나 확정 판정으로 해석하지 마세요. 검색과 연결 정보 필터는 서버가 지원하지 않아 제공하지 않습니다.</p>
+    <p className={styles.notice}>조사 우선순위(0~1)는 먼저 살펴볼 순서를 정하는 신호이며 부정 거래 확률이 아닙니다. 저장된 근거만 표시하므로 전체 분석 결과나 확정 판정으로 해석하지 마세요. 그룹 순번은 현재 목록의 표시 순서일 뿐 저장된 식별자가 아닙니다. 검색과 연결 정보 필터는 서버가 지원하지 않아 제공하지 않습니다.</p>
   </div>
 }
 
@@ -58,28 +58,29 @@ function ClusterList({ event }: { event: AdminEvent }) {
   const pageCount = Math.max(Math.ceil(data.totalItems / data.pageSize), 1)
   const first = data.page * data.pageSize + 1
   const columns = [
-    { key: 'id', header: '군집 / 분석 요청', render: (cluster: Track1ClusterSummary) => <span><strong>{cluster.clusterId}</strong><small className={styles.cellSub}>{cluster.analysisRequestId}</small></span> },
-    { key: 'members', header: '저장 구성원', render: (cluster: Track1ClusterSummary) => `${cluster.storedMemberCount}건` },
+    // 순번은 화면 표시용이고, 서버 참조(clusterId)는 보조 정보로 함께 보여 준다. 상세 이동은 항상 서버 참조로 한다.
+    { key: 'id', header: '연결된 예매 그룹', render: (cluster: Track1ClusterSummary) => <span><strong>{first + data.items.indexOf(cluster)}번째 그룹</strong><small className={styles.cellSub}>분석 내 그룹 참조 {cluster.clusterId}</small></span> },
+    { key: 'members', header: '저장된 예매 기록', render: (cluster: Track1ClusterSummary) => `${cluster.storedMemberCount}건` },
     { key: 'priority', header: '조사 우선순위 (0~1)', render: (cluster: Track1ClusterSummary) => <strong className={styles.priority}>{formatRiskScore(cluster.riskScore)}</strong> },
     { key: 'algorithm', header: '분석 방법', render: formatAlgorithm },
     { key: 'time', header: '분석 시각', render: (cluster: Track1ClusterSummary) => cluster.analyzedAt === null ? '기록 없음' : <time dateTime={cluster.analyzedAt}>{formatAnalyzedAt(cluster.analyzedAt)}</time> },
-    { key: 'detail', header: '상세', render: (cluster: Track1ClusterSummary) => <Link className={styles.detailLink} to={track1DetailRoute({ eventId: event.id, analysisRequestId: cluster.analysisRequestId, clusterId: cluster.clusterId })} aria-label={`${cluster.clusterId} 상세 보기`}>상세 보기</Link> },
+    { key: 'detail', header: '근거 확인', render: (cluster: Track1ClusterSummary) => <Link className={styles.detailLink} to={track1DetailRoute({ eventId: event.id, analysisRequestId: cluster.analysisRequestId, clusterId: cluster.clusterId })} aria-label={`${cluster.clusterId} 상세 보기`}>근거 확인</Link> },
   ]
 
   return <>
     {sortControl}
     <div className={styles.metrics} aria-label="서버 조회 결과 요약">
-      <Card><span>저장된 군집 (전체)</span><strong>{data.totalItems}건</strong></Card>
+      <Card><span>저장된 예매 그룹 (전체)</span><strong>{data.totalItems}건</strong></Card>
       <Card><span>현재 페이지</span><strong>{data.items.length}개 표시</strong></Card>
-      <Card><span>증거 범위</span><strong>저장 증거만</strong></Card>
+      <Card><span>근거 범위</span><strong>저장된 근거만</strong></Card>
     </div>
     {data.totalItems === 0
-      ? <EmptyState title="저장된 군집이 없습니다" description="선택한 공연에 저장된 Track 1 군집 증거가 없습니다. 분석 실행 여부나 분석 실패 여부를 뜻하지 않습니다." />
+      ? <EmptyState title="저장된 예매 그룹이 없습니다" description="선택한 공연에 저장된 연결된 예매 그룹이 없습니다. 분석 실행 여부나 분석 실패 여부를 뜻하지 않습니다." />
       : data.items.length === 0
         ? <div className={styles.page}><EmptyState title="이 페이지에 표시할 군집이 없습니다" description="요청한 페이지가 전체 결과 범위를 벗어났습니다." /><Button variant="secondary" onClick={() => navigate({ page: 0 })}>첫 페이지로 이동</Button></div>
         : <Card className={styles.tableCard}>
-          <div className={styles.sectionHeading}><h2>{event.name} 군집 목록</h2><span>전체 {data.totalItems}건 중 {first}~{first + data.items.length - 1}번째</span></div>
-          <DataTable caption="Track 1 저장 증거 군집 목록" columns={columns} rows={data.items} getRowKey={(cluster) => JSON.stringify([cluster.analysisRequestId, cluster.clusterId])} />
+          <div className={styles.sectionHeading}><h2>{event.name} 연결된 예매 그룹</h2><span>전체 {data.totalItems}건 중 {first}~{first + data.items.length - 1}번째</span></div>
+          <DataTable caption="연결된 예매 그룹 목록" columns={columns} rows={data.items} getRowKey={(cluster) => JSON.stringify([cluster.analysisRequestId, cluster.clusterId])} />
           <nav className={styles.pagination} aria-label="군집 목록 페이지"><Button variant="secondary" size="small" disabled={data.page === 0} onClick={() => navigate({ page: data.page - 1 })}>이전</Button><span>{data.page + 1} / {pageCount} 페이지</span><Button variant="secondary" size="small" disabled={!data.hasNext} onClick={() => navigate({ page: data.page + 1 })}>다음</Button></nav>
         </Card>}
   </>

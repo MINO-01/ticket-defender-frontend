@@ -11,6 +11,7 @@ import { lookupFanReport } from './fanReportApi'
 import { describeLookupFailure } from './submission'
 import type { LookupFailureView } from './submission'
 import { useFanReport } from './FanReportState'
+import { IdentifierGuide } from './OutcomePages'
 import styles from './FanReport.module.css'
 
 export function LookupPage() {
@@ -44,7 +45,7 @@ export function LookupPage() {
   return <div className={styles.lookupPage}>
     <Card className={styles.lookupCard}>
       <span className={styles.eyebrow}>내 제보 조회</span><h1>제보 조회 인증</h1>
-      <p>접수 완료 화면에서 받은 접수번호와 조회 코드를 입력하면 접수 상태를 확인할 수 있습니다.</p>
+      <p>접수 완료 화면에서 받은 접수번호와 조회 코드를 입력하면 접수 상태를 확인할 수 있습니다. 판매자 이름이나 예매번호로는 조회할 수 없습니다.</p>
       <form noValidate className={styles.fields} onSubmit={(event) => { void handleSubmit(lookup)(event) }}>
         <Input label="접수번호" autoComplete="off" required placeholder="접수번호를 입력해 주세요" error={errors.receiptNumber?.message} {...register('receiptNumber')} />
         <Input label="비밀 조회 코드" type="password" autoComplete="off" required placeholder="조회 코드를 입력해 주세요" error={errors.lookupCode?.message} {...register('lookupCode')} />
@@ -54,5 +55,6 @@ export function LookupPage() {
       <Link className={styles.textLink} to="/fan/guide">새 제보 안내 보기</Link>
     </Card>
     <Card className={styles.privacyCard}><h2>조회 시 정보 보호</h2><p>인증 전에는 특정 제보의 처리 상태를 공개하지 않습니다. 접수번호와 조회 코드는 주소에 기록되지 않고 요청 본문으로만 전송됩니다.</p></Card>
+    <IdentifierGuide />
   </div>
 }

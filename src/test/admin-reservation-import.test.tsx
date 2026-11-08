@@ -182,8 +182,8 @@ describe('합성 예매 반입 화면', () => {
   it('메뉴에서 열고 ACTIVE 회차만 선택지로 보여 준다', async () => {
     stubFetch({})
     renderApp('/app/overview')
-    fireEvent.click(await screen.findByRole('link', { name: '데이터 반입' }))
-    expect(await screen.findByRole('heading', { name: '데이터 반입' })).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('link', { name: '예매 자료 준비' }))
+    expect(await screen.findByRole('heading', { name: '예매 자료 준비' })).toBeInTheDocument()
     expect(screen.getByRole('note')).toHaveTextContent('실제 고객사 예매 데이터 반입 기능이 아니며')
     fireEvent.change(screen.getByRole('combobox', { name: '조회할 공연' }), { target: { value: EVENT_A } })
     const form = await openForm()

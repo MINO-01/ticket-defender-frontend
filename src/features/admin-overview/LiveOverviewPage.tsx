@@ -13,6 +13,7 @@ import { caseDetailRoute, casePageSchema, caseTypeLabels } from '../admin-cases/
 import { AdminEventGate } from '../admin-events/AdminEventGate'
 import type { AdminEvent } from '../admin-events/adminEventsApi'
 import { track1ClusterPageSchema, track1ListRoute } from '../admin-track1/track1Api'
+import { terms } from '../../app/terms'
 import { verifiedPerformanceRoute } from '../admin-track2/candidatePipelineApi'
 import { fanReportListRoute, fanReportPageSchema, formatUtc } from '../admin-track2/track2Api'
 import {
@@ -34,18 +35,36 @@ export function OverviewRoute() {
 
 export function LiveOverviewPage() {
   return <div className={styles.page}>
-    <PageHeader eyebrow="운영 현황" title="전체 현황" description="선택한 공연의 팬 제보, 저장된 연관 예매 군집, 최근 Case를 서버 조회 결과로 확인합니다. 건수와 상태는 조사 진행 현황이며 부정 거래 판정이 아닙니다." />
+    <PageHeader eyebrow="업무 시작" title="전체 현황" description="선택한 공연의 팬 제보, 연결된 예매 그룹, 최근 조사 사건을 서버 조회 결과로 확인하고 다음 업무로 이동합니다. 건수와 상태는 조사 진행 현황이며 부정 거래 판정이 아닙니다." />
     <AdminEventGate>{(event) => <EventOverview key={event.id} event={event} />}</AdminEventGate>
     <p className={styles.notice}>각 영역은 기존 조회 API 결과만 표시하고 자동으로 다시 조회하지 않습니다. 역할에 따라 일부 영역만 볼 수 있으며, 조회하지 못한 영역은 0건으로 표시하지 않습니다.</p>
   </div>
 }
 
 function EventOverview({ event }: { event: AdminEvent }) {
-  return <div className={styles.grid}>
-    <FanReportSection eventId={event.id} />
-    <ClusterSection eventId={event.id} />
-    <RecentCaseSection eventId={event.id} />
-  </div>
+  return <>
+    <NextWork eventId={event.id} />
+    <div className={styles.grid}>
+      <FanReportSection eventId={event.id} />
+      <ClusterSection eventId={event.id} />
+      <RecentCaseSection eventId={event.id} />
+    </div>
+  </>
+}
+
+/** 업무 흐름 순서대로 다음 화면으로 이동하는 바로가기다. 건수나 대기 여부를 추정하지 않고 이동만 안내한다. */
+function NextWork({ eventId }: { eventId: string }) {
+  const query = new URLSearchParams({ eventId })
+  const actions = [
+    { to: `/app/fan-reports?${new URLSearchParams({ eventId, intakeStatus: 'RECEIVED' })}`, title: '접수 완료된 제보 확인', text: '증거 저장이 확인된 제보를 열어 이미지 정보 추출부터 진행합니다.' },
+    { to: track1ListRoute(eventId), title: `${terms.cluster} 확인`, text: '조사 우선순위가 높은 그룹부터 저장된 관계 근거를 확인합니다.' },
+    { to: `/app/cases?${query}`, title: `${terms.case} 확인`, text: '진행 중인 조사 사건의 근거, 보고서 초안, 승인 단계를 확인합니다.' },
+    { to: '/app/approvals', title: `${terms.approvalRequest} 검토`, text: '전달받은 승인 요청을 열어 독립 검토와 결정을 진행합니다.' },
+  ]
+  return <nav className={styles.nextWork} aria-label="다음 업무">
+    <h2>다음 업무</h2>
+    <ol>{actions.map((action, index) => <li key={action.title}><Link to={action.to}><span className={styles.stepNo}>{index + 1}</span><span><strong>{action.title}</strong><small>{action.text}</small></span></Link></li>)}</ol>
+  </nav>
 }
 
 type SectionProps = { title: string; role: string; children: ReactNode }
@@ -78,7 +97,7 @@ function Count({ label, value }: { label: string; value: number }) {
 function FanReportSection({ eventId }: { eventId: string }) {
   const { result, retry } = useAdminQuery(overviewFanReportCountPath(eventId), fanReportPageSchema)
   const links = <div className={styles.links}>
-    <Link to={fanReportListRoute(eventId)}>팬 제보 검토</Link>
+    <Link to={fanReportListRoute(eventId)}>팬 제보 조사</Link>
     <Link to={verifiedPerformanceRoute(eventId)}>검증 회차 관리</Link>
   </div>
   let body: ReactNode
@@ -89,55 +108,55 @@ function FanReportSection({ eventId }: { eventId: string }) {
       ? <SectionFailure failure={outcome.failure} forbidden="팬 제보 목록은 분석 담당(ANALYST) 또는 검토 담당(REVIEWER)만 조회할 수 있습니다." onRetry={retry} />
       : <Count label="접수된 팬 제보 (서버 totalItems)" value={outcome.data.totalItems} />
   }
-  return <Section title="팬 제보 (Track 2)" role="분석 담당, 검토 담당">{body}{links}</Section>
+  return <Section title="팬 제보 (팬 제보 조사)" role="분석 담당, 검토 담당">{body}{links}</Section>
 }
 
 function ClusterSection({ eventId }: { eventId: string }) {
   const { result, retry } = useAdminQuery(overviewClusterCountPath(eventId), track1ClusterPageSchema)
   let body: ReactNode
-  if (result === null) body = <LoadingSkeleton label="저장된 군집 건수를 불러오는 중" />
+  if (result === null) body = <LoadingSkeleton label="연결된 예매 그룹 건수를 불러오는 중" />
   else {
     const outcome = checked(result, (data) => isClusterCountFor(eventId, data))
     body = 'failure' in outcome
-      ? <SectionFailure failure={outcome.failure} forbidden="저장된 군집 목록은 고객사 관리자, 분석 담당, 검토 담당, 승인 담당만 조회할 수 있습니다." onRetry={retry} />
+      ? <SectionFailure failure={outcome.failure} forbidden="연결된 예매 그룹 목록은 고객사 관리자, 분석 담당, 검토 담당, 승인 담당만 조회할 수 있습니다." onRetry={retry} />
       : <>
-        <Count label="저장된 연관 예매 군집 (서버 totalItems)" value={outcome.data.totalItems} />
-        <p className={styles.note}>저장된 증거만 기준으로 한 군집 수입니다. 위험 점수는 조사 우선순위이며 불법 거래 확률이 아닙니다.</p>
+        <Count label="저장된 연결된 예매 그룹 (서버 totalItems)" value={outcome.data.totalItems} />
+        <p className={styles.note}>저장된 근거만 기준으로 한 그룹 수입니다. 조사 우선순위는 먼저 살펴볼 순서이며 불법 거래 확률이 아닙니다.</p>
       </>
   }
-  return <Section title="연관 예매 군집 (Track 1)" role="고객사 관리자, 분석, 검토, 승인 담당">
+  return <Section title="연결된 예매 그룹 (예매 관계 분석)" role="고객사 관리자, 분석, 검토, 승인 담당">
     {body}
-    <div className={styles.links}><Link to={track1ListRoute(eventId)}>연관 예매 분석</Link></div>
+    <div className={styles.links}><Link to={track1ListRoute(eventId)}>예매 관계 분석</Link></div>
   </Section>
 }
 
 function RecentCaseSection({ eventId }: { eventId: string }) {
   const { result, retry } = useAdminQuery(overviewRecentCasesPath(eventId), casePageSchema)
   let body: ReactNode
-  if (result === null) body = <LoadingSkeleton label="최근 Case를 불러오는 중" />
+  if (result === null) body = <LoadingSkeleton label="최근 조사 사건을 불러오는 중" />
   else {
     const outcome = checked(result, (data) => isRecentCasesFor(eventId, data))
     if ('failure' in outcome) {
-      body = <SectionFailure failure={outcome.failure} forbidden="Case 목록은 고객사 관리자, 분석 담당, 검토 담당만 조회할 수 있습니다." onRetry={retry} />
+      body = <SectionFailure failure={outcome.failure} forbidden="조사 사건 목록은 고객사 관리자, 분석 담당, 검토 담당만 조회할 수 있습니다." onRetry={retry} />
     } else if (outcome.data.items.length === 0) {
-      body = <p className={styles.empty}>현재 계정이 볼 수 있는 Case가 없습니다. 서버가 빈 목록을 반환했습니다.</p>
+      body = <p className={styles.empty}>현재 계정이 볼 수 있는 조사 사건이 없습니다. 서버가 빈 목록을 반환했습니다.</p>
     } else {
       body = <>
         <ul className={styles.caseList}>
           {outcome.data.items.map((item) => <li key={item.caseId}>
-            <Link to={caseDetailRoute(item.caseId, eventId)} aria-label={`${item.caseId} 상세 보기`}><span className={styles.caseId}>{item.caseId}</span></Link>
+            <Link to={caseDetailRoute(item.caseId, eventId)} aria-label={`${item.caseId} 상세 보기`}><span className={styles.caseId}>사건 {item.caseId.slice(0, 8)}</span></Link>
             <span>{caseTypeLabels[item.type]}</span>
             <StatusBadge domain="case" status={item.status} />
             <time dateTime={item.createdAt}>{formatUtc(item.createdAt)}</time>
           </li>)}
         </ul>
-        {outcome.data.hasNext && <p className={styles.note}>더 많은 Case가 있습니다. 전체 목록은 사건 관리에서 확인해 주세요.</p>}
+        {outcome.data.hasNext && <p className={styles.note}>더 많은 조사 사건이 있습니다. 전체 목록은 조사 사건 화면에서 확인해 주세요.</p>}
       </>
     }
   }
-  return <Section title="최근 Case" role="고객사 관리자, 분석 담당, 검토 담당">
-    <p className={styles.note}>생성 시각 최신순 최대 {recentCasePageSize}건입니다. 서버가 전체 건수를 주지 않아 합계와 승인 대기 건수는 표시하지 않습니다. 분석 담당은 자신이 만들었거나 담당한 Case만 받습니다.</p>
+  return <Section title="최근 조사 사건" role="고객사 관리자, 분석 담당, 검토 담당">
+    <p className={styles.note}>생성 시각 최신순 최대 {recentCasePageSize}건입니다. 서버가 전체 건수를 주지 않아 합계와 승인 대기 건수는 표시하지 않습니다. 분석 담당은 자신이 만들었거나 담당한 조사 사건만 받습니다.</p>
     {body}
-    <div className={styles.links}><Link to={`/app/cases?${new URLSearchParams({ eventId })}`}>사건 관리</Link></div>
+    <div className={styles.links}><Link to={`/app/cases?${new URLSearchParams({ eventId })}`}>조사 사건 전체 보기</Link></div>
   </Section>
 }

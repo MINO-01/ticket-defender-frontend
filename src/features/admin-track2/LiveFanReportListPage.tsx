@@ -11,7 +11,7 @@ import type { AdminEvent } from '../admin-events/adminEventsApi'
 import { verifiedPerformanceRoute } from './candidatePipelineApi'
 import { StatusPill } from './StatusPill'
 import {
-  fanReportDetailRoute, fanReportListPath, fanReportPageSchema, formatUtc, intakeStatusLabels, intakeStatuses, intakeTone, readIntakeStatusParam, readPageParam,
+  fanReportDetailRoute, fanReportListPath, fanReportReference, intakeStatusHelp, fanReportPageSchema, formatUtc, intakeStatusLabels, intakeStatuses, intakeTone, readIntakeStatusParam, readPageParam,
 } from './track2Api'
 import type { FanReportSummary, IntakeStatus } from './track2Api'
 import { reportTypeLabels } from './track2Model'
@@ -22,9 +22,9 @@ import styles from './Track2.module.css'
 
 export function LiveFanReportListPage() {
   return <div className={styles.page}>
-    <PageHeader eyebrow="Track 2 팬 제보 조회" title="팬 제보 검토" description="선택한 공연에 접수된 팬 제보를 최근 접수 순으로 살펴봅니다. 접수 상태는 분석 결과나 부정 거래 판정이 아닙니다." />
+    <PageHeader eyebrow="조사" title="팬 제보 조사" description="선택한 공연에 접수된 팬 제보를 최근 접수 순으로 확인하고, 제보를 열어 이미지 정보 추출부터 조사 사건 생성까지 진행합니다. 접수 상태는 분석 결과나 부정 거래 판정이 아닙니다." />
     <AdminEventGate>{(event) => <ReportList key={event.id} event={event} />}</AdminEventGate>
-    <p className={styles.notice}>접수 상태는 증거 저장 여부를 나타내며 이미지 분석 결과가 아닙니다. 분석 이력과 관찰값은 제보 상세에서 증거별로 확인합니다. 검색, 분석 상태 필터, 예매 대조 필터는 서버가 지원하지 않아 제공하지 않습니다.</p>
+    <p className={styles.notice}>접수 상태는 증거 저장 여부를 나타내며 이미지 정보 추출 결과가 아닙니다. 접수 완료는 담당자가 아직 보지 않은 새 제보라는 뜻도 아닙니다. 추출 이력과 관찰값은 제보를 열어 증거별로 확인합니다. 검색, 추출 상태 필터, 예매 기록 비교 필터는 서버가 지원하지 않아 제공하지 않습니다. 접수번호는 서버가 반환한 값만 표시하며 제보자 신원이 아닙니다.</p>
   </div>
 }
 
@@ -53,6 +53,7 @@ function ReportList({ event }: { event: AdminEvent }) {
       </select></label>
       <Link className={styles.detailLink} to={verifiedPerformanceRoute(event.id)}>이 공연의 검증 회차 관리</Link>
     </div>
+    {intakeStatus && <p className={styles.subtleNote}>{intakeStatusHelp[intakeStatus]}</p>}
   </Card>
 
   if (result === null) return <>{filterControl}<LoadingSkeleton label="팬 제보 목록을 불러오는 중" /></>
@@ -70,13 +71,16 @@ function ReportList({ event }: { event: AdminEvent }) {
   const first = data.page * data.pageSize + 1
   const scope = intakeStatus ? `접수 상태 "${intakeStatusLabels[intakeStatus]}"` : '전체 접수 상태'
   const columns = [
-    { key: 'id', header: '제보 ID', render: (report: FanReportSummary) => <span className={styles.idCell}>{report.fanReportId}</span> },
+    { key: 'reference', header: '접수번호', render: (report: FanReportSummary) => report.receiptNumber
+      ? <strong>{report.receiptNumber}</strong>
+      : <span>{fanReportReference(report)}<small className={styles.cellSub}>서버 응답에 접수번호 없음</small></span> },
+    { key: 'event', header: '공연', render: () => event.name },
     { key: 'type', header: '제보 유형', render: (report: FanReportSummary) => reportTypeLabels[report.reportType] },
-    { key: 'received', header: '접수 시각', render: (report: FanReportSummary) => <time dateTime={report.receivedAt}>{formatUtc(report.receivedAt)}</time> },
+    { key: 'received', header: '접수일', render: (report: FanReportSummary) => <time dateTime={report.receivedAt}>{formatUtc(report.receivedAt)}</time> },
     { key: 'intake', header: '접수 상태', render: (report: FanReportSummary) => <StatusPill label={intakeStatusLabels[report.intakeStatus]} tone={intakeTone(report.intakeStatus)} /> },
     { key: 'evidence', header: '증거 (저장 완료 / 접수)', render: (report: FanReportSummary) => `${report.storedEvidenceCount} / ${report.evidenceCount}개` },
     { key: 'performance', header: '팬 입력 공연 일시', render: (report: FanReportSummary) => <span>{formatUtc(report.submittedPerformanceAt)}<small className={styles.cellSub}>검증된 회차 아님</small></span> },
-    { key: 'detail', header: '상세', render: (report: FanReportSummary) => <Link className={styles.detailLink} to={fanReportDetailRoute(report.fanReportId)} aria-label={`${report.fanReportId} 상세 보기`}>상세 보기</Link> },
+    { key: 'detail', header: '조사', render: (report: FanReportSummary) => <Link className={styles.detailLink} to={fanReportDetailRoute(report.fanReportId)} aria-label={`${report.fanReportId} 상세 보기`}>조사 열기</Link> },
   ]
 
   return <>
@@ -91,7 +95,7 @@ function ReportList({ event }: { event: AdminEvent }) {
         ? <div className={styles.page}><EmptyState title="이 페이지에 표시할 제보가 없습니다" description="요청한 페이지가 전체 결과 범위를 벗어났습니다." /><Button variant="secondary" onClick={() => navigate({ page: 0 })}>첫 페이지로 이동</Button></div>
         : <Card className={styles.tableCard}>
           <div className={styles.tableHeading}><h2>{event.name} 제보 목록</h2><span>전체 {data.totalItems}건 중 {first}~{first + data.items.length - 1}번째</span></div>
-          <DataTable caption="Track 2 팬 제보 목록" columns={columns} rows={data.items} getRowKey={(report) => report.fanReportId} />
+          <DataTable caption="팬 제보 목록" columns={columns} rows={data.items} getRowKey={(report) => report.fanReportId} />
           <nav className={styles.pagination} aria-label="팬 제보 목록 페이지"><Button variant="secondary" size="small" disabled={data.page === 0} onClick={() => navigate({ page: data.page - 1 })}>이전</Button><span>{data.page + 1} / {pageCount} 페이지</span><Button variant="secondary" size="small" disabled={!data.hasNext} onClick={() => navigate({ page: data.page + 1 })}>다음</Button></nav>
         </Card>}
   </>

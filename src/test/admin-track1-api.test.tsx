@@ -214,7 +214,7 @@ describe('Track 1 군집 목록 실제 API', () => {
     })
     renderApp('/app/analysis/findings')
     fireEvent.change(await screen.findByRole('combobox', { name: '조회할 공연' }), { target: { value: EVENT_A } })
-    const table = await screen.findByRole('table', { name: 'Track 1 저장 증거 군집 목록' })
+    const table = await screen.findByRole('table', { name: '연결된 예매 그룹 목록' })
     expect(within(table).getByText('0.82')).toBeInTheDocument()
     expect(within(table).getByText('값 없음')).toBeInTheDocument()
     expect(within(table).queryByText('0.00')).not.toBeInTheDocument()
@@ -314,7 +314,7 @@ describe('Track 1 군집 목록 실제 API', () => {
       return undefined
     })
     renderApp(`/app/analysis/findings?eventId=${EVENT_A}`)
-    expect(await screen.findByRole('heading', { name: '저장된 군집이 없습니다' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '저장된 예매 그룹이 없습니다' })).toBeInTheDocument()
     expect(screen.getByText(/분석 실행 여부나 분석 실패 여부를 뜻하지 않습니다/)).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
@@ -338,7 +338,7 @@ describe('Track 1 군집 목록 실제 API', () => {
     })
     renderApp(`/app/analysis/findings?eventId=${EVENT_A}`)
     expect(await screen.findByRole('alert')).toHaveTextContent(message)
-    expect(screen.queryByRole('heading', { name: '저장된 군집이 없습니다' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '저장된 예매 그룹이 없습니다' })).not.toBeInTheDocument()
     expect(screen.queryByText(/DEMO-/)).not.toBeInTheDocument()
     expect(screen.queryByText(/내부 고객사 정보/)).not.toBeInTheDocument()
   })
@@ -377,24 +377,63 @@ describe('Track 1 군집 상세 실제 API', () => {
     coverage: 'STORED_EVIDENCE_ONLY',
   }
 
+  const relationship = {
+    sharedSignals: [{ type: 'IP_HASH', sharedMemberCount: 3, verifiedConnectionCount: 3 }, { type: 'DEVICE_ID_HASH', sharedMemberCount: 2, verifiedConnectionCount: 1 }],
+    verifiedConnectionCount: 4,
+    unavailableSignalTypes: ['PAYMENT_HASH', 'ADDRESS_HASH'],
+    investigationPrioritySource: 'STORED_LOUVAIN_RISK_SCORE',
+    normalSharingNotice: '합성 정상 공유 가능성 안내',
+    memberCoverage: 'STORED_CLUSTER_MEMBERS_ONLY',
+  }
+
+  it('relationship이 있으면 기기와 IP 공유 근거 요약만 표시하고 연결 쌍 합계를 고유 연결 수로 설명하지 않는다', async () => {
+    stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, { ...detailBody, relationship }) : undefined)
+    renderApp(detailRoute)
+    const evidence = await screen.findByRole('region', { name: '공유 근거 요약' })
+    const items = within(evidence).getAllByRole('listitem')
+    // 기기 근거를 먼저, IP 근거를 다음에 표시한다.
+    expect(items[0]).toHaveTextContent('같은 기기 식별 신호')
+    expect(items[0]).toHaveTextContent('같은 저장 값을 가진 예매 기록 2건')
+    expect(items[1]).toHaveTextContent('같은 네트워크(IP) 신호')
+    expect(items[1]).toHaveTextContent('이 신호로 이어지는 예매 기록 쌍 3개')
+    expect(within(evidence).getByRole('note')).toHaveTextContent('합성 정상 공유 가능성 안내')
+    expect(evidence).toHaveTextContent('4개 (신호마다 따로 센 합계라 같은 두 예매가 중복될 수 있으며, 고유한 예매 연결 수가 아닙니다)')
+    expect(evidence).toHaveTextContent('결제 수단, 배송 주소')
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(evidence).not.toHaveTextContent(/_HASH/)
+  })
+
+  it('공유 신호가 없으면 관계 없음 판정이 아닌 서버 결과로 안내하고, 합계가 맞지 않는 relationship은 계약 위반으로 처리한다', async () => {
+    stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, { ...detailBody, relationship: { ...relationship, sharedSignals: [], verifiedConnectionCount: 0 } }) : undefined)
+    const view = renderApp(detailRoute)
+    expect(await screen.findByRole('heading', { name: '저장된 구성원끼리 공유한 기기나 IP 신호가 없습니다' })).toBeInTheDocument()
+    view.unmount()
+
+    stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, { ...detailBody, relationship: { ...relationship, verifiedConnectionCount: 9 } }) : undefined)
+    renderApp(detailRoute)
+    expect(await screen.findByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: '공유 근거 요약' })).not.toBeInTheDocument()
+  })
+
+
   it('직접 URL의 세 식별자로 상세를 조회하고 저장된 구성원과 분석 정보만 표시한다', async () => {
     const fetchMock = stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, detailBody) : undefined)
     renderApp(detailRoute)
-    expect(await screen.findByRole('heading', { name: '군집 cluster-1' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '연결된 예매 그룹 cluster-1' })).toBeInTheDocument()
     expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH, detailApi])
-    const members = screen.getByRole('table', { name: '저장된 군집 구성원' })
+    const members = screen.getByRole('table', { name: '저장된 그룹 구성원' })
     expect(within(members).getAllByRole('row')).toHaveLength(3)
     expect(within(members).getByText('account-2')).toBeInTheDocument()
     expect(within(members).getByText('reservation-1')).toBeInTheDocument()
     expect(screen.getByText('run/1')).toBeInTheDocument()
     expect(screen.getByText('LOUVAIN 1.0.0')).toBeInTheDocument()
     expect(screen.getByText('합성 공연 A')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '연결 관계 그래프를 표시할 수 없습니다' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '공유 근거를 표시할 수 없습니다' })).toBeInTheDocument()
     expect(screen.queryByRole('img', { name: /관계 그래프/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: '연결 신호 필터' })).not.toBeInTheDocument()
     expect(screen.queryByText(/DEMO-/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Case 생성' })).toBeDisabled()
-    expect(screen.getByRole('link', { name: '← 군집 목록' })).toHaveAttribute('href', `/app/analysis/findings?eventId=${EVENT_A}`)
+    expect(screen.getByRole('link', { name: '← 예매 그룹 목록' })).toHaveAttribute('href', `/app/analysis/findings?eventId=${EVENT_A}`)
   })
 
   it('목록에서 상세로 이동할 때 식별자를 유지한다', async () => {
@@ -406,7 +445,7 @@ describe('Track 1 군집 상세 실제 API', () => {
     })
     renderApp(`/app/analysis/findings?eventId=${EVENT_A}`)
     fireEvent.click(await screen.findByRole('link', { name: 'cluster-1 상세 보기' }))
-    expect(await screen.findByRole('heading', { name: '군집 cluster-1' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '연결된 예매 그룹 cluster-1' })).toBeInTheDocument()
     expect(requestedUrls(fetchMock).at(-1)).toBe(detailApi)
   })
 
@@ -450,7 +489,7 @@ describe('Track 1 군집 상세 실제 API', () => {
     stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? respond() : undefined)
     renderApp(detailRoute)
     expect(await screen.findByRole('alert')).toHaveTextContent(message)
-    expect(screen.queryByRole('table', { name: '저장된 군집 구성원' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: '저장된 그룹 구성원' })).not.toBeInTheDocument()
   })
 
   // 공연 목록 확인을 통과한 뒤 상세 API가 막히는 경우다. 409는 Backend 7c772ac의 실제 응답 형식이다.
@@ -464,7 +503,7 @@ describe('Track 1 군집 상세 실제 API', () => {
     renderApp(detailRoute)
     expect(await screen.findByRole('alert')).toHaveTextContent(message)
     expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH, detailApi])
-    expect(screen.queryByRole('table', { name: '저장된 군집 구성원' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: '저장된 그룹 구성원' })).not.toBeInTheDocument()
     expect(screen.queryByText(/내부 고객사 정보|Internal Server Error|DEPENDENCY_UNAVAILABLE|TENANT_SELECTION_REQUIRED/)).not.toBeInTheDocument()
     expect(screen.queryByText('account-1')).not.toBeInTheDocument()
   })
@@ -478,8 +517,8 @@ describe('Track 1 군집 상세 실제 API', () => {
     })
     renderApp(detailRoute)
     fireEvent.click(within(await screen.findByRole('alert')).getByRole('button', { name: '다시 시도' }))
-    expect(await screen.findByRole('heading', { name: '군집 cluster-1' })).toBeInTheDocument()
-    expect(within(screen.getByRole('table', { name: '저장된 군집 구성원' })).getAllByRole('row')).toHaveLength(3)
+    expect(await screen.findByRole('heading', { name: '연결된 예매 그룹 cluster-1' })).toBeInTheDocument()
+    expect(within(screen.getByRole('table', { name: '저장된 그룹 구성원' })).getAllByRole('row')).toHaveLength(3)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH, detailApi, detailApi])
   })
@@ -496,7 +535,7 @@ describe('Track 1 군집 상세 실제 API', () => {
     expect(alert).toHaveTextContent('서버가 일시적으로 응답할 수 없습니다')
     expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH])
     fireEvent.click(within(alert).getByRole('button', { name: '다시 시도' }))
-    expect(await screen.findByRole('heading', { name: '군집 cluster-1' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '연결된 예매 그룹 cluster-1' })).toBeInTheDocument()
     expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH, EVENTS_PATH, detailApi])
   })
 })

@@ -14,8 +14,8 @@ export const intakeStatuses = ['PENDING_STORAGE', 'RECEIVED', 'STORAGE_FAILED', 
 export type IntakeStatus = (typeof intakeStatuses)[number]
 const reportTypes = ['PREMIUM_RESALE', 'AUTOMATION_OFFER', 'FAKE_TICKET', 'OTHER'] as const
 const storageStatuses = ['PENDING', 'STORED', 'FAILED'] as const
-const executionStatuses = ['IN_PROGRESS', 'SUCCEEDED', 'INPUT_REJECTED', 'STORAGE_FAILED', 'ANALYZER_FAILED', 'ABANDONED'] as const
-const analysisStatuses = ['COMPLETED', 'PARTIAL', 'UNVERIFIABLE', 'FAILED'] as const
+export const executionStatuses = ['IN_PROGRESS', 'SUCCEEDED', 'INPUT_REJECTED', 'STORAGE_FAILED', 'ANALYZER_FAILED', 'ABANDONED'] as const
+export const analysisStatuses = ['COMPLETED', 'PARTIAL', 'UNVERIFIABLE', 'FAILED'] as const
 const fieldStates = ['FOUND', 'UNKNOWN', 'AMBIGUOUS'] as const
 const unknownReasons = ['ABSENT', 'UNREADABLE', 'NOT_CONFIRMED'] as const
 const candidateMatchReasons = ['PERFORMANCE_REF_UNVERIFIED', 'SEAT_NOT_FOUND', 'MATCH_SCORE_UNAVAILABLE', 'ANALYSIS_NOT_SUCCEEDED'] as const
@@ -37,8 +37,13 @@ const uuid = z.string().refine(isUuid).transform((value) => value.toLowerCase())
 
 const eventSchema = z.object({ id: uuid, externalEventId: z.string(), name: z.string().min(1) })
 
+// 접수번호는 팬이 받은 receiptNumber와 같은 업무용 번호이며 제보자 신원이 아니다.
+// 서버가 null을 주거나 필드가 없는 이전 서버 응답이면 없음으로 두고 화면이 임의 번호를 만들지 않는다.
+const receiptNumber = z.string().trim().min(1).max(64).nullable().optional()
+
 const summarySchema = z.object({
   fanReportId: uuid,
+  receiptNumber,
   reportType: z.enum(reportTypes),
   intakeStatus: z.enum(intakeStatuses),
   receivedAt: offsetDateTime,
@@ -71,6 +76,7 @@ const evidenceSchema = z.object({
 
 export const fanReportDetailSchema = z.object({
   fanReportId: uuid,
+  receiptNumber,
   event: eventSchema,
   reportType: z.enum(reportTypes),
   intakeStatus: z.enum(intakeStatuses),
@@ -225,14 +231,29 @@ export function formatCode(value: string | null) {
 
 export const intakeStatusLabels: Record<IntakeStatus, string> = {
   PENDING_STORAGE: '증거 저장 확인 중',
-  RECEIVED: '접수됨',
-  STORAGE_FAILED: '증거 저장 실패',
+  RECEIVED: '접수 완료',
+  STORAGE_FAILED: '접수 실패 (증거 저장 실패)',
   ANALYSIS_PENDING: '분석 대기',
   ANALYSIS_FAILED: '분석 실패 기록',
   UNVERIFIABLE: '확인 불가 기록',
 }
 
 /** 접수 상태 표시 색. 저장 실패 계열만 위험 색을 쓰며 어떤 값도 부정 거래 판정을 뜻하지 않는다. */
+/** 접수 상태별 설명이다. 접수 상태는 이미지 정보 추출 실행 결과와 다른 값이므로 접수 완료가 추출 완료를 뜻하지 않는다. */
+export const intakeStatusHelp: Record<IntakeStatus, string> = {
+  PENDING_STORAGE: '증거 원본 저장이 아직 확인되지 않았습니다.',
+  RECEIVED: '증거 저장이 확인된 접수 완료 상태입니다. 담당자 확인 여부나 이미지 정보 추출 결과와는 별개입니다.',
+  STORAGE_FAILED: '제보 접수 단계에서 증거 저장이 실패했습니다. 이미지 정보 추출 실패와는 다른 상태입니다.',
+  ANALYSIS_PENDING: '접수 기록상 분석 대기 상태입니다. 실제 이미지 정보 추출 실행 이력은 증거별로 따로 확인합니다.',
+  ANALYSIS_FAILED: '접수 기록상 분석 실패 상태입니다. 제보 접수 실패가 아니며 증거별 실행 이력으로 원인을 확인합니다.',
+  UNVERIFIABLE: '접수 기록상 확인 불가 상태입니다. 정상적인 빈 결과나 부정 거래 판정이 아닙니다.',
+}
+
+/** 관리자 화면의 제보 표시 이름이다. 서버 접수번호가 있으면 그것을, 없으면 UUID 앞부분을 참조용으로 쓴다. 번호를 새로 만들지 않는다. */
+export function fanReportReference(report: { fanReportId: string; receiptNumber?: string | null }) {
+  return report.receiptNumber ?? `제보 ${report.fanReportId.slice(0, 8)}`
+}
+
 export function intakeTone(status: IntakeStatus) {
   if (status === 'RECEIVED') return 'info' as const
   if (status === 'STORAGE_FAILED' || status === 'ANALYSIS_FAILED') return 'critical' as const

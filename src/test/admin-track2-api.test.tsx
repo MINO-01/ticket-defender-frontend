@@ -155,6 +155,19 @@ afterEach(() => {
 })
 
 describe('Track 2 팬 제보 목록 실제 API', () => {
+  it('서버 접수번호가 있으면 접수번호를, null이면 번호를 만들지 않고 없음 안내를 표시한다', async () => {
+    stubFetch((url) => {
+      if (url === EVENTS_PATH) return json(200, eventPage())
+      if (url === listPath(EVENT_A)) return json(200, reportPage(eventA, [summary({ receiptNumber: 'TD-SYN-0002' }), summary({ fanReportId: REPORT_2, receiptNumber: null })], { totalItems: 2 }))
+      return undefined
+    })
+    renderApp(`/app/fan-reports?eventId=${EVENT_A}`)
+    const table = await screen.findByRole('table')
+    expect(within(table).getByText('TD-SYN-0002')).toBeInTheDocument()
+    expect(within(table).getByText(`제보 ${REPORT_2.slice(0, 8)}`)).toBeInTheDocument()
+    expect(within(table).getAllByText('서버 응답에 접수번호 없음')).toHaveLength(1)
+  })
+
   it('인증된 관리자는 선택한 공연의 서버 목록만 Bearer 토큰으로 조회하고 데모 데이터를 섞지 않는다', async () => {
     const fetchMock = stubFetch((url) => {
       if (url === EVENTS_PATH) return json(200, eventPage())
@@ -163,10 +176,10 @@ describe('Track 2 팬 제보 목록 실제 API', () => {
     })
     renderApp(`/app/fan-reports?eventId=${EVENT_A}`)
     const table = await screen.findByRole('table')
-    expect(within(table).getByText(REPORT_1)).toBeInTheDocument()
+    expect(within(table).getByRole('link', { name: `${REPORT_1} 상세 보기` })).toBeInTheDocument()
     expect(within(table).getByText('고액 재판매 정황')).toBeInTheDocument()
-    expect(within(table).getByText('접수됨')).toBeInTheDocument()
-    expect(within(table).getByText('증거 저장 실패')).toBeInTheDocument()
+    expect(within(table).getByText('접수 완료')).toBeInTheDocument()
+    expect(within(table).getByText('접수 실패 (증거 저장 실패)')).toBeInTheDocument()
     expect(within(table).getByText('1 / 2개')).toBeInTheDocument()
     expect(within(table).getByText('0 / 1개')).toBeInTheDocument()
     expect(within(table).getAllByText('2026-11-01 09:30 UTC')).toHaveLength(2)
@@ -214,11 +227,11 @@ describe('Track 2 팬 제보 목록 실제 API', () => {
     renderApp(`/app/fan-reports?eventId=${EVENT_A}&page=0`)
     expect(await screen.findByRole('status', { name: '팬 제보 목록을 불러오는 중' })).toBeInTheDocument()
     fireEvent.change(screen.getByRole('combobox', { name: '조회할 공연' }), { target: { value: EVENT_B } })
-    expect(await screen.findByText(REPORT_2)).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: `${REPORT_2} 상세 보기` })).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent(`/app/fan-reports?eventId=${EVENT_B}`)
     lateA.resolve(json(200, reportPage(eventA, [summary()])))
     await new Promise((resolve) => setTimeout(resolve, 20))
-    expect(screen.queryByText(REPORT_1)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: `${REPORT_1} 상세 보기` })).not.toBeInTheDocument()
     expect(screen.getByText('합성 공연 B 제보 목록')).toBeInTheDocument()
   })
 
@@ -231,7 +244,7 @@ describe('Track 2 팬 제보 목록 실제 API', () => {
       return undefined
     })
     renderApp(`/app/fan-reports?eventId=${EVENT_A}&page=1&intakeStatus=RECEIVED`)
-    expect(await screen.findByText(REPORT_2)).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: `${REPORT_2} 상세 보기` })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: '접수 상태' })).toHaveValue('RECEIVED')
     expect(screen.getByText('2 / 3 페이지')).toBeInTheDocument()
     expect(screen.getByText('전체 41건 중 21~21번째')).toBeInTheDocument()
@@ -254,7 +267,7 @@ describe('Track 2 팬 제보 목록 실제 API', () => {
       return undefined
     })
     renderApp(`/app/fan-reports?eventId=${EVENT_A}&intakeStatus=MATCH_CANDIDATE`)
-    expect(await screen.findByText(REPORT_1)).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: `${REPORT_1} 상세 보기` })).toBeInTheDocument()
     expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH, listPath(EVENT_A)])
   })
 
@@ -278,7 +291,7 @@ describe('Track 2 팬 제보 목록 실제 API', () => {
     expect(screen.queryByRole('heading', { name: '조건에 맞는 제보가 없습니다' })).not.toBeInTheDocument()
     expect(screen.queryByText(/내부 고객사 정보|SQLSTATE/)).not.toBeInTheDocument()
     fireEvent.click(within(alert).getByRole('button', { name: '다시 시도' }))
-    expect(await screen.findByText(REPORT_2)).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: `${REPORT_2} 상세 보기` })).toBeInTheDocument()
   })
 
   it.each([
@@ -352,7 +365,7 @@ describe('Track 2 팬 제보 상세 실제 API', () => {
     expect(await screen.findByRole('heading', { name: '팬 제보 상세' })).toBeInTheDocument()
     expect(screen.getByText('합성 공연 A')).toBeInTheDocument()
     expect(screen.getByText('고액 재판매 정황')).toBeInTheDocument()
-    expect(screen.getByText('접수됨')).toBeInTheDocument()
+    expect(screen.getByText('접수 완료')).toBeInTheDocument()
     expect(screen.getByText('R석 2구역')).toBeInTheDocument()
     expect(screen.getByText('합성판매자')).toBeInTheDocument()
     expect(screen.getByText('250,000')).toBeInTheDocument()
@@ -363,6 +376,25 @@ describe('Track 2 팬 제보 상세 실제 API', () => {
     await screen.findByText('분석 시점 미연결 (검증된 회차 정보가 없습니다)')
     // 상세 직접 주소는 상세와 상세 응답의 증거 ID로만 조회한다.
     expect(requestedUrls(fetchMock)).toEqual([detailPath(), historyPath()])
+  })
+
+  it('상단 조사 진행 요약은 상세 응답만으로 확인한 사실과 미확인 내용을 나누고 접수번호를 만들지 않는다', async () => {
+    stubFetch(detailRoute())
+    const view = renderApp(`/app/fan-reports/${REPORT_1}`)
+    const guide = await screen.findByRole('region', { name: '조사 진행 요약' })
+    expect(within(guide).getByRole('region', { name: '확인한 사실' })).toHaveTextContent('접수 상태: 접수 완료')
+    expect(within(guide).getByRole('region', { name: '아직 확인되지 않은 내용' })).toHaveTextContent('판매자 표시는 확인된 신원이 아니며')
+    expect(within(guide).getByRole('region', { name: '다음 작업' })).toHaveTextContent('이미지 정보 추출')
+    expect(within(screen.getByRole('navigation', { name: '팬 제보 조사 단계' })).getAllByRole('link')).toHaveLength(5)
+    // 관리자 API가 접수번호를 주지 않으면 번호를 만들지 않고 제보 ID 앞부분과 미제공 안내를 보여 준다.
+    expect(screen.getByText('서버 응답에 접수번호가 없어 제보 ID 앞부분으로 표시합니다')).toBeInTheDocument()
+    expect(screen.getByText(`제보 ${REPORT_1.slice(0, 8)}`)).toBeInTheDocument()
+    view.unmount()
+
+    stubFetch(detailRoute(undefined, detail({ receiptNumber: 'TD-SYN-0001' })))
+    renderApp(`/app/fan-reports/${REPORT_1}`)
+    expect(await screen.findByText('TD-SYN-0001')).toBeInTheDocument()
+    expect(screen.queryByText('서버 응답에 접수번호가 없어 제보 ID 앞부분으로 표시합니다')).not.toBeInTheDocument()
   })
 
   it('URL의 제보 ID가 UUID가 아니면 API를 호출하지 않고, 데모 제보 주소도 실제 화면에서 열지 않는다', async () => {
@@ -590,7 +622,7 @@ describe('Track 2 증거별 분석 이력 실제 API', () => {
     const base = detailRoute()
     stubFetch((url) => url === historyPath() ? late.promise : base(url))
     renderApp(`/app/fan-reports/${REPORT_1}`)
-    expect(await screen.findByRole('status', { name: '분석 이력을 불러오는 중' })).toBeInTheDocument()
+    expect(await screen.findByRole('status', { name: '이미지 정보 추출 이력을 불러오는 중' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '증거 2 선택' }))
     expect(await screen.findByText('원본 저장이 확인되지 않은 증거이며 분석 기록이 없습니다.')).toBeInTheDocument()
     late.resolve(json(200, analysisPage([analysis()])))

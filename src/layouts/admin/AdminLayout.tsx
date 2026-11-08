@@ -1,20 +1,28 @@
-import { NavLink, Outlet } from 'react-router-dom'
-import { adminPages } from '../../app/router/navigation'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { adminGroups, adminPages, adminShortcuts, supportLabels } from '../../app/router/navigation'
 import { Button } from '../../components/common/Button'
 import { useAdminAuth } from '../../features/admin-auth/AdminAuthProvider'
 import styles from './AdminLayout.module.css'
 
 export function AdminSidebar() {
-  const groups = ['운영', '조사', '관리'] as const
+  const location = useLocation()
+  // 바로가기와 원래 메뉴가 같은 경로를 쓰므로 서버 필터 값까지 같을 때만 바로가기를 현재 위치로 표시한다.
+  const params = new URLSearchParams(location.search)
+  const activeShortcut = adminShortcuts.find((shortcut) => location.pathname === shortcut.match.path && params.get(shortcut.match.param) === shortcut.match.value)
   return <aside className={styles.sidebar} aria-label="관리자 메뉴">
-    <NavLink to="/" className={styles.brand}><span className={styles.brandMark}>TD</span><span>Ticket Defender<small>관리자 화면</small></span></NavLink>
+    <NavLink to="/" className={styles.brand}><span className={styles.brandMark}>TD</span><span>Ticket Defender<small>조사 지원 관리자 화면</small></span></NavLink>
     <nav aria-label="관리자 탐색">
-      {groups.map((group) => <div key={group} className={styles.navGroup}>
+      {adminGroups.map((group) => <div key={group} className={styles.navGroup}>
         <p className={styles.groupLabel}>{group}</p>
-        {adminPages.filter((page) => page.group === group).map((page) => <NavLink key={page.path} to={`/app/${page.path}`} className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}><span>{page.label}</span></NavLink>)}
+        {adminPages.filter((page) => page.group === group).map((page) => <NavLink key={page.path} to={`/app/${page.path}`}
+          className={({ isActive }) => `${styles.navLink} ${isActive && !(activeShortcut && activeShortcut.match.path === `/app/${page.path}`) ? styles.active : ''}`}>
+          <span>{page.label}</span>{page.support !== 'live' && <small className={styles.supportTag}>{supportLabels[page.support]}</small>}
+        </NavLink>)}
+        {adminShortcuts.filter((shortcut) => shortcut.group === group).map((shortcut) => <Link key={shortcut.to} to={shortcut.to} aria-current={activeShortcut === shortcut ? 'page' : undefined}
+          className={`${styles.navLink} ${activeShortcut === shortcut ? styles.active : ''}`}><span>{shortcut.label}</span></Link>)}
       </div>)}
     </nav>
-    <p className={styles.sidebarNote}>업무 데이터 연결 전 화면 구성</p>
+    <p className={styles.sidebarNote}>분석 결과와 상태는 조사 지원 정보이며 부정 거래 판정이 아닙니다.</p>
   </aside>
 }
 
