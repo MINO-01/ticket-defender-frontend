@@ -1,31 +1,50 @@
-# Frontend가 요청하는 Backend 조회 계약 초안
+# Frontend가 요청한 Backend 조회 계약과 실제 구현 비교
 
-작성 기준: Frontend `feat/capstone-demo-ux-20261108`, Backend `origin/main` 7eb2f0b (2026-11-08)
+최초 작성 기준: Frontend `feat/capstone-demo-ux-20261108`, Backend `origin/main` 7eb2f0b (2026-11-08)
+비교 갱신 기준: Backend `feat/capstone-demo-integration-20261108` e37a1a5, 계약 문서 `docs/api/capstone-demo-integration-v1.md`
 
-이 문서는 관리자 업무 화면을 완성하는 데 필요한 조회 계약의 **요청 초안**입니다. 확정 계약이 아닙니다. Backend 담당자가 실제 계약을 제공하면 아래 비교 표를 갱신하고, 서비스별 기존 API 모듈(`track2Api.ts`, `track1Api.ts`, `caseApi.ts`, `approvalApi.ts`, `officialPdfApi.ts`)에 연결합니다.
-
-계약이 확정되기 전에는 Frontend가 이 경로를 호출하지 않습니다. 해당 화면에는 "Backend 계약 대기"로 표시하고 완료 기능으로 취급하지 않습니다.
+이 문서의 1~7번은 Frontend가 처음 요청한 **초안**입니다. 아래 비교 표는 Backend가 실제로 구현한 계약과 Frontend 연결 상태를 정리합니다. Frontend는 실제 DTO에 있는 필드와 enum만 사용하며, 아직 없는 API는 호출하지 않고 화면에 "Backend 계약 대기"로 표시합니다.
 
 ## 공통 원칙
 
 - 모든 조회는 기존 관리자 인증(Bearer)과 tenant, event 범위 검사를 따릅니다. 범위 밖이면 404, 역할이 없으면 403을 반환합니다.
-- 목록은 `page`, `pageSize`(1~100), `hasNext`를 반환합니다. 화면이 건수를 표시해야 하는 목록은 `totalItems`도 반환합니다.
 - 원본 예매번호, 실명, 연락처, 원본 HMAC 입력값, 객체 저장소 키, 자격 증명은 응답에 넣지 않습니다.
 - 분석 실패, 확인 불가, 미실행은 서로 다른 값으로 반환합니다. 실패를 빈 목록으로 바꾸지 않습니다.
 
 ## 비교 표
 
-| 번호 | 항목 | 화면 | Frontend 요청 | Backend 실제 계약 | 상태 |
-|---|---|---|---|---|---|
-| 1 | 관리자 제보 접수번호 | 팬 제보 목록, 상세 | 아래 1 | 미제공 (원격 브랜치 없음) | 대기, 화면은 선택 필드로 준비 완료 |
-| 2 | 연결된 예매 그룹 공유 근거 | 예매 관계 분석 상세 | 아래 2 | 미제공 | 대기 |
-| 3 | 분석 작업 조회 | 분석 작업 | 아래 3 | 미제공 | 대기 |
-| 4 | 감사 기록 조회 | 감사 기록 | 아래 4 | 미제공 (Case별 활동 기록만 있음) | 대기 |
-| 5 | 내 역할과 설정 조회 | 설정, 각 화면 역할 안내 | 아래 5 | 미제공 | 대기 |
-| 6 | 승인 요청 목록 | 보고서 승인 요청 | 아래 6 | 미제공 (ID로만 열 수 있음) | 대기 |
-| 7 | 승인 결정 조회 | 조사 사건, 승인 요청, 보고서 발급 | 아래 7 | 미제공 (결정 직후 응답에만 결정 ID 있음) | 대기 |
+| 번호 | 항목 | Backend 실제 계약 (e37a1a5) | Frontend 연결 | 상태 |
+|---|---|---|---|---|
+| 1 | 관리자 제보 접수번호 | 기존 제보 목록과 상세에 `receiptNumber` 추가 | `track2Api.ts` 선택 필드(null 허용), 목록과 상세에 우선 표시, 없으면 없음 안내 | 연결 완료 |
+| 2 | 연결된 예매 그룹 공유 근거 | 별도 API 대신 기존 군집 상세에 `relationship` 추가 (`DEVICE_ID_HASH`, `IP_HASH` 요약만) | `track1Api.ts` 스키마, 예매 그룹 상세의 공유 근거 요약 | 연결 완료 (결제, 주소 근거는 서버 미제공) |
+| 3 | 분석 작업 조회 | `GET /api/v1/admin/analysis-runs` (Track 2 이미지 정보 추출 실행만, totalItems 없음) | `operationsApi.ts`, 분석 작업 화면의 실행 이력 | 부분 연결 (통합 작업 이력은 미구현) |
+| 4 | 감사 기록 조회 | `GET /api/v1/cases/{caseId}/approval-audit-events` (조사 사건별 승인 감사만) | `caseLinkApi.ts`, 조사 사건 상세와 감사 기록 화면 | 부분 연결 (고객사 전체 감사 로그는 미구현) |
+| 5 | 내 역할과 설정 조회 | `GET /api/v1/admin/operations/settings?eventId` (TENANT_ADMIN, 기능 상태만) | `operationsApi.ts`, 설정 화면 운영 상태 | 부분 연결 (사용자 역할 목록 `/admin/me`, AUDITOR는 미구현) |
+| 6 | 승인 요청 목록 | 미구현 | 승인 요청 ID나 조사 사건 업무 연결 링크로 엽니다 | 대기 |
+| 7 | 승인 결정 조회 | 전체 목록은 미구현. `GET /api/v1/cases/{caseId}/workflow`의 `approval`에 결정 ID와 결과 포함 | `caseLinkApi.ts`, 조사 사건 업무 연결에서 승인 요청과 발급 화면으로 이동 | 사건 단위 연결 완료, 전체 목록 대기 |
+
+### 실제 계약을 쓸 때 지키는 점
+
+- `receiptNumber`는 업무용 번호이며 제보자 신원이 아닙니다. 조회 비밀, 복구 코드, 팬 신원정보는 요청하거나 표시하지 않습니다.
+- `relationship.verifiedConnectionCount`는 신호별 비순서 구성원 쌍의 합계라 중복될 수 있습니다. 화면은 "고유한 예매 연결 수가 아님"을 함께 표시하고, `normalSharingNotice`를 항상 보여 줍니다. 신호 값, HMAC, 그래프 간선은 응답에 없으므로 그래프를 만들지 않습니다.
+- `analysis-runs`의 `coverage`는 `PERSISTED_TRACK2_LISTING_CONTEXT_ANALYSES_ONLY`만 받습니다. 실행 상태와 분석 결과 상태를 나눠 표시하고 실패 실행을 숨기지 않으며, 전체 건수를 계산하지 않습니다.
+- `workflow`의 `report`, `approval`, `officialPdf`는 null이면 "없음"으로 표시합니다. `nextStep`은 안내 문구로만 보여 주고 버튼 권한이나 PDF 발급 가능 여부 판단에 쓰지 않습니다. 발급 가능 여부는 기존 `official-pdf-eligibility`가 판단합니다.
+- 승인 감사 이력은 조사 사건 활동 기록과 별도 영역으로 보여 주며 하나의 전역 감사 기록으로 합치지 않습니다.
+- `operations/settings`는 로그인한 사용자의 역할 목록이 아닙니다. 403이면 고객사 관리자 역할이 필요하다고 안내하고 역할을 추정하지 않습니다. 설정 변경 기능은 없습니다.
+
+### 여전히 미구현인 Backend 기능
+
+- 승인 요청 전체 목록, 승인 결정 전체 목록
+- 고객사 전체 감사 로그
+- Track 1과 Track 2를 합친 통합 분석 작업 이력 (Track 1 실행 요청 저장 모델 없음)
+- 로그인한 관리자의 전체 역할 조회 (`/admin/me`)
+- AUDITOR 역할과 운영 권한 (정책 결정 필요)
 
 `/api/v1/audits/**`는 레거시 분석 및 PDF 409 차단용 엔드포인트이며 감사 기록 조회 API가 아닙니다. Frontend는 이를 감사 기록으로 사용하지 않습니다.
+
+## 최초 요청 초안 (참고)
+
+아래 1~7은 실제 구현 전에 Frontend가 제안한 형태입니다. 실제 경로와 필드는 위 비교 표와 Backend 계약 문서를 따릅니다.
 
 ## 1. 관리자 제보 접수번호
 
