@@ -13,9 +13,14 @@ import styles from './FanReport.module.css'
 
 export function EvidenceAttachments() {
   const { evidence, fileError, addEvidence, removeEvidence } = useFanReport()
+  // 합성 원장 대조 안내는 실제 접수가 설정된 격리 시연 환경에서만 표시한다.
+  const intakeEnabled = getIntakeEvent() !== null
   return <Card className={styles.evidenceCard}>
     <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>자료 선택</span><h2>증거 자료 첨부</h2></div><span className={styles.count}>{evidence.length}/{evidencePolicy.maxFiles}</span></div>
     <p>관련 게시글이나 대화 화면 등 확인에 도움이 되는 자료가 있다면 첨부해 주세요. 선택한 파일은 최종 확인 화면에서 제출할 때만 서버로 전송됩니다.</p>
+    <p className={styles.note}>본인이 촬영했거나 사용할 권한이 있는 게시물 이미지만 제출하세요. 계정정보와 개인 메시지 등 불필요한 개인정보는 포함하지 마세요.</p>
+    {intakeEnabled && <p className={styles.note}>이번 시연은 합성 예매 데이터와 대조합니다.</p>}
+    {intakeEnabled && <p className={styles.note}>업로드는 파일당 20MB까지 가능하지만 이미지 정보 추출은 5MiB 이하 파일만 실행할 수 있습니다.</p>}
     <div className={styles.filePicker}>
       <span aria-hidden="true" className={styles.fileSymbol}>＋</span>
       <label htmlFor="evidence-files" className={styles.fileLabel}>사진 선택하기</label>

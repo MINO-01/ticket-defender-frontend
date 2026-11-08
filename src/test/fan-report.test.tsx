@@ -42,6 +42,8 @@ describe('팬 제보 UI', () => {
     renderRoute('/fan/guide')
     fireEvent.click(screen.getByRole('link', { name: /제보 작성 시작/ }))
     expect(screen.getByRole('heading', { name: '제보 내용 작성' })).toBeInTheDocument()
+    expect(screen.getByText('본인이 촬영했거나 사용할 권한이 있는 게시물 이미지만 제출하세요. 계정정보와 개인 메시지 등 불필요한 개인정보는 포함하지 마세요.')).toBeInTheDocument()
+    expect(screen.queryByText('이번 시연은 합성 예매 데이터와 대조합니다.')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '다음 단계: 최종 확인' }))
     expect(await screen.findByText('공연을 선택해 주세요.')).toBeInTheDocument()
     expect(screen.getByText('제보 유형을 선택해 주세요.')).toBeInTheDocument()
