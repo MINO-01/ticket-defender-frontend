@@ -44,7 +44,7 @@
 
 ## 실제 캡처 조사 시연 연결 현황
 
-확인 기준: Frontend `feat/capstone-demo-flow-20261108`, Backend `origin/main` c982e79 (2026-11-08)
+확인 기준: Frontend `feat/capstone-demo-flow-20261108`, Backend `feat/capstone-demo-evidence-link-20261108` 9cda95f (2026-11-08, main 미병합)
 
 | 단계 | 화면 | Backend API | 상태 |
 |---|---|---|---|
@@ -53,10 +53,14 @@
 | 검증 회차 연결과 후보 대조 | 관리자 제보 상세 | 기존 검증 회차, 회차 연결, 후보 대조 실행과 이력 API | 연결 완료 |
 | 제보, 증거, 후보 실행, 군집의 Case 출처 전달 | 관리자 제보 상세의 Case 생성 영역 | 기존 Case 생성 API | 연결 완료 |
 | Track 2 후보 출처 Case의 승인 차단 안내 | 제보 상세, Case 상세 | 기존 승인과 PDF 적격성 API | 연결 완료 |
-| 군집 구성원의 원장 좌석 | 없음 | 계약 없음 | Backend 계약 대기 |
-| `LINKED`, `NO_TRACK1_LINK`, `NOT_APPLICABLE`, `LEDGER_UNAVAILABLE` 수렴 상태와 연결 카드 | 없음 | 계약 없음 | Backend 계약 대기 |
+| 군집 구성원의 원장 좌석 | 군집 상세의 구성원 원장 좌석 영역 | `GET /api/v1/admin/track1/clusters/detail` + `performanceId`, `sourceVersion` | 연결 완료 |
+| `LINKED`, `NO_TRACK1_LINK`, `NOT_APPLICABLE`, `LEDGER_UNAVAILABLE` 수렴 상태와 원장 좌석 | Case 상세의 Track 1 연결 비교 영역 | `GET /api/v1/cases/{caseId}/track1-candidate-links` | 연결 완료 |
+| Track 1 저장 간선 그래프 | 없음 | 제공하지 않음 (`track1-ledger-seat-read-v1`) | 공유 근거 집계만 표시 |
 
-- 위 수렴 상태와 군집 좌석 필드는 Backend 코드와 계약 문서에 없으므로 경로나 응답 필드를 추측해 호출하거나 화면을 만들지 않습니다. Backend가 실제 DTO와 계약 문서를 Push한 뒤 그 계약으로 연결합니다.
+- 군집 구성원 응답은 `auditId`와 `ledgerSeat`만 사용합니다. 계정 식별자와 예매참조는 응답에도 화면에도 없습니다.
+- 수렴 조회는 Case 생성 이후의 현재 조회이며 Case 생성 전 연결 여부로 표시하지 않습니다. 군집 상세의 원장 좌석 조회는 `LINKED` 판정을 만들지 않습니다.
+- 저장된 간선 API가 없으므로 Cytoscape 그래프를 실제 데이터에 연결하지 않고, 공유 근거나 Risk Score로 간선을 추정하지 않습니다.
+- 두 API는 Backend 작업 브랜치에만 있으므로 해당 브랜치가 배포되지 않은 서버에서는 연결 비교 영역에 조회 실패가 표시됩니다.
 - 팬 작성 화면의 공연명은 공개 공연 목록 API가 없어 `VITE_FAN_REPORT_EVENT_LABEL` 설정값을 표시합니다. 관리자 화면의 공연명은 서버 응답을 사용합니다.
 - 이미지 정보 추출과 후보 대조는 제보별로 관리자가 직접 눌러야 실행되며 자동 재시도, 일괄 실행 기능은 없습니다.
 
