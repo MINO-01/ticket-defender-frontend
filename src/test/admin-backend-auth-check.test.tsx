@@ -36,7 +36,8 @@ describe('백엔드 인증 연결 확인', () => {
   function withEvents(handler: (url: string) => Response | Promise<Response>) {
     return vi.fn<typeof fetch>(async (input) => {
       const url = String(input)
-      return url.startsWith('/api/v1/admin/events') ? jsonResponse(200, eventsBody) : handler(url)
+      if (url.startsWith('/api/v1/admin/events')) return jsonResponse(200, eventsBody)
+      return url.startsWith('/api/v1/admin/fan-reports') ? handler(url) : new Response(null, { status: 404 })
     })
   }
   const panelCalls = (fetchMock: ReturnType<typeof withEvents>) => fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/v1/admin/fan-reports'))

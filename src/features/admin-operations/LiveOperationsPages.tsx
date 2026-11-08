@@ -6,24 +6,29 @@ import { describeAdminApiFailure } from '../../api/adminApiFailure'
 import { roleLabels, terms } from '../../app/terms'
 import { Button } from '../../components/common/Button'
 import { Card } from '../../components/common/Card'
+import { DataTable } from '../../components/common/DataTable'
 import { EmptyState, ErrorState, LoadingSkeleton } from '../../components/common/Feedback'
 import { PageHeader } from '../../components/common/PageHeader'
 import { StatusBadge } from '../../components/common/StatusBadge'
 import { AdminPagePlaceholder } from '../../pages/admin/AdminPagePlaceholder'
 import { useAdminAuth } from '../admin-auth/AdminAuthProvider'
 import { useAdminQuery } from '../admin-auth/useAdminQuery'
+import { ApprovalAuditPanel } from '../admin-cases/CaseLinkPanels'
 import { ActivityPanel } from '../admin-cases/LiveCaseDetailPage'
 import { caseDetailRoute, caseListPath, casePageSchema, caseTypeLabels } from '../admin-cases/caseApi'
 import { AdminEventGate } from '../admin-events/AdminEventGate'
 import type { AdminEvent } from '../admin-events/adminEventsApi'
-import { useAccessibleEvents } from '../admin-events/useAccessibleEvents'
 import { BackendAuthCheckPanel } from '../admin-settings/BackendAuthCheckPanel'
-import { fanReportPageSchema, formatUtc, intakeStatusHelp, intakeStatusLabels } from '../admin-track2/track2Api'
+import { StatusPill } from '../admin-track2/StatusPill'
+import { analysisStatusLabels, executionStatusLabels, fanReportDetailRoute, fanReportPageSchema, formatUtc, intakeStatusHelp, intakeStatusLabels } from '../admin-track2/track2Api'
 import type { FanReportPage, IntakeStatus } from '../admin-track2/track2Api'
+import { analysisRunPageSchema, analysisRunsPath, describeOperationState, isAnalysisRunPageFor, operationSettingsPath, operationSettingsSchema } from './operationsApi'
+import type { AnalysisRun } from './operationsApi'
 import styles from './Operations.module.css'
 
-// 운영 메뉴(분석 작업, 감사 기록, 설정)의 실제 조회 화면이다. 기존 Backend 조회 API가 지원하는 범위만 실제 데이터로 보여 준다.
-// 공연 단위 분석 작업 목록, 고객사 전체 감사 로그, 서버 설정 조회 API는 아직 없으므로 만들어 내지 않고 계약 대기로 안내한다.
+// 운영 메뉴(분석 작업, 감사 기록, 설정)의 실제 조회 화면이다. Backend 조회 API가 지원하는 범위만 실제 데이터로 보여 준다.
+// 이미지 정보 추출 실행 이력, 조사 사건별 활동과 승인 감사 이력, 고객사 관리자용 운영 상태는 실제로 조회한다.
+// 통합 분석 작업 이력, 고객사 전체 감사 로그, 사용자 역할 목록은 아직 없으므로 만들어 내지 않고 계약 대기로 안내한다.
 // 계약 초안은 docs/contracts/backend-requests.md에 정리한다.
 
 function PendingContract({ title, children }: { title: string; children: ReactNode }) {
@@ -59,20 +64,70 @@ export function isIntakeCountFor(eventId: string, intakeStatus: IntakeStatus, da
 
 function AnalysisJobsPage() {
   return <div className={styles.page}>
-    <PageHeader eyebrow="운영" title="분석 작업" description={`${terms.listingAnalysis}과 ${terms.candidateMatch} 실행 상태를 확인하는 곳을 안내하고, 접수 기록상 분석 대기나 실패가 남은 제보를 공연별로 찾습니다.`} />
-    <AdminEventGate>{(event) => <IntakeWatch key={event.id} event={event} />}</AdminEventGate>
+    <PageHeader eyebrow="운영" title="분석 작업" description={`저장된 ${terms.listingAnalysis} 실행 이력을 공연별로 확인합니다. 실행 상태와 분석 결과 상태는 서로 다른 값이며, 실패한 실행도 숨기지 않습니다.`} />
+    <AdminEventGate>{(event) => <EventAnalysisWork key={event.id} event={event} />}</AdminEventGate>
     <Card className={styles.panel} aria-label="실행 이력 확인 위치">
-      <h2>실행 이력은 어디서 보나요</h2>
+      <h2>이 화면에 없는 실행</h2>
       <ul className={styles.list}>
-        <li>{terms.listingAnalysis}: 팬 제보 상세의 증거 영역에서 증거별로 실행 상태(실행 중, 실행 완료, 입력 검증 실패, 분석 서버 실패 등)와 결과 상태를 따로 확인합니다.</li>
-        <li>{terms.candidateMatch}: 같은 화면의 추출 결과별 비교 실행 이력에서 확인합니다.</li>
-        <li>{terms.track1}: 저장된 분석 결과만 연결된 예매 그룹 화면에서 확인합니다. 실행 중이거나 실패한 분석 요청 목록은 제공되지 않습니다.</li>
+        <li>{terms.candidateMatch}: 팬 제보 상세의 추출 결과별 비교 실행 이력에서 확인합니다.</li>
+        <li>{terms.track1}: 저장된 분석 결과만 연결된 예매 그룹 화면에서 확인합니다. 실행 중이거나 결과 없이 끝난 분석 요청 목록은 제공되지 않습니다.</li>
       </ul>
     </Card>
-    <PendingContract title="공연 단위 분석 작업 목록">
-      <p>공연 전체의 추출, 비교, 예매 관계 분석 실행을 한 번에 보는 조회 API가 없습니다. 화면이 증거마다 반복 조회해 목록을 만들지 않습니다(N+1 금지). 필요한 응답 계약은 docs/contracts/backend-requests.md의 분석 작업 조회 항목에 정리했습니다.</p>
+    <PendingContract title="통합 분석 작업 이력">
+      <p>{terms.track1}과 {terms.track2}의 모든 실행(예매 기록 비교, 결과 없이 끝난 요청 포함)을 한 번에 보는 조회 API는 아직 없습니다. 위 실행 이력은 이미지 정보 추출만 포함합니다.</p>
     </PendingContract>
   </div>
+}
+
+function EventAnalysisWork({ event }: { event: AdminEvent }) {
+  return <>
+    <AnalysisRunHistory eventId={event.id} />
+    <h2 className={styles.subheading}>접수 상태로 본 제보</h2>
+    <IntakeWatch event={event} />
+  </>
+}
+
+function executionTone(status: AnalysisRun['executionStatus']) {
+  if (status === 'SUCCEEDED') return 'success' as const
+  return status === 'IN_PROGRESS' ? 'neutral' as const : 'critical' as const
+}
+
+/** 서버의 Track 2 이미지 정보 추출 실행 이력이다. 전체 건수를 주지 않으므로 페이지와 다음 페이지 여부만 표시한다. */
+function AnalysisRunHistory({ eventId }: { eventId: string }) {
+  const [page, setPage] = useState(0)
+  const { result, retry } = useAdminQuery(analysisRunsPath(eventId, page), analysisRunPageSchema)
+  let content: ReactNode
+  if (result === null) content = <LoadingSkeleton label="이미지 정보 추출 실행 이력을 불러오는 중" />
+  else if (result.kind !== 'success' || !isAnalysisRunPageFor(page, result.data)) {
+    const failure = result.kind === 'success' ? { kind: 'invalidResponse' as const, status: result.status } : result
+    const message = failure.kind === 'forbidden'
+      ? { title: '실행 이력에 필요한 역할이 없습니다', description: `${roleLabels.ANALYST} 또는 ${roleLabels.REVIEWER}만 조회할 수 있습니다.` }
+      : describeAdminApiFailure(failure, '공연을 찾을 수 없거나 접근 범위 밖입니다')
+    content = <ErrorState title={message.title} description={message.description} onRetry={retry} />
+  } else if (result.data.items.length === 0) {
+    content = page === 0
+      ? <EmptyState title="저장된 실행 이력이 없습니다" description="이 공연의 제보 증거로 이미지 정보 추출을 실행한 기록이 없습니다. 실패 기록과는 다른 상태입니다." />
+      : <><EmptyState title="이 페이지에 표시할 실행 이력이 없습니다" description="요청한 페이지가 이력 범위를 벗어났습니다." /><Button variant="secondary" size="small" onClick={() => setPage(0)}>첫 페이지로 이동</Button></>
+  } else {
+    const columns = [
+      { key: 'created', header: '실행 시각', render: (run: AnalysisRun) => <time dateTime={run.createdAt}>{formatUtc(run.createdAt)}</time> },
+      { key: 'execution', header: '실행 상태', render: (run: AnalysisRun) => <StatusPill label={executionStatusLabels[run.executionStatus]} tone={executionTone(run.executionStatus)} /> },
+      { key: 'analysis', header: '분석 결과 상태', render: (run: AnalysisRun) => run.analysisStatus === null ? '결과 없음' : analysisStatusLabels[run.analysisStatus] },
+      { key: 'failure', header: '실패 코드', render: (run: AnalysisRun) => run.errorCode === null && run.analyzerErrorCode === null ? '없음'
+        : <span>{[run.errorCode, run.analyzerErrorCode === null ? null : `분석 서버 ${run.analyzerErrorCode}`].filter(Boolean).join(', ')}<small className={styles.sub}>실패 기록이며 빈 결과가 아닙니다</small></span> },
+      { key: 'completed', header: '종료 시각', render: (run: AnalysisRun) => run.completedAt === null ? '기록 없음' : formatUtc(run.completedAt) },
+      { key: 'report', header: '제보', render: (run: AnalysisRun) => <Link className={styles.link} to={fanReportDetailRoute(run.fanReportId)} aria-label={`${run.analysisId} 실행의 제보 열기`}>제보 열기</Link> },
+    ]
+    content = <>
+      <DataTable caption="이미지 정보 추출 실행 이력" columns={columns} rows={result.data.items} getRowKey={(run) => run.analysisId} />
+      {(page > 0 || result.data.hasNext) && <nav className={styles.pagination} aria-label="실행 이력 페이지"><Button variant="secondary" size="small" disabled={page === 0} onClick={() => setPage(page - 1)}>이전</Button><span>{page + 1} 페이지</span><Button variant="secondary" size="small" disabled={!result.data.hasNext} onClick={() => setPage(page + 1)}>다음</Button></nav>}
+    </>
+  }
+  return <Card className={styles.panel} aria-label="이미지 정보 추출 실행 이력">
+    <h2>{terms.listingAnalysis} 실행 이력</h2>
+    <p className={styles.note}>저장된 {terms.track2} 이미지 정보 추출 실행만 포함합니다(서버 범위 PERSISTED_TRACK2_LISTING_CONTEXT_ANALYSES_ONLY). 최신 실행 순이며 서버가 전체 건수를 주지 않아 합계는 표시하지 않습니다.</p>
+    {content}
+  </Card>
 }
 
 function IntakeWatch({ event }: { event: AdminEvent }) {
@@ -156,6 +211,7 @@ function CaseAudit({ event }: { event: AdminEvent }) {
         ? <EmptyState title="조사 사건을 선택해 주세요" description="왼쪽 목록에서 사건을 고르면 그 사건의 활동 기록을 조회합니다." />
         : <>
           <ActivityPanel key={selected} caseId={selected} />
+          <ApprovalAuditPanel key={`approval-audit:${selected}`} caseId={selected} />
           <Link className={styles.link} to={caseDetailRoute(selected, event.id)}>이 조사 사건 열기</Link>
         </>}
     </div>
@@ -171,30 +227,47 @@ export function SettingsRoute() {
 }
 
 function SettingsPage() {
-  const { state, retry } = useAccessibleEvents(null)
-  let events: ReactNode
-  if (state.status === 'loading') events = <LoadingSkeleton label="접근 가능한 공연을 불러오는 중" />
-  else if (state.status === 'failed') {
-    const message = describeAdminApiFailure(state.failure, '공연 목록을 찾을 수 없습니다')
-    events = <ErrorState title={message.title} description={message.description} onRetry={retry} />
-  } else if (state.events.length === 0) {
-    events = <EmptyState title="접근 가능한 공연이 없습니다" description="서버가 빈 목록을 반환했습니다. 고객사 관리자에게 공연 권한을 확인해 주세요." />
-  } else {
-    events = <ul className={styles.list}>{state.events.map((event) => <li key={event.id}>{event.name}</li>)}</ul>
-  }
   return <div className={styles.page}>
-    <PageHeader eyebrow="운영" title="설정" description="현재 관리자 세션의 접근 범위와 서버 인증 상태를 확인합니다. 역할과 권한은 서버가 요청마다 판단합니다." />
+    <PageHeader eyebrow="운영" title="설정" description="선택한 공연 기준의 운영 기능 상태와 서버 인증 상태를 확인합니다. 역할과 권한은 서버가 요청마다 판단하며, 이 화면에서 설정을 바꿀 수 없습니다." />
     <Card className={styles.panel} aria-label="현재 세션">
       <h2>현재 세션</h2>
       <p className={styles.note}>인증된 관리자 세션입니다. 화면은 토큰 내용에서 역할을 추정하지 않으며, 권한이 없는 작업은 서버가 403으로 거부합니다.</p>
     </Card>
-    <Card className={styles.panel} aria-label="접근 가능한 공연">
-      <h2>접근 가능한 공연</h2>
-      {events}
-    </Card>
+    <AdminEventGate>{(event) => <OperationStatus key={event.id} eventId={event.id} />}</AdminEventGate>
     <BackendAuthCheckPanel />
-    <PendingContract title="고객사 설정과 내 역할 조회">
-      <p>현재 계정의 역할, 고객사 이름, 보존 기간, 공식 PDF 발급 정책 등 서버 설정을 조회하는 API가 없어 표시하지 않습니다. 설정 변경 기능도 제공하지 않습니다. 필요한 응답 계약은 docs/contracts/backend-requests.md의 설정 조회 항목에 정리했습니다.</p>
+    <PendingContract title="내 역할과 감사 담당 권한">
+      <p>로그인한 계정의 전체 역할 목록, 고객사 이름, 감사 담당(AUDITOR) 역할과 권한은 아직 서버에 없어 표시하지 않습니다. 설정 변경 기능도 제공하지 않습니다.</p>
     </PendingContract>
   </div>
+}
+
+function enabledText(value: boolean, on: string, off: string) {
+  return value ? on : off
+}
+
+/** 서버의 안전 운영 상태다. 고객사 관리자만 조회할 수 있으며 사용자 역할 목록이 아니다. */
+function OperationStatus({ eventId }: { eventId: string }) {
+  const { result, retry } = useAdminQuery(operationSettingsPath(eventId), operationSettingsSchema)
+  let content: ReactNode
+  if (result === null) content = <LoadingSkeleton label="운영 상태를 불러오는 중" />
+  else if (result.kind !== 'success') {
+    const message = result.kind === 'forbidden'
+      ? { title: '운영 상태를 볼 역할이 없습니다', description: `${roleLabels.TENANT_ADMIN}만 조회할 수 있습니다. 다른 화면은 역할에 따라 계속 사용할 수 있습니다.` }
+      : describeAdminApiFailure(result, '공연을 찾을 수 없거나 접근 범위 밖입니다')
+    content = <ErrorState title={message.title} description={message.description} onRetry={retry} />
+  } else {
+    const data = result.data
+    content = <dl className={styles.facts}>
+      <div><dt>팬 제보 접수</dt><dd>{enabledText(data.fanReportIntakeEnabled, '사용 중', '꺼짐')}</dd></div>
+      <div><dt>{terms.listingAnalysis} 분석기 연결</dt><dd>{enabledText(data.track2ListingAnalysisConfigured, '설정됨', '설정되지 않음')}</dd></div>
+      <div><dt>{terms.track1} 근거 범위</dt><dd>{describeOperationState(data.track1RelationshipEvidenceCoverage)}</dd></div>
+      <div><dt>{terms.officialPdf} 발급</dt><dd>{describeOperationState(data.officialPdfIssuanceState)}</dd></div>
+      <div><dt>감사 담당 접근</dt><dd>{describeOperationState(data.auditorAccessState)}</dd></div>
+    </dl>
+  }
+  return <Card className={styles.panel} aria-label="운영 상태">
+    <h2>운영 상태</h2>
+    <p className={styles.note}>기능 활성 상태만 표시합니다. 비밀 값, 내부 주소, 저장소 정보는 서버가 반환하지 않습니다.</p>
+    {content}
+  </Card>
 }

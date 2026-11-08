@@ -10,13 +10,13 @@ export const adminPages = [
   { path: 'fan-reports', label: '팬 제보 조사', group: '조사', support: 'live', description: '팬 제보를 열어 이미지 정보 추출, 검증 회차 연결, 예매 기록 비교, 조사 사건 생성을 진행합니다.' },
   { path: 'verified-performances', label: '검증 회차 관리', group: '조사', support: 'live', description: '공연의 검증된 회차를 등록하고 관리합니다. 예매 기록 비교의 기준이 됩니다.' },
   { path: 'analysis/findings', label: '예매 관계 분석', group: '조사', support: 'live', description: '저장된 연결된 예매 그룹을 조사 우선순위 순으로 확인하고 조사 사건으로 연결합니다.' },
-  { path: 'cases', label: '조사 사건', group: '조사', support: 'live', description: '조사 사건의 상태, 연결 근거, 담당자, 보고서 초안과 승인 단계를 관리합니다.' },
+  { path: 'cases', label: '조사 사건', group: '조사', support: 'live', description: '조사 사건의 상태, 연결 근거, 담당자, 보고서 초안, 승인과 발급 기록 연결을 관리합니다.' },
   { path: 'approvals', label: '보고서 승인 요청', group: '검토', support: 'partial', description: '조사 보고서 초안의 승인 요청을 열어 독립 검토와 결정을 진행합니다.' },
   { path: 'report-center', label: '조사 보고서 발급', group: '검토', support: 'partial', description: '승인 결정을 기준으로 공식 보고서 PDF 발급 가능 여부와 발급 기록을 확인합니다.' },
   { path: 'imports', label: '예매 자료 준비', group: '운영', support: 'live', description: '합성 격리 테스트 환경에서 예매 스냅샷을 반입합니다.' },
-  { path: 'analysis/jobs', label: '분석 작업', group: '운영', support: 'partial', description: '이미지 정보 추출과 예매 기록 비교 실행 상태를 확인하는 경로를 안내합니다.' },
-  { path: 'audit', label: '감사 기록', group: '운영', support: 'partial', description: '조사 사건별 활동 기록을 확인합니다.' },
-  { path: 'settings', label: '설정', group: '운영', support: 'partial', description: '현재 관리자 세션과 접근 가능한 공연, 서버 인증 상태를 확인합니다.' },
+  { path: 'analysis/jobs', label: '분석 작업', group: '운영', support: 'partial', description: '저장된 이미지 정보 추출 실행 이력과 접수 상태별 제보를 확인합니다. 통합 작업 이력은 아닙니다.' },
+  { path: 'audit', label: '감사 기록', group: '운영', support: 'partial', description: '조사 사건별 활동 기록과 승인 감사 이력을 확인합니다. 고객사 전체 감사 로그는 아닙니다.' },
+  { path: 'settings', label: '설정', group: '운영', support: 'partial', description: '고객사 관리자용 운영 기능 상태와 서버 인증 상태를 확인합니다.' },
 ] as const satisfies readonly { path: string; label: string; group: AdminGroup; support: AdminSupport; description: string }[]
 
 /** 메뉴에만 있는 업무 바로가기다. 별도 라우트를 만들지 않고 기존 화면의 서버 필터로 이동한다. */

@@ -18,4 +18,10 @@
 .caseList button[aria-pressed='true'] { border-color: var(--color-primary-500); box-shadow: inset 3px 0 var(--color-primary-500); }
 .caseList time { grid-column: 1 / -1; color: var(--color-text-secondary); font-size: 12px; }
 .pagination { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.subheading { margin: 4px 0 0; font-size: 17px; }
+.sub { display: block; margin-top: 2px; color: var(--color-text-secondary); font-size: 12px; }
+.facts { display: grid; gap: 8px; margin: 0; }
+.facts div { display: grid; grid-template-columns: minmax(140px, 220px) minmax(0, 1fr); gap: 12px; font-size: 14px; }
+.facts dt { color: var(--color-text-secondary); }
+.facts dd { margin: 0; font-weight: 700; }
 @media (max-width: 960px) { .grid, .split { grid-template-columns: minmax(0, 1fr); } }
