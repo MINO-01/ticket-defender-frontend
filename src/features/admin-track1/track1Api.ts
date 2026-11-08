@@ -3,7 +3,8 @@ import { adminApiPath } from '../../api/adminApiClient'
 import { isUuid } from '../fan-report/intakeConfig'
 
 // Backend track1-admin-evidence-read-v1 계약이다. 응답은 저장된 증거만 담는 STORED_EVIDENCE_ONLY이며
-// 좌석, 그래프 간선, 결제/주소/기기/IP 신호 원문이나 HMAC 값은 제공하지 않는다.
+// 계정 식별자, 예매참조, 그래프 간선, 결제/주소/기기/IP 신호 원문이나 HMAC 값은 제공하지 않으며 구성원은 auditId로만 식별한다.
+// members[].ledgerSeat(track1-ledger-seat-read-v1)은 회차와 sourceVersion을 함께 보낸 조회에서만 채워지고 그 외에는 null이다.
 // 상세의 relationship(capstone-demo-integration-v1)은 저장된 기기와 IP 신호의 공유 요약 수치만 담는다. 이전 서버 응답에는 없을 수 있다.
 
 export const track1PageSize = 20
@@ -27,11 +28,42 @@ const summarySchema = z.object({
   storedMemberCount: z.number().int().nonnegative(),
 })
 
+export const ledgerSeatStatuses = ['FOUND', 'NOT_IN_LEDGER', 'LEDGER_UNAVAILABLE'] as const
+export type LedgerSeatStatus = (typeof ledgerSeatStatuses)[number]
+
+const ledgerSeatPart = z.string().max(128).nullable().optional()
+
+/** 원장 좌석 상태와 값이다. Case 수렴 응답은 여기에 auditId가 더해진다. */
+export const ledgerSeatSchema = z.object({
+  status: z.enum(ledgerSeatStatuses),
+  zone: ledgerSeatPart,
+  row: ledgerSeatPart,
+  seat: ledgerSeatPart,
+})
+
+export type LedgerSeat = z.infer<typeof ledgerSeatSchema>
+
 const memberSchema = z.object({
   auditId: z.number().int(),
-  accountId: z.string().nullable(),
-  reservationNo: z.string().nullable(),
+  ledgerSeat: ledgerSeatSchema.nullable().optional(),
 })
+
+export const ledgerSeatStatusLabels: Record<LedgerSeatStatus, string> = {
+  FOUND: '원장 좌석 확인 (FOUND)',
+  NOT_IN_LEDGER: '원장에 없음 (NOT_IN_LEDGER)',
+  LEDGER_UNAVAILABLE: '원장 확인 불가 (LEDGER_UNAVAILABLE)',
+}
+
+export function ledgerSeatTone(status: LedgerSeatStatus) {
+  if (status === 'FOUND') return 'info' as const
+  return status === 'NOT_IN_LEDGER' ? 'neutral' as const : 'warning' as const
+}
+
+/** FOUND일 때만 서버가 준 좌석 값을 표시한다. 비어 있는 값을 다른 값으로 채우지 않는다. */
+export function formatLedgerSeat(seat: LedgerSeat) {
+  if (seat.status !== 'FOUND') return '좌석 정보 없음'
+  return `구역 ${seat.zone ?? '기록 없음'}, 열 ${seat.row ?? '기록 없음'}, 좌석 ${seat.seat ?? '기록 없음'}`
+}
 
 const coverageSchema = z.literal('STORED_EVIDENCE_ONLY')
 
@@ -82,8 +114,11 @@ export function track1ClusterListPath(eventId: string, page: number, sort: Track
   return adminApiPath('/api/v1/admin/track1/clusters', { eventId, page, pageSize: track1PageSize, sort })
 }
 
-export function track1ClusterDetailPath(key: Track1ClusterKey) {
-  return adminApiPath('/api/v1/admin/track1/clusters/detail', { eventId: key.eventId, analysisRequestId: key.analysisRequestId, clusterId: key.clusterId })
+export type LedgerSeatQuery = { performanceId: string; sourceVersion: string }
+
+/** ledger를 주면 회차와 sourceVersion을 항상 함께 보낸다. 하나만 보내면 서버가 400으로 거부한다. */
+export function track1ClusterDetailPath(key: Track1ClusterKey, ledger?: LedgerSeatQuery) {
+  return adminApiPath('/api/v1/admin/track1/clusters/detail', { eventId: key.eventId, analysisRequestId: key.analysisRequestId, clusterId: key.clusterId, ...ledger })
 }
 
 /** 관리자 화면의 상세 주소. 슬래시가 포함될 수 있는 분석 ID를 경로가 아닌 쿼리로 전달한다. */

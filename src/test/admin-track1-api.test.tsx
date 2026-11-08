@@ -373,7 +373,8 @@ describe('Track 1 군집 상세 실제 API', () => {
   const detailBody = {
     event: eventA,
     cluster: summary({ analysisRequestId: 'run/1', storedMemberCount: 2 }),
-    members: [{ auditId: 123, accountId: 'account-1', reservationNo: 'reservation-1' }, { auditId: 124, accountId: 'account-2', reservationNo: 'reservation-2' }],
+    // Backend Track1ClusterDto.Member의 실제 직렬화 형식이다. 원장 조건이 없는 조회의 ledgerSeat은 null이다.
+    members: [{ auditId: 123, ledgerSeat: null }, { auditId: 124, ledgerSeat: null }],
     coverage: 'STORED_EVIDENCE_ONLY',
   }
 
@@ -423,8 +424,10 @@ describe('Track 1 군집 상세 실제 API', () => {
     expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH, detailApi])
     const members = screen.getByRole('table', { name: '저장된 그룹 구성원' })
     expect(within(members).getAllByRole('row')).toHaveLength(3)
-    expect(within(members).getByText('account-2')).toBeInTheDocument()
-    expect(within(members).getByText('reservation-1')).toBeInTheDocument()
+    expect(within(members).getByText('123')).toBeInTheDocument()
+    expect(within(members).getByText('124')).toBeInTheDocument()
+    expect(within(members).queryByRole('columnheader', { name: /계정 참조|예매 참조/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(/가명 처리/)).not.toBeInTheDocument()
     expect(screen.getByText('run/1')).toBeInTheDocument()
     expect(screen.getByText('LOUVAIN 1.0.0')).toBeInTheDocument()
     expect(screen.getByText('합성 공연 A')).toBeInTheDocument()
@@ -434,6 +437,86 @@ describe('Track 1 군집 상세 실제 API', () => {
     expect(screen.queryByText(/DEMO-/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Case 생성' })).toBeDisabled()
     expect(screen.getByRole('link', { name: '← 예매 그룹 목록' })).toHaveAttribute('href', `/app/analysis/findings?eventId=${EVENT_A}`)
+  })
+
+  it('auditId만 있는 구성원을 받고, 계약 밖 계정과 예매 참조가 섞여 와도 표시하지 않는다', async () => {
+    const members = [{ auditId: 123 }, { auditId: 124, accountId: 'SYN-LEAK-ACCOUNT', reservationNo: 'SYN-LEAK-RESERVATION' }]
+    stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, { ...detailBody, members }) : undefined)
+    renderApp(detailRoute)
+    expect(await screen.findByRole('table', { name: '저장된 그룹 구성원' })).toHaveTextContent('124')
+    expect(screen.queryByText(/SYN-LEAK/)).not.toBeInTheDocument()
+  })
+
+  describe('구성원 원장 좌석 조회', () => {
+    const PERFORMANCE = '99999999-9999-4999-8999-999999999991'
+    const WITHDRAWN = '99999999-9999-4999-8999-999999999992'
+    const performancesApi = `/api/v1/admin/events/${EVENT_A}/verified-performances`
+    const ledgerApi = `${detailApi}&performanceId=${PERFORMANCE}&sourceVersion=syn-ledger-v1`
+    const performance = (overrides: Record<string, unknown>) => ({ performanceId: PERFORMANCE, eventId: EVENT_A, performanceRef: 'SYN-PERF-20261205-18', status: 'ACTIVE', revision: 1, sourceVersion: 'syn-v1', verifiedAt: '2026-11-04T01:00:00', withdrawnAt: null, ...overrides })
+    const performances = [performance({}), performance({ performanceId: WITHDRAWN, performanceRef: 'SYN-PERF-OLD', status: 'WITHDRAWN', revision: 2, withdrawnAt: '2026-11-04T02:00:00' })]
+    const ledgerBody = {
+      ...detailBody,
+      members: [
+        { auditId: 123, ledgerSeat: { status: 'FOUND', zone: 'A', row: '1', seat: '2' } },
+        { auditId: 124, ledgerSeat: { status: 'NOT_IN_LEDGER', zone: null, row: null, seat: null } },
+        { auditId: 125, ledgerSeat: { status: 'LEDGER_UNAVAILABLE', zone: null, row: null, seat: null } },
+      ],
+    }
+
+    async function openAndQuery() {
+      fireEvent.click(await screen.findByRole('button', { name: '원장 좌석 조회 열기' }))
+      fireEvent.change(await screen.findByRole('combobox', { name: /검증 회차/ }), { target: { value: PERFORMANCE } })
+      fireEvent.change(screen.getByRole('textbox', { name: /원장 버전/ }), { target: { value: ' syn-ledger-v1 ' } })
+      fireEvent.click(screen.getByRole('button', { name: '원장 좌석 조회' }))
+    }
+
+    it('관리자가 조회할 때만 요청하고 3개 상태를 구분하며 활성 회차만 선택지로 보여 준다', async () => {
+      const fetchMock = stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, detailBody) : url === performancesApi ? json(200, performances) : url === ledgerApi ? json(200, ledgerBody) : undefined)
+      renderApp(detailRoute)
+      await screen.findByRole('button', { name: '원장 좌석 조회 열기' })
+      expect(requestedUrls(fetchMock)).toEqual([EVENTS_PATH, detailApi])
+      await openAndQuery()
+      expect(screen.queryByRole('option', { name: 'SYN-PERF-OLD' })).not.toBeInTheDocument()
+      const rows = within(await screen.findByRole('table', { name: '구성원별 원장 좌석' })).getAllByRole('row')
+      expect(rows[1]).toHaveTextContent('원장 좌석 확인 (FOUND)')
+      expect(rows[1]).toHaveTextContent('구역 A, 열 1, 좌석 2')
+      expect(rows[2]).toHaveTextContent('원장에 없음 (NOT_IN_LEDGER)')
+      expect(rows[2]).toHaveTextContent('좌석 정보 없음')
+      expect(rows[3]).toHaveTextContent('원장 확인 불가 (LEDGER_UNAVAILABLE)')
+      expect(rows[3]).toHaveTextContent('좌석 정보 없음')
+      expect(screen.getByText(/조회 조건: 회차 SYN-PERF-20261205-18, 원장 버전 syn-ledger-v1/)).toBeInTheDocument()
+      expect(requestedUrls(fetchMock)).toContain(ledgerApi)
+    })
+
+    it('FOUND가 아닌 상태에 좌석 값이 섞여 와도 표시하지 않는다', async () => {
+      const body = { ...detailBody, members: [{ auditId: 123, ledgerSeat: { status: 'NOT_IN_LEDGER', zone: 'SYN-Z', row: 'SYN-R', seat: 'SYN-S' } }] }
+      stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, detailBody) : url === performancesApi ? json(200, performances) : url === ledgerApi ? json(200, body) : undefined)
+      renderApp(detailRoute)
+      await openAndQuery()
+      expect(await screen.findByRole('table', { name: '구성원별 원장 좌석' })).toHaveTextContent('좌석 정보 없음')
+      expect(screen.queryByText(/SYN-[ZRS]/)).not.toBeInTheDocument()
+    })
+
+    it.each([
+      ['404', () => new Response(null, { status: 404 }), '회차를 찾을 수 없거나 철회되었거나 접근 범위 밖입니다'],
+      ['403', () => new Response(null, { status: 403 }), '이 화면에 필요한 역할이 없습니다'],
+      ['형식 오류', () => json(200, { ...detailBody, members: [{ auditId: 123, ledgerSeat: { status: 'SEATED' } }] }), '서버 응답 형식이 계약과 다릅니다'],
+    ])('조회 %s 실패는 이 영역에만 표시하고 저장된 구성원 표는 유지한다', async (_label, respond, message) => {
+      stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, detailBody) : url === performancesApi ? json(200, performances) : url === ledgerApi ? respond() : undefined)
+      renderApp(detailRoute)
+      await openAndQuery()
+      expect(await screen.findByRole('alert')).toHaveTextContent(message)
+      expect(screen.getByRole('table', { name: '저장된 그룹 구성원' })).toBeInTheDocument()
+      expect(screen.queryByRole('table', { name: '구성원별 원장 좌석' })).not.toBeInTheDocument()
+    })
+
+    it('활성 회차가 없으면 좌석 없음으로 표시하지 않고 원장 조회를 보내지 않는다', async () => {
+      const fetchMock = stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, detailBody) : url === performancesApi ? json(200, [performances[1]]) : undefined)
+      renderApp(detailRoute)
+      fireEvent.click(await screen.findByRole('button', { name: '원장 좌석 조회 열기' }))
+      expect(await screen.findByText(/활성 검증 회차가 없어.*좌석이 없다는 결과가 아닙니다/)).toBeInTheDocument()
+      expect(requestedUrls(fetchMock)).not.toContain(ledgerApi)
+    })
   })
 
   it('목록에서 상세로 이동할 때 식별자를 유지한다', async () => {
