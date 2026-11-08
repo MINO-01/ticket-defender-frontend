@@ -377,6 +377,45 @@ describe('Track 1 군집 상세 실제 API', () => {
     coverage: 'STORED_EVIDENCE_ONLY',
   }
 
+  const relationship = {
+    sharedSignals: [{ type: 'IP_HASH', sharedMemberCount: 3, verifiedConnectionCount: 3 }, { type: 'DEVICE_ID_HASH', sharedMemberCount: 2, verifiedConnectionCount: 1 }],
+    verifiedConnectionCount: 4,
+    unavailableSignalTypes: ['PAYMENT_HASH', 'ADDRESS_HASH'],
+    investigationPrioritySource: 'STORED_LOUVAIN_RISK_SCORE',
+    normalSharingNotice: '합성 정상 공유 가능성 안내',
+    memberCoverage: 'STORED_CLUSTER_MEMBERS_ONLY',
+  }
+
+  it('relationship이 있으면 기기와 IP 공유 근거 요약만 표시하고 연결 쌍 합계를 고유 연결 수로 설명하지 않는다', async () => {
+    stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, { ...detailBody, relationship }) : undefined)
+    renderApp(detailRoute)
+    const evidence = await screen.findByRole('region', { name: '공유 근거 요약' })
+    const items = within(evidence).getAllByRole('listitem')
+    // 기기 근거를 먼저, IP 근거를 다음에 표시한다.
+    expect(items[0]).toHaveTextContent('같은 기기 식별 신호')
+    expect(items[0]).toHaveTextContent('같은 저장 값을 가진 예매 기록 2건')
+    expect(items[1]).toHaveTextContent('같은 네트워크(IP) 신호')
+    expect(items[1]).toHaveTextContent('이 신호로 이어지는 예매 기록 쌍 3개')
+    expect(within(evidence).getByRole('note')).toHaveTextContent('합성 정상 공유 가능성 안내')
+    expect(evidence).toHaveTextContent('4개 (신호마다 따로 센 합계라 같은 두 예매가 중복될 수 있으며, 고유한 예매 연결 수가 아닙니다)')
+    expect(evidence).toHaveTextContent('결제 수단, 배송 주소')
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(evidence).not.toHaveTextContent(/_HASH/)
+  })
+
+  it('공유 신호가 없으면 관계 없음 판정이 아닌 서버 결과로 안내하고, 합계가 맞지 않는 relationship은 계약 위반으로 처리한다', async () => {
+    stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, { ...detailBody, relationship: { ...relationship, sharedSignals: [], verifiedConnectionCount: 0 } }) : undefined)
+    const view = renderApp(detailRoute)
+    expect(await screen.findByRole('heading', { name: '저장된 구성원끼리 공유한 기기나 IP 신호가 없습니다' })).toBeInTheDocument()
+    view.unmount()
+
+    stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, { ...detailBody, relationship: { ...relationship, verifiedConnectionCount: 9 } }) : undefined)
+    renderApp(detailRoute)
+    expect(await screen.findByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: '공유 근거 요약' })).not.toBeInTheDocument()
+  })
+
+
   it('직접 URL의 세 식별자로 상세를 조회하고 저장된 구성원과 분석 정보만 표시한다', async () => {
     const fetchMock = stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : url === detailApi ? json(200, detailBody) : undefined)
     renderApp(detailRoute)

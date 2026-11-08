@@ -12,14 +12,14 @@ import { CreateCasePanel } from '../admin-cases/CreateCasePanel'
 import { isCanonicalAnalysisRequestId } from '../admin-cases/caseWorkflowApi'
 import { useAccessibleEvents } from '../admin-events/useAccessibleEvents'
 import {
-  formatAlgorithm, formatAnalyzedAt, formatRiskScore, readTrack1ClusterKey, track1ClusterDetailPath, track1ClusterDetailSchema, track1ListRoute,
+  formatAlgorithm, formatAnalyzedAt, formatRiskScore, readTrack1ClusterKey, sharedSignalTypes, track1ClusterDetailPath, track1ClusterDetailSchema, track1ListRoute,
 } from './track1Api'
-import type { Track1ClusterDetail, Track1ClusterKey } from './track1Api'
+import type { SharedSignalType, Track1ClusterDetail, Track1ClusterKey, Track1Relationship } from './track1Api'
 import styles from './Track1.module.css'
 
 // 인증된 관리자의 Track 1 군집 상세다. eventId, analysisRequestId, clusterId를 주소에서 읽어 함께 조회하므로 직접 주소로 접근해도 같은 군집을 연다.
 // 공연은 접근 가능 공연 목록에서 확인된 뒤에만 상세를 조회한다.
-// 현재 응답은 저장된 구성원 식별자와 분석 메타데이터뿐이므로 공유 신호와 그래프 간선을 만들지 않고 미지원으로 표시한다.
+// 공유 근거는 서버의 relationship 요약 수치만 표시한다. 신호 값과 구성원 사이의 간선은 응답에 없으므로 그래프를 만들지 않는다.
 // Case 생성은 서버가 확인한 이 군집의 공연, 분석 요청 ID, 군집 ID만 출처로 보내며 관리자가 사유를 입력해 명시적으로 요청할 때만 실행한다.
 
 type Member = Track1ClusterDetail['members'][number]
@@ -81,7 +81,10 @@ function ClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey }) {
     { key: 'analysis', content: <>분석 방법 {formatAlgorithm(cluster)}, 분석 시각 {formatAnalyzedAt(cluster.analyzedAt)}</> },
   ]
   const unconfirmed: GuideItem[] = [
-    { key: 'signals', content: '예매 기록끼리 어떤 정보를 공유하는지(공유 근거)는 서버가 아직 제공하지 않아 표시하지 않습니다.' },
+    { key: 'signals', content: result.data.relationship
+      ? '공유 근거는 저장된 기기와 IP 신호의 개수 요약만 있으며, 공유한 값 자체와 결제, 주소 근거는 제공되지 않습니다.'
+      : '이 서버 응답에는 공유 근거 요약이 없어 표시하지 않습니다.' },
+    { key: 'normal', content: '공용 기기나 같은 네트워크를 정상적으로 함께 쓴 경우일 수 있습니다.' },
     { key: 'identity', content: '같은 사람인지, 부정 거래인지는 확인되지 않았습니다.' },
     { key: 'coverage', content: '중복 저장 방지로 일부 예매 기록이 저장되지 않았을 수 있습니다.' },
   ]
@@ -114,8 +117,8 @@ function ClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey }) {
       </div>
       <div className={styles.detailColumn}>
         <Card className={`${styles.panel} ${styles.graphPanel}`}>
-          <div className={styles.sectionHeading}><div><h2>공유 근거와 연결 관계</h2><p>실제 저장된 관계 근거만 표시합니다.</p></div></div>
-          <EmptyState title="공유 근거를 표시할 수 없습니다" description="현재 서버 응답은 저장된 예매 기록 참조만 제공하며 공유 신호, 신호별 연결 관계, 그래프 간선, 좌석 정보를 제공하지 않습니다. 관계를 임의로 만들지 않기 위해 그래프를 표시하지 않습니다. 공유 근거 조회는 Backend 계약을 준비 중입니다." />
+          <div className={styles.sectionHeading}><div><h2>공유 근거</h2><p>서버가 저장된 기기와 IP 신호로 계산한 요약만 표시합니다. 연결 그래프는 그리지 않습니다.</p></div></div>
+          <RelationshipEvidence relationship={result.data.relationship} />
         </Card>
         <Card id="cluster-members" className={styles.tableCard}>
           <div className={styles.sectionHeading}><h2>저장된 예매 기록</h2><span>{members.length}건</span></div>
@@ -132,4 +135,34 @@ function ClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey }) {
       </div>
     </div>
   </div>
+}
+
+const signalLabels: Record<SharedSignalType, string> = { DEVICE_ID_HASH: '같은 기기 식별 신호', IP_HASH: '같은 네트워크(IP) 신호' }
+const unavailableLabels: Record<string, string> = { PAYMENT_HASH: '결제 수단', ADDRESS_HASH: '배송 주소' }
+
+/**
+ * 서버가 계산한 공유 근거 요약만 보여 준다. 신호 값, HMAC, 구성원 사이의 간선은 응답에 없으므로 그래프를 그리지 않는다.
+ * 전체 verifiedConnectionCount는 신호별 연결 쌍의 합이라 고유한 예매 연결 수로 설명하지 않는다.
+ */
+function RelationshipEvidence({ relationship }: { relationship: Track1Relationship | undefined }) {
+  if (relationship === undefined) {
+    return <EmptyState title="공유 근거를 표시할 수 없습니다" description="이 서버 응답에는 공유 근거 요약(relationship)이 없습니다. 관계를 임의로 만들지 않기 위해 그래프와 연결을 표시하지 않습니다." />
+  }
+  // 기기와 IP 근거를 먼저 보여 준다. 서버가 준 유형만 순서를 고정해 표시한다.
+  const signals = sharedSignalTypes.flatMap((type) => relationship.sharedSignals.filter((signal) => signal.type === type))
+  return <section className={styles.relationship} aria-label="공유 근거 요약">
+    <p className={styles.warning} role="note">{relationship.normalSharingNotice}</p>
+    {signals.length === 0
+      ? <EmptyState title="저장된 구성원끼리 공유한 기기나 IP 신호가 없습니다" description="서버가 저장된 기기와 IP 신호를 확인한 결과입니다. 조회 장애가 아니며, 관계가 없다는 판정도 아닙니다." />
+      : <ul className={styles.signalList}>{signals.map((signal) => <li key={signal.type}>
+        <strong>{signalLabels[signal.type]}</strong>
+        <span>같은 저장 값을 가진 예매 기록 {signal.sharedMemberCount}건</span>
+        <span>이 신호로 이어지는 예매 기록 쌍 {signal.verifiedConnectionCount}개</span>
+      </li>)}</ul>}
+    <dl className={styles.factList}>
+      <div><dt>신호별 연결 쌍 합계</dt><dd>{relationship.verifiedConnectionCount}개 (신호마다 따로 센 합계라 같은 두 예매가 중복될 수 있으며, 고유한 예매 연결 수가 아닙니다)</dd></div>
+      <div><dt>제공되지 않는 근거</dt><dd>{relationship.unavailableSignalTypes.length === 0 ? '없음' : relationship.unavailableSignalTypes.map((type) => unavailableLabels[type] ?? type).join(', ')} (이 그룹에 저장된 근거가 아니어서 만들거나 추정하지 않습니다)</dd></div>
+      <div><dt>근거 범위</dt><dd>저장된 그룹 구성원만 (원래 전체 그룹을 복원하지 않습니다)</dd></div>
+    </dl>
+  </section>
 }
