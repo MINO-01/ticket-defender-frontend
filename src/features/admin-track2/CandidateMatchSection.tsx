@@ -44,6 +44,7 @@ export function CandidateMatchSection({ fanReportId, evidenceId, analysis, attem
   return <section className={styles.analysisRun} aria-label="예매 후보 대조">
     <div className={styles.panelHeading}><h4>예매 후보 대조</h4><span>분석 담당 또는 검토 담당</span></div>
     <p className={styles.subtleNote}>사람이 확인한 회차 연결과 이 분석의 구역, 열, 좌석 관찰값을 그 회차의 완전한 예매 스냅샷과 비교합니다. 이미지 분석 실행과는 별도 작업이며 결과는 조사 후보일 뿐 부정 거래 확정이 아닙니다.</p>
+    <p className={styles.caution} role="note">좌석 번호가 관찰되지 않은 게시물(예: 좌석 번호 없는 2연석)은 정확한 예매 1건으로 승격하지 않습니다.</p>
     {!runnable && <p className={styles.previewUnavailable}>실행 완료(SUCCEEDED)된 분석만 후보 대조를 실행할 수 있습니다. 이 분석의 기존 후보 실행 이력은 조회할 수 있습니다.</p>}
 
     {attempt?.phase === 'sending' && <p className={styles.runStatus} role="status">후보 대조를 요청했습니다. 서버 응답을 기다리는 중입니다.</p>}
@@ -110,7 +111,7 @@ function CandidateRunHistory({ fanReportId, evidenceId, analysisId, selection }:
 
 function statusNote(run: CandidateRun) {
   switch (run.status) {
-    case 'MATCH_CANDIDATE': return '관찰한 좌석과 같은 예매 후보가 하나 있다는 조사 후보입니다. 판매자, 동일인, 불법성, 부정 거래를 확정하지 않습니다.'
+    case 'MATCH_CANDIDATE': return '관찰한 좌석과 같은 예매 후보가 하나 있다는 조사 후보입니다. 일치 후보가 있는 좌석이라는 뜻일 뿐 실제 티켓 확인이나 판매자 소유권 확인이 아닙니다. 판매자, 동일인, 불법성, 부정 거래를 확정하지 않습니다.'
     case 'NO_MATCH': return '정상적이고 완전한 예매 스냅샷 조회가 성공했고 같은 좌석 후보가 없었다는 뜻입니다. 거래가 없었다는 확인은 아닙니다.'
     case 'AMBIGUOUS': return '같은 좌석 후보가 여럿이라 하나로 정하지 않았습니다. 일치 후보로 바꾸지 않습니다.'
     case 'UNVERIFIABLE': return '대조에 필요한 회차 연결, 예매 출처 또는 좌석 관찰값을 확인할 수 없어 대조하지 않았습니다. 후보 없음이 아닙니다.'
