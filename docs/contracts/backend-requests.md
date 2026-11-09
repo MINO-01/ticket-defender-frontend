@@ -81,6 +81,21 @@
 | 예매 반입 이력과 배치 조회 | BLOCKED | 반입 POST 응답만 존재, 조회 API 없음 |
 | 고객사 전체 감사 로그, 통합 분석 작업 이력 | BLOCKED | 조회 API 없음 |
 
+## Backend PR #80 (Issue #79, 82c5899) 연동 현황
+
+PR #80이 병합되지 않은 서버에서는 정책 API가 403을 돌려주며, 화면은 이를 빈 정책으로 바꾸지 않습니다.
+
+| 영역 | 상태 | 내용 |
+|---|---|---|
+| 정책 조회, 등록, 수정, 철회 | 연결 완료 | `PATCH`와 `expectedRevision` 사용. 멱등 키가 없어 결과 불확실 시 재전송하지 않고 목록을 다시 확인 |
+| 회차별 정책 현황과 분석 준비 안내 | 연결 완료 | 정책 값으로 계산한 안내이며 서버 평가 결과가 아님 |
+| `seats[]`, `linkBasis` | 연결 완료 | 이전 서버 응답도 허용. 연결 근거는 예매 참조 일치일 뿐 티켓 단위 동일성이 아님 |
+| `purchaseLimitEvaluations`, `accountLimitFindings` 표시 | BLOCKED | Spring 내부 서비스만 있고 조회 API와 저장 모델 없음 (`TRACK1_V2_ENABLED` 기본 꺼짐) |
+| 정책 변경 감사 이력 조회 | BLOCKED | 저장은 하지만 조회 API 없음 |
+| 다좌석 반입의 `ticketReference` 입력 | OPEN | 서버 필드는 있으나 반입 화면 입력 형식은 미반영 |
+
+필요한 조회 계약 예시: `GET /api/v1/admin/events/{eventId}/purchase-limit-evaluations?performanceId&page&pageSize`. 응답은 분석 요청 ID, 회차, `status`, `policyVersion`, 계정별 수량과 finding을 담고, 평가하지 못한 회차를 빈 목록으로 합치지 않아야 합니다.
+
 ## 최초 요청 초안 (참고)
 
 아래 1~7은 실제 구현 전에 Frontend가 제안한 형태입니다. 실제 경로와 필드는 위 비교 표와 Backend 계약 문서를 따릅니다.

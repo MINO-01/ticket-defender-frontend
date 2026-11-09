@@ -46,7 +46,9 @@ function LinkItem({ item }: { item: EvidenceLink }) {
       <div><dt>Track 1 출처 참조 ID</dt><dd className={styles.idCell}>{item.graphSourceId}</dd></div>
       <div><dt>후보 출처 참조 ID</dt><dd className={styles.idCell}>{item.candidateSourceId}</dd></div>
       <div><dt>후보 실행 ID</dt><dd className={styles.idCell}>{item.candidateRunId}</dd></div>
+      <div><dt>연결 근거</dt><dd>{item.linkBasis === undefined ? '서버 미제공' : '예매 참조 일치 (RESERVATION_REFERENCE)'}</dd></div>
     </dl>
+    {item.linkBasis !== undefined && <p className={styles.caution}>예매 참조가 일치한다는 뜻입니다. 티켓 단위 동일성, 소유권, 진위, 부정 거래나 승인 근거가 아닙니다.</p>}
     {item.ledgerSeats.length === 0
       ? <p className={styles.caution}>서버가 돌려준 원장 좌석이 없습니다.</p>
       : <ul className={styles.checkList} aria-label="구성원별 원장 좌석">{item.ledgerSeats.map((seat) => <li key={seat.auditId}>

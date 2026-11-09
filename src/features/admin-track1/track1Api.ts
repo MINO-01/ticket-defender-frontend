@@ -39,6 +39,8 @@ export const ledgerSeatSchema = z.object({
   zone: ledgerSeatPart,
   row: ledgerSeatPart,
   seat: ledgerSeatPart,
+  // Backend #79 다좌석 계약이다. 한 예매의 모든 좌석이며 다좌석이면 위의 단일 값은 비어 있다. 이전 서버는 보내지 않는다.
+  seats: z.array(z.object({ zone: z.string().max(128), row: z.string().max(128), seat: z.string().max(128) })).optional(),
 })
 
 export type LedgerSeat = z.infer<typeof ledgerSeatSchema>
@@ -62,6 +64,7 @@ export function ledgerSeatTone(status: LedgerSeatStatus) {
 /** FOUND일 때만 서버가 준 좌석 값을 표시한다. 비어 있는 값을 다른 값으로 채우지 않는다. */
 export function formatLedgerSeat(seat: LedgerSeat) {
   if (seat.status !== 'FOUND') return '좌석 정보 없음'
+  if (seat.seats && seat.seats.length > 1) return `${seat.seats.map((item) => `구역 ${item.zone}, 열 ${item.row}, 좌석 ${item.seat}`).join(' / ')} (같은 예매 ${seat.seats.length}석)`
   return `구역 ${seat.zone ?? '기록 없음'}, 열 ${seat.row ?? '기록 없음'}, 좌석 ${seat.seat ?? '기록 없음'}`
 }
 

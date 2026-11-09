@@ -18,6 +18,8 @@ const evidenceLinkSchema = z.object({
   candidateRunId: uuid,
   status: z.enum(evidenceLinkStatuses),
   ledgerSeats: z.array(linkedLedgerSeatSchema),
+  // Backend #79에서 필수가 된 연결 근거다. 이전 서버 응답에는 없다.
+  linkBasis: z.literal('RESERVATION_REFERENCE').optional(),
 })
 
 export const evidenceLinkViewSchema = z.object({

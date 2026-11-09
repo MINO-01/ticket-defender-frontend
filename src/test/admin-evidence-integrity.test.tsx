@@ -3,6 +3,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import type { AdminAuthAdapter } from '../features/admin-auth/authAdapter'
+import { evidenceLinkViewSchema } from '../features/admin-cases/track1CandidateLinkApi'
+import { formatLedgerSeat } from '../features/admin-track1/track1Api'
 
 // 증거 무결성 패널과 구매 한도 정책 조회를 Mock 인증과 Mock fetch로 검증한다. 실제 Backend HTTP 연동 결과가 아니며 모든 값은 합성 데이터다.
 const SYNTHETIC_TOKEN = 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJzeW50aGV0aWMtYWRtaW4ifQ.c3ludGhldGljLXNpZ25hdHVyZQ'
@@ -22,6 +24,9 @@ const EVALUATION = `/api/v1/cases/${CASE_1}/integrity-evaluation?reportVersionId
 const POLICY = `/api/v1/admin/events/${EVENT_A}/purchase-limit-policies`
 const EVENTS = '/api/v1/admin/events?page=0&pageSize=100'
 const SETTINGS = `/api/v1/admin/operations/settings?eventId=${EVENT_A}`
+const PERFS = `/api/v1/admin/events/${EVENT_A}/verified-performances`
+const PERF = '77777777-7777-4777-8777-777777777771'
+const POLICY_1 = '88888888-8888-4888-8888-888888888881'
 
 const adapter = () => ({
   availability: { status: 'ready' },
@@ -171,21 +176,118 @@ describe('증거 무결성 검증', () => {
   })
 })
 
+describe('다좌석 원장 표시', () => {
+  it('seats가 여러 개면 모든 좌석을 표시하고 없으면 기존 단일 값을 쓴다', () => {
+    expect(formatLedgerSeat({ status: 'FOUND', zone: null, row: null, seat: null, seats: [{ zone: 'A', row: '1', seat: '1' }, { zone: 'A', row: '1', seat: '2' }] })).toBe('구역 A, 열 1, 좌석 1 / 구역 A, 열 1, 좌석 2 (같은 예매 2석)')
+    expect(formatLedgerSeat({ status: 'FOUND', zone: 'B', row: '2', seat: '3', seats: [{ zone: 'B', row: '2', seat: '3' }] })).toBe('구역 B, 열 2, 좌석 3')
+    expect(formatLedgerSeat({ status: 'FOUND', zone: 'C', row: '4', seat: '5' })).toBe('구역 C, 열 4, 좌석 5')
+    expect(formatLedgerSeat({ status: 'NOT_IN_LEDGER', seats: [] })).toBe('좌석 정보 없음')
+  })
+
+  it('linkBasis는 알려진 값만 받고 이전 서버 응답도 허용한다', () => {
+    const view = (extra: object) => ({ status: 'LINKED', items: [{ graphSourceId: SOURCE, candidateSourceId: SOURCE, candidateRunId: SOURCE, status: 'LINKED', ledgerSeats: [], ...extra }] })
+    expect(evidenceLinkViewSchema.safeParse(view({ linkBasis: 'RESERVATION_REFERENCE' })).success).toBe(true)
+    expect(evidenceLinkViewSchema.safeParse(view({})).success).toBe(true)
+    expect(evidenceLinkViewSchema.safeParse(view({ linkBasis: 'SAME_TICKET' })).success).toBe(false)
+  })
+})
+
 describe('구매 한도 정책 조회', () => {
   const settingsBody = { fanReportIntakeEnabled: true, track2ListingAnalysisConfigured: false, track1RelationshipEvidenceCoverage: 'STORED_DEVICE_AND_IP_SIGNALS_ONLY', officialPdfIssuanceState: 'BLOCKED', auditorAccessState: 'NOT_IMPLEMENTED_POLICY_PENDING' }
   const events = { items: [{ id: EVENT_A, externalEventId: 'synthetic-a', name: '합성 공연 A' }], page: 0, pageSize: 100, totalItems: 1, hasNext: false }
-  const base = (policy: Handler): Record<string, Handler> => ({ [`GET ${EVENTS}`]: () => json(200, events), [`GET ${SETTINGS}`]: () => json(200, settingsBody), [`GET ${POLICY}`]: policy })
+  const performance = { performanceId: PERF, eventId: EVENT_A, performanceRef: 'synthetic-perf-1', status: 'ACTIVE', revision: 1, sourceVersion: 'src-1', verifiedAt: '2026-11-01T00:00:00Z', withdrawnAt: null }
+  const policy = (overrides = {}) => ({ policyId: POLICY_1, eventId: EVENT_A, performanceId: PERF, maxTicketsPerAccount: 2, policyVersion: 'synthetic-r1', effectiveFrom: '2026-11-01T00:00:00', effectiveUntil: null, status: 'ACTIVE', policySource: 'synthetic source', verificationBasis: 'synthetic basis', limitSubject: 'ACCOUNT', applicationScope: 'PERFORMANCE', salesPhaseRef: null, cancellationRefundRule: 'NETTED', includesPresale: true, revision: 1, changedAt: '2026-11-01T00:00:00', ...overrides })
+  const base = (list: Handler, extra: Record<string, Handler> = {}): Record<string, Handler> => ({ [`GET ${EVENTS}`]: () => json(200, events), [`GET ${SETTINGS}`]: () => json(200, settingsBody), [`GET ${POLICY}`]: list, [`GET ${PERFS}`]: () => json(200, [performance]), ...extra })
+  const fill = (scope: HTMLElement, name: RegExp, value: string) => fireEvent.change(within(scope).getByLabelText(name), { target: { value } })
   const region = () => screen.findByRole('region', { name: '구매 한도 정책' })
   const route = `/app/settings?eventId=${EVENT_A}`
 
   it('서버 정책을 표시하고 모르는 코드는 코드 그대로 둔다', async () => {
-    stub(base(() => json(200, [{ policyId: 'p1', eventId: EVENT_A, performanceId: 'perf-1', maxTicketsPerAccount: 2, policyVersion: 'synthetic-r1', effectiveFrom: '2026-11-01T00:00:00', effectiveUntil: null, status: 'ACTIVE', policySource: 's', verificationBasis: 'b', limitSubject: 'ACCOUNT', applicationScope: 'FUTURE_SCOPE', salesPhaseRef: null, cancellationRefundRule: 'NETTED', includesPresale: null, revision: 1, changedAt: '2026-11-01T00:00:00' }])))
+    stub(base(() => json(200, [policy({ applicationScope: 'FUTURE_SCOPE', includesPresale: null })])))
     open(route)
     const panelNode = await region()
     expect(await within(panelNode).findByText('2매')).toBeInTheDocument()
     expect(within(panelNode).getByText('계정별 (ACCOUNT)')).toBeInTheDocument()
     expect(within(panelNode).getByText('알 수 없는 서버 값 (FUTURE_SCOPE)')).toBeInTheDocument()
     expect(within(panelNode).getByText('미지정')).toBeInTheDocument()
+    expect(within(panelNode).getByText(/의미 값이 비어 있어 분석에서 정책 미확인/)).toBeInTheDocument()
+    expect(within(panelNode).getByText(/의미 값이 확인된 계정 한도 정책 없음/)).toBeInTheDocument()
+  })
+
+  it('회차별로 정책 없음을 정책 미확인으로 표시한다', async () => {
+    stub(base(() => json(200, [])))
+    open(route)
+    expect(await within(await region()).findByText(/정책 없음. 한도를 평가하지 않습니다/)).toBeInTheDocument()
+  })
+
+  it('관리자가 입력한 값만 시간대 없이 등록하고 미확인 의미 값은 null로 보낸다', async () => {
+    const calls = stub(base((_call, count) => json(200, count === 1 ? [] : [policy()]), { [`POST ${POLICY}`]: () => json(201, policy()) }))
+    open(route)
+    const panelNode = await region()
+    fireEvent.click(await within(panelNode).findByRole('button', { name: '정책 등록' }))
+    const form = await within(panelNode).findByRole('group', { name: '정책 등록' })
+    fill(form, /검증 회차/, PERF)
+    fill(form, /계정당 최대 수량/, '2')
+    fill(form, /^정책 버전/, 'synthetic-r1')
+    fill(form, /적용 시작/, '2026-11-01T00:00')
+    fill(form, /정책 출처/, 'synthetic source')
+    fill(form, /확인 근거/, 'synthetic basis')
+    fireEvent.click(within(form).getByRole('button', { name: '정책 저장' }))
+    await waitFor(() => expect(calls.some((call) => call.method === 'POST')).toBe(true))
+    expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ performanceId: PERF, maxTicketsPerAccount: 2, policyVersion: 'synthetic-r1', effectiveFrom: '2026-11-01T00:00:00', effectiveUntil: null, policySource: 'synthetic source', verificationBasis: 'synthetic basis', limitSubject: null, applicationScope: null, salesPhaseRef: null, cancellationRefundRule: null, includesPresale: null })
+    expect(await within(panelNode).findByText('구매 한도 정책을 등록했습니다.')).toBeInTheDocument()
+  })
+
+  it('수량이나 필수 값이 없으면 보내지 않고 기본 한도를 넣지 않는다', async () => {
+    const calls = stub(base(() => json(200, [])))
+    open(route)
+    const panelNode = await region()
+    fireEvent.click(await within(panelNode).findByRole('button', { name: '정책 등록' }))
+    const form = await within(panelNode).findByRole('group', { name: '정책 등록' })
+    expect((within(form).getByLabelText(/계정당 최대 수량/) as HTMLInputElement).value).toBe('')
+    fireEvent.click(within(form).getByRole('button', { name: '정책 저장' }))
+    expect(await within(form).findByText(/기본 한도는 없습니다/)).toBeInTheDocument()
+    expect(calls.some((call) => call.method === 'POST')).toBe(false)
+  })
+
+  it('수정은 expectedRevision을 PATCH로 보내고 같은 버전은 막는다', async () => {
+    const calls = stub(base(() => json(200, [policy({ revision: 3 })]), { [`PATCH ${POLICY}/${POLICY_1}`]: () => json(200, policy({ revision: 4, policyVersion: 'synthetic-r2' })) }))
+    open(route)
+    const panelNode = await region()
+    fireEvent.click(await within(panelNode).findByRole('button', { name: '수정' }))
+    const form = await within(panelNode).findByRole('group', { name: '정책 수정' })
+    fill(form, /새 정책 버전/, 'synthetic-r1')
+    fireEvent.click(within(form).getByRole('button', { name: '수정 저장' }))
+    expect(await within(form).findByText(/새 정책 버전을 입력해야/)).toBeInTheDocument()
+    expect(calls.some((call) => call.method === 'PATCH')).toBe(false)
+    fill(form, /새 정책 버전/, 'synthetic-r2')
+    fireEvent.click(within(form).getByRole('button', { name: '수정 저장' }))
+    await waitFor(() => expect(calls.some((call) => call.method === 'PATCH')).toBe(true))
+    expect(calls.find((call) => call.method === 'PATCH')?.body).toMatchObject({ expectedRevision: 3, policyVersion: 'synthetic-r2', limitSubject: 'ACCOUNT', includesPresale: true })
+    expect(calls.find((call) => call.method === 'PATCH')?.headers['Idempotency-Key']).toBeUndefined()
+  })
+
+  it('철회는 확인 뒤 expectedRevision으로 요청하고 충돌을 안내한다', async () => {
+    const calls = stub(base(() => json(200, [policy({ revision: 5 })]), { [`POST ${POLICY}/${POLICY_1}/withdrawals`]: () => problem(409, 'PURCHASE_LIMIT_POLICY_REVISION_CONFLICT') }))
+    open(route)
+    const panelNode = await region()
+    fireEvent.click(await within(panelNode).findByRole('button', { name: '철회' }))
+    expect(calls.some((call) => call.method === 'POST')).toBe(false)
+    fireEvent.click(await within(panelNode).findByRole('button', { name: '철회 확인' }))
+    expect(await within(panelNode).findByText('다른 변경이 먼저 저장되었습니다')).toBeInTheDocument()
+    expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ expectedRevision: 5 })
+    expect(within(panelNode).queryByText(/secret-detail/)).not.toBeInTheDocument()
+  })
+
+  it('결과가 불확실한 쓰기는 다시 보내지 않고 목록 확인만 허용한다', async () => {
+    const calls = stub(base(() => json(200, [policy()]), { [`POST ${POLICY}/${POLICY_1}/withdrawals`]: () => problem(500, 'INTERNAL_ERROR') }))
+    open(route)
+    const panelNode = await region()
+    fireEvent.click(await within(panelNode).findByRole('button', { name: '철회' }))
+    fireEvent.click(await within(panelNode).findByRole('button', { name: '철회 확인' }))
+    fireEvent.click(await within(panelNode).findByRole('button', { name: '목록 다시 확인' }))
+    await waitFor(() => expect(calls.filter((call) => call.method === 'GET' && call.url === POLICY).length).toBeGreaterThan(1))
+    expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1)
   })
 
   it('정책이 없으면 기본 한도를 표시하지 않는다', async () => {
