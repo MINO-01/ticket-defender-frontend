@@ -24,6 +24,8 @@ const reservationRowSchema = z.object({
   zone: boundedText,
   row: boundedText,
   seat: boundedText,
+  // Backend #79 다좌석 계약의 선택 값이다. 같은 예매의 여러 좌석 행을 구분한다. 서버에서 HMAC 처리된다.
+  ticketReference: boundedText.optional(),
 }).strict()
 
 /** 요청 본문 스키마다. 계약의 additionalProperties: false에 맞춰 정의하지 않은 필드는 보내지 않는다. */
@@ -74,8 +76,9 @@ export type ImportFormInput = { performanceId: string; sourceVersion: string; co
 export type ImportFormErrors = { performanceId?: string; sourceVersion?: string; completeSnapshot?: string; rows?: string; rowLines?: string[] }
 export type BuiltImport = { ok: true; body: ImportRequestBody } | { ok: false; errors: ImportFormErrors }
 
-const rowFields = ['reservationReference', 'zone', 'row', 'seat'] as const
-const rowFieldLabels: Record<(typeof rowFields)[number], string> = { reservationReference: '합성 예매번호', zone: '구역', row: '열', seat: '좌석' }
+const rowFields = ['reservationReference', 'zone', 'row', 'seat', 'ticketReference'] as const
+const requiredRowFields = 4
+const rowFieldLabels: Record<(typeof rowFields)[number], string> = { reservationReference: '합성 예매번호', zone: '구역', row: '열', seat: '좌석', ticketReference: '티켓 참조' }
 /** 행 오류 안내는 앞부분만 보여 준다. 오류 문구에는 입력 값을 넣지 않고 줄 번호와 항목 이름만 쓴다. */
 const maxLineErrors = 20
 
@@ -106,12 +109,12 @@ export function buildImportRequest(input: ImportFormInput): BuiltImport {
       break
     }
     const values = line.split(line.includes('\t') ? '\t' : ',')
-    if (values.length !== rowFields.length) {
-      addLineError(`${index + 1}번째 줄: 값이 ${rowFields.length}개(합성 예매번호, 구역, 열, 좌석)여야 합니다.`)
+    if (values.length !== requiredRowFields && values.length !== rowFields.length) {
+      addLineError(`${index + 1}번째 줄: 값이 ${requiredRowFields}개(합성 예매번호, 구역, 열, 좌석) 또는 티켓 참조를 더한 ${rowFields.length}개여야 합니다.`)
       rows.push({})
       continue
     }
-    const row = Object.fromEntries(rowFields.map((field, position) => [field, values[position]]))
+    const row = Object.fromEntries(rowFields.slice(0, values.length).map((field, position) => [field, values[position]]))
     const parsed = reservationRowSchema.safeParse(row)
     if (!parsed.success) {
       // Zod 오류에는 입력 값이 들어갈 수 있어 경로의 항목 이름만 읽어 고정 문구로 바꾼다.

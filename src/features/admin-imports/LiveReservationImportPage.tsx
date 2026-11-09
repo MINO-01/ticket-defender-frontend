@@ -143,7 +143,7 @@ function ImportForm({ eventId, eventName, performances, onRejected }: { eventId:
           </fieldset>
           <div className={styles.rows}><Textarea ref={rowsRef} label={`합성 예매 행 (1~${maxImportRows}개)`} aria-describedby="reservation-rows-format" maxLength={maxRowsTextLength} readOnly={locked}
             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-gramm="false" error={errors?.rows} required /></div>
-          <p id="reservation-rows-format" className={trackStyles.subtleNote}>한 줄에 한 행씩 <code>합성 예매번호,구역,열,좌석</code> 순서로 입력합니다. 쉼표 또는 탭으로 구분하고 빈 줄은 건너뜁니다. 각 값은 앞뒤 공백을 뺀 1~128자이며 값 안에 쉼표나 탭은 넣을 수 없습니다. 입력은 이 화면 메모리에만 있고 저장되지 않습니다.</p>
+          <p id="reservation-rows-format" className={trackStyles.subtleNote}>한 줄에 한 행씩 <code>합성 예매번호,구역,열,좌석</code> 순서로 입력합니다. 다좌석 예매는 다섯 번째 값으로 티켓 참조를 붙입니다. 쉼표 또는 탭으로 구분하고 빈 줄은 건너뜁니다. 각 값은 앞뒤 공백을 뺀 1~128자이며 값 안에 쉼표나 탭은 넣을 수 없습니다. 입력은 이 화면 메모리에만 있고 저장되지 않습니다.</p>
           {errors?.rowLines && <ul className={styles.lineErrors} aria-label="행 형식 오류">{errors.rowLines.map((line) => <li key={line}>{line}</li>)}</ul>}
           <div className={styles.actions}>
             <Button type="submit" loading={sending} disabled={locked}>합성 스냅샷 반입</Button>

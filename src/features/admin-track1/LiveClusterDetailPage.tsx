@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { describeAdminApiFailure } from '../../api/adminApiFailure'
 import { Card } from '../../components/common/Card'
@@ -15,7 +16,9 @@ import {
   formatAlgorithm, formatAnalyzedAt, formatRiskScore, readTrack1ClusterKey, sharedSignalTypes, track1ClusterDetailPath, track1ClusterDetailSchema, track1ListRoute,
 } from './track1Api'
 import type { SharedSignalType, Track1ClusterDetail, Track1ClusterKey, Track1Relationship } from './track1Api'
+import { ClusterGraph } from './ClusterGraph'
 import { LedgerSeatLookupPanel } from './LedgerSeatLookupPanel'
+import type { GraphModel } from './track1Model'
 import styles from './Track1.module.css'
 
 // 인증된 관리자의 Track 1 군집 상세다. eventId, analysisRequestId, clusterId를 주소에서 읽어 함께 조회하므로 직접 주소로 접근해도 같은 군집을 연다.
@@ -118,6 +121,9 @@ function ClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey }) {
         <Card className={`${styles.panel} ${styles.graphPanel}`}>
           <div className={styles.sectionHeading}><div><h2>공유 근거</h2><p>서버가 저장된 기기와 IP 신호로 계산한 요약만 표시합니다. 연결 그래프는 그리지 않습니다.</p></div></div>
           <RelationshipEvidence relationship={result.data.relationship} />
+          {result.data.graph
+            ? <StoredGraph graph={result.data.graph} />
+            : <p className={styles.muted}>저장된 연결 관계 API가 없어 그래프를 표시하지 않습니다(BLOCKED). 요약 수치로 간선을 추정하지 않습니다.</p>}
         </Card>
         <Card id="cluster-members" className={styles.tableCard}>
           <div className={styles.sectionHeading}><h2>저장된 예매 기록</h2><span>{members.length}건</span></div>
@@ -144,6 +150,16 @@ const unavailableLabels: Record<string, string> = { PAYMENT_HASH: '결제 수단
  * 서버가 계산한 공유 근거 요약만 보여 준다. 신호 값, HMAC, 구성원 사이의 간선은 응답에 없으므로 그래프를 그리지 않는다.
  * 전체 verifiedConnectionCount는 신호별 연결 쌍의 합이라 고유한 예매 연결 수로 설명하지 않는다.
  */
+/** 서버가 저장 근거로 돌려준 노드와 간선만 그린다. 값을 보강하거나 추정하지 않는다. */
+function StoredGraph({ graph }: { graph: NonNullable<Track1ClusterDetail['graph']> }) {
+  const [selected, setSelected] = useState<string | null>(null)
+  const model = useMemo<GraphModel>(() => ({
+    nodes: graph.nodes.map((node) => ({ id: node.id, label: node.label, graphLabel: node.label, kind: node.kind, detail: '서버 저장 근거' })),
+    edges: graph.edges.map((edge) => ({ id: edge.id, source: edge.source, target: edge.target, signalKind: edge.signalKind ?? undefined, label: edge.signalKind ?? '예매', evidence: '서버 저장 근거' })),
+  }), [graph])
+  return <ClusterGraph graph={model} selectedId={selected} onSelect={setSelected} />
+}
+
 function RelationshipEvidence({ relationship }: { relationship: Track1Relationship | undefined }) {
   if (relationship === undefined) {
     return <EmptyState title="공유 근거를 표시할 수 없습니다" description="이 서버 응답에는 공유 근거 요약(relationship)이 없습니다. 관계를 임의로 만들지 않기 위해 그래프와 연결을 표시하지 않습니다." />

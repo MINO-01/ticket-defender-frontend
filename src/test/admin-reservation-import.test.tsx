@@ -134,7 +134,7 @@ describe('합성 예매 반입 요청 해석', () => {
     expect(built.errors.sourceVersion).toBeDefined()
     expect(built.errors.completeSnapshot).toBeDefined()
     expect(built.errors.rowLines).toEqual([
-      '1번째 줄: 값이 4개(합성 예매번호, 구역, 열, 좌석)여야 합니다.',
+      '1번째 줄: 값이 4개(합성 예매번호, 구역, 열, 좌석) 또는 티켓 참조를 더한 5개여야 합니다.',
       '2번째 줄: 구역 값은 앞뒤 공백을 뺀 1~128자여야 합니다.',
       '3번째 줄: 구역 값은 앞뒤 공백을 뺀 1~128자여야 합니다.',
     ])
