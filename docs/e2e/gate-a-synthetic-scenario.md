@@ -1,6 +1,6 @@
 # Gate A 합성 격리 시나리오
 
-기준: Backend main `5d80788`, Data 브랜치 `feat/#30-track1-demo-verification`, Frontend 브랜치 `feat/final-demo-live-integration-20261109`. 이 문서는 실행 절차이며 결과 기록이 아닙니다. 실행하지 않은 단계는 NOT_RUN으로 기록합니다.
+기준: Backend main `a4be847`, Data 브랜치 `feat/#30-shared-signal-observations`, Frontend 브랜치 `feat/final-demo-backend81-alignment-20261110`. 이 문서는 실행 절차이며 결과 기록이 아닙니다. 실행하지 않은 단계는 NOT_RUN으로 기록합니다.
 
 ## 격리 조건
 
@@ -26,7 +26,7 @@
 | --- | --- | --- | --- |
 | 1 | `/fan/write` 제출, 접수 조회 | 201, 조회 200, 실패 복구 | 화면 연결됨 |
 | 2 | `/app/verified-performances`, `/app/imports` | 합성 예매 반입 ACCEPTED, 다좌석은 5번째 값 `ticketReference` | 화면 연결됨 |
-| 3 | `/app/fan-reports/:id` 이미지 분석 | COMPLETED, PARTIAL, UNVERIFIABLE, FAILED 구분 | 실제 모델은 BLOCKED. 스텁 검증은 모델 품질이 아님 |
+| 3 | `/app/fan-reports/:id` 이미지 분석 | COMPLETED, PARTIAL, UNVERIFIABLE, FAILED 구분 | 실제 Gemini BLOCKED (교체 키와 합성 listing_A/B/C 없음) |
 | 4 | 같은 화면의 회차 연결과 후보 대조 | MATCH_CANDIDATE는 확정 판정이 아님 | 화면 연결됨 |
 | 5 | 같은 화면의 Case 생성 후 `/app/cases/:id` | `linkBasis=RESERVATION_REFERENCE` | 화면 연결됨 |
 | 6 | Case의 조사 근거 묶음, 초안, 증거 무결성 검증 | MATCH와 승인 적격성 분리 | 실제 Backend 검증됨 |
@@ -34,17 +34,17 @@
 | 8 | 후보 없는 Track 1 적격 Case로 `/app/approvals/:id` 독립 승인 | 자기 승인 403 | 화면 연결됨 |
 | 9 | `/app/report-center/decisions/:id` 발급, 다운로드, 감사 | 승인과 발급 분리 | 화면 연결됨 |
 
-정책상 후보 단독 근거는 승인되지 않으므로 8~9는 적격 근거 Case로 별도 검증합니다.
+세 시나리오의 승인과 PDF는 Backend DEMO_V1 구현 전까지 BLOCKED입니다. 공백은 `docs/contracts/demo-v1-gaps.md`에 있습니다.
 
 ## 시연 경로 B: 수량 원장에서 분석 결과까지
 
 | 단계 | 화면 | 기대 결과 | 현재 상태 |
 | --- | --- | --- | --- |
 | 1 | `/app/settings` 구매 한도 정책 등록 | 201, 낡은 개정 409 | 화면 연결됨 |
-| 2 | `/app/analysis/quantity` 원장 반입 | ACCEPTED 또는 행별 사유가 있는 REJECTED | Backend #81 BLOCKED |
-| 3 | 같은 화면의 분석 실행 | 실제 Louvain 실행, 장애는 FAILED 유지 | Backend #81 BLOCKED |
-| 4 | 같은 화면의 결과 | 한도 내 계정, 3매 초과 신호, 평가 불가 사유 구분 | Backend #81 BLOCKED |
-| 5 | `/app/analysis/findings` 군집과 그래프 | 저장 간선이 있을 때만 그래프 표시 | 그래프는 Backend 응답 대기 |
+| 2 | `/app/analysis/quantity` 원장 반입 | ACCEPTED 또는 행별 사유가 있는 REJECTED | 화면 연결됨, 실제 E2E NOT_RUN |
+| 3 | 같은 화면의 분석 실행 | 실제 Louvain 실행, 장애는 FAILED 유지 | 화면 연결됨, 실제 E2E NOT_RUN |
+| 4 | 같은 화면의 결과 | 한도 내 계정, 3매 초과 신호, 평가 불가 사유 구분 | 화면 연결됨, 실제 E2E NOT_RUN |
+| 5 | `/app/analysis/findings` 군집과 그래프 | 저장 간선이 있을 때만 그래프 표시 | 저장된 기기, IP 간선만 표시 |
 
 Data 측 입력과 기대 결과는 `tests/fixtures/track1_v2_demo_scenario.json`과 manifest로 격리 GDS에서 검증합니다.
 
