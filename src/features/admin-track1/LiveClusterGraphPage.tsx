@@ -11,16 +11,17 @@ import { AdminEventGate } from '../admin-events/AdminEventGate'
 import type { AdminEvent } from '../admin-events/adminEventsApi'
 import { ClusterGraph } from './ClusterGraph'
 import {
-  formatAlgorithm, formatAnalyzedAt, formatRiskScore, readTrack1ClusterKey, readTrack1Page, sharedSignalTypes, track1ClusterDetailPath, track1ClusterDetailSchema,
+  formatAlgorithm, formatAnalyzedAt, formatRiskScore, readTrack1ClusterKey, readTrack1Page,
   track1ClusterListPath, track1ClusterPageSchema, track1DetailRoute, track1ListRoute,
 } from './track1Api'
-import type { SharedSignalType, Track1ClusterDetail, Track1ClusterKey } from './track1Api'
+import type { Track1ClusterKey, Track1ClusterSummary } from './track1Api'
 import { toGraphModel, track1ClusterGraphPath, track1ClusterGraphSchema } from './track1GraphApi'
 import type { Track1ClusterGraph } from './track1GraphApi'
 import type { GraphModel } from './track1Model'
 import styles from './Track1.module.css'
 
-// 인증된 관리자의 Track 1 관계 그래프 화면이다. 군집 목록, 상세, 그래프 모두 서버 응답만 사용하며 합성 데모 데이터를 쓰지 않는다.
+// 인증된 관리자의 Track 1 관계 그래프 화면이다. 군집 목록과 그래프 API의 응답만 사용하며 합성 데모 데이터를 쓰지 않는다.
+// 상세 API는 원본 accountId와 reservationNo를 포함하므로 이 화면에서 호출하지 않는다. 군집 메타데이터는 목록의 선택 항목을 쓴다.
 // 그래프 응답이 요청한 분석과 군집이 아니면 다른 범위의 데이터가 섞일 수 있으므로 표시하지 않는다.
 
 const invalidResponse = (status: number): AdminApiFailure => ({ kind: 'invalidResponse', status })
@@ -87,14 +88,13 @@ function GraphWorkspace({ event }: { event: AdminEvent }) {
       <Link className={styles.backLink} to={track1ListRoute(event.id)}>← 예매 그룹 목록</Link>
     </Card>
     {selected
-      ? <SelectedCluster key={JSON.stringify(selected)} clusterKey={selected} />
+      ? <SelectedCluster key={JSON.stringify(selected)} clusterKey={selected} summary={data.items.find((item) => item.analysisRequestId === selected.analysisRequestId && item.clusterId === selected.clusterId) ?? null} />
       : <EmptyState title="이 페이지에 표시할 군집이 없습니다" description="요청한 페이지가 전체 결과 범위를 벗어났습니다." />}
   </div>
 }
 
-function SelectedCluster({ clusterKey }: { clusterKey: Track1ClusterKey }) {
+function SelectedCluster({ clusterKey, summary }: { clusterKey: Track1ClusterKey; summary: Track1ClusterSummary | null }) {
   const graphQuery = useAdminQuery(track1ClusterGraphPath(clusterKey), track1ClusterGraphSchema)
-  const detailQuery = useAdminQuery(track1ClusterDetailPath(clusterKey), track1ClusterDetailSchema)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const graphResult = graphQuery.result
@@ -102,11 +102,6 @@ function SelectedCluster({ clusterKey }: { clusterKey: Track1ClusterKey }) {
   const graphData = graphMatches ? graphResult.data : null
   // ClusterGraph는 graph 참조가 바뀔 때 인스턴스를 다시 만들므로 응답이 같으면 같은 모델을 유지한다.
   const model = useMemo(() => graphData ? toGraphModel(graphData) : null, [graphData])
-
-  const detailResult = detailQuery.result
-  const detailMatches = detailResult?.kind === 'success' && detailResult.data.event.id === clusterKey.eventId
-    && detailResult.data.cluster.analysisRequestId === clusterKey.analysisRequestId && detailResult.data.cluster.clusterId === clusterKey.clusterId
-  const detail = detailMatches ? detailResult.data : null
 
   let center
   if (graphResult === null) center = <LoadingSkeleton label="관계 그래프를 불러오는 중" />
@@ -133,10 +128,8 @@ function SelectedCluster({ clusterKey }: { clusterKey: Track1ClusterKey }) {
     </Card>
     <div className={styles.detailColumn}>
       <Card className={styles.panel} aria-label="선택한 요소"><h2>선택한 요소</h2><SelectionEvidence model={model} selectedId={selectedId} /></Card>
-      <Card className={styles.panel} aria-label="공유 근거 요약"><h2>저장된 공유 근거</h2>
-        {detailResult === null ? <LoadingSkeleton label="공유 근거를 불러오는 중" /> : detail === null ? <DetailFailure failure={detailResult.kind === 'success' ? invalidResponse(detailResult.status) : detailResult} onRetry={detailQuery.retry} /> : <RelationshipSummary detail={detail} />}
-      </Card>
-      <AnalysisFacts graph={graphData} detail={detail} clusterKey={clusterKey} />
+      <Card className={styles.panel} aria-label="공유 근거 요약"><h2>저장된 공유 근거</h2><GraphEvidenceSummary model={model} /></Card>
+      <AnalysisFacts graph={graphData} summary={summary} clusterKey={clusterKey} />
       <Card className={styles.panel} aria-label="주의사항"><h2>주의사항</h2>
         {graphData?.warnings.map((warning, index) => <p key={index} className={styles.warning} role="note">{warning}</p>)}
         <p>그룹 소속이나 조사 우선순위만으로 동일인 또는 부정거래를 판단하지 마세요.</p>
@@ -144,11 +137,6 @@ function SelectedCluster({ clusterKey }: { clusterKey: Track1ClusterKey }) {
       </Card>
     </div>
   </>
-}
-
-function DetailFailure({ failure, onRetry }: { failure: AdminApiFailure; onRetry: () => void }) {
-  const message = describeAdminApiFailure(failure, '군집을 찾을 수 없거나 접근 범위 밖입니다')
-  return <ErrorState title={message.title} description={message.description} onRetry={onRetry} />
 }
 
 function SelectionEvidence({ model, selectedId }: { model: GraphModel | null; selectedId: string | null }) {
@@ -176,33 +164,30 @@ function SelectionEvidence({ model, selectedId }: { model: GraphModel | null; se
   </>
 }
 
-const signalNames: Record<SharedSignalType, string> = { DEVICE_ID_HASH: '같은 기기 식별 신호', IP_HASH: '같은 네트워크(IP) 신호' }
-
-function RelationshipSummary({ detail }: { detail: Track1ClusterDetail }) {
-  const relationship = detail.relationship
-  if (relationship === undefined) return <p className={styles.muted}>이 서버 응답에는 공유 근거 요약이 없어 표시하지 않습니다.</p>
-  const signals = sharedSignalTypes.flatMap((type) => relationship.sharedSignals.filter((signal) => signal.type === type))
+/** 그래프 응답의 신호 노드와 간선만 집계한다. 원본 GDS 신호 전체로 설명하지 않는다. */
+function GraphEvidenceSummary({ model }: { model: GraphModel | null }) {
+  if (model === null) return <p className={styles.muted}>그래프 응답을 확인하기 전에는 표시하지 않습니다.</p>
+  const signals = model.nodes.filter((node) => node.kind === 'signal')
   return <>
     {signals.length === 0
-      ? <p className={styles.muted}>저장된 구성원끼리 공유한 기기나 IP 신호가 없습니다.</p>
-      : <ul className={styles.signalList}>{signals.map((signal) => <li key={signal.type}>
-        <strong>{signalNames[signal.type]}</strong>
-        <span>같은 저장 값을 가진 예매 기록 {signal.sharedMemberCount}건</span>
-        <span>이 신호로 이어지는 예매 기록 쌍 {signal.verifiedConnectionCount}개</span>
+      ? <p className={styles.muted}>이 그래프 응답에는 공유 신호 노드가 없습니다.</p>
+      : <ul className={styles.signalList}>{signals.map((signal) => <li key={signal.id}>
+        <strong>{signal.label}</strong>
+        <span>연결된 노드 {model.edges.filter((edge) => edge.source === signal.id || edge.target === signal.id).length}개</span>
       </li>)}</ul>}
-    <p className={styles.warning} role="note">{relationship.normalSharingNotice}</p>
+    <p className={styles.muted}>그래프 API가 제공한 노드와 간선만 집계했으며 원본 GDS 신호 전체가 아닙니다.</p>
   </>
 }
 
-function AnalysisFacts({ graph, detail, clusterKey }: { graph: Track1ClusterGraph | null; detail: Track1ClusterDetail | null; clusterKey: Track1ClusterKey }) {
+function AnalysisFacts({ graph, summary, clusterKey }: { graph: Track1ClusterGraph | null; summary: Track1ClusterSummary | null; clusterKey: Track1ClusterKey }) {
   return <Card className={styles.panel} aria-label="분석 정보"><h2>분석 정보</h2>
     <dl className={styles.factList}>
-      <div><dt>분석 방법</dt><dd>{detail ? formatAlgorithm(detail.cluster) : '확인되지 않음'}</dd></div>
+      <div><dt>분석 방법</dt><dd>{summary ? formatAlgorithm(summary) : '확인되지 않음'}</dd></div>
       <div><dt>그래프 알고리즘 버전</dt><dd>{graph ? graph.algorithmVersion ?? '기록 없음' : '확인되지 않음'}</dd></div>
-      <div><dt>분석 시각</dt><dd>{detail ? formatAnalyzedAt(detail.cluster.analyzedAt) : '확인되지 않음'}</dd></div>
-      <div><dt>조사 우선순위 (0~1)</dt><dd>{detail ? formatRiskScore(detail.cluster.riskScore) : '확인되지 않음'}<small className={styles.cellSub}>먼저 살펴볼 순서이며 부정거래 확률이 아닙니다.</small></dd></div>
-      <div><dt>저장된 구성원</dt><dd>{detail ? `${detail.cluster.storedMemberCount}건` : '확인되지 않음'}</dd></div>
-      <div><dt>근거 범위</dt><dd>{graph ? '저장된 근거만' : '확인되지 않음'}</dd></div>
+      <div><dt>분석 시각</dt><dd>{summary ? formatAnalyzedAt(summary.analyzedAt) : '확인되지 않음'}</dd></div>
+      <div><dt>조사 우선순위 (0~1)</dt><dd>{summary ? formatRiskScore(summary.riskScore) : '확인되지 않음'}<small className={styles.cellSub}>먼저 살펴볼 순서이며 부정거래 확률이 아닙니다.</small></dd></div>
+      <div><dt>저장된 구성원</dt><dd>{summary ? `${summary.storedMemberCount}건` : '확인되지 않음'}</dd></div>
+      <div><dt>근거 범위</dt><dd>{graph ? '저장 근거로 재구성한 그래프 (원본 GDS 투영 아님)' : '확인되지 않음'}</dd></div>
       <div><dt>원장 좌석</dt><dd>이 화면의 API 응답에 없어 표시하지 않습니다.</dd></div>
     </dl>
     <Link className={styles.detailLink} to={track1DetailRoute(clusterKey)}>그룹 상세 보기</Link>

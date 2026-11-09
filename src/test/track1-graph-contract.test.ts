@@ -6,7 +6,7 @@ const RAW_LABEL = 'raw-account-synthetic-9001'
 
 function graph(overrides: Record<string, unknown> = {}) {
   return {
-    analysisRequestId: 'run-1', clusterId: 'cluster-1', algorithmVersion: '1.0.0', coverage: 'STORED_EVIDENCE_ONLY', warnings: [],
+    analysisRequestId: 'run-1', clusterId: 'cluster-1', algorithmVersion: '1.0.0', coverage: 'STORED_EVIDENCE_RECONSTRUCTION', warnings: [],
     nodes: [
       { id: 'n-a1', label: RAW_LABEL, kind: 'ACCOUNT' },
       { id: 'n-a2', label: RAW_LABEL, kind: 'ACCOUNT' },
@@ -42,7 +42,8 @@ describe('Track 1 그래프 계약', () => {
     ['노드와 같은 간선 ID', { edges: [{ id: 'n-a1', source: 'n-a1', target: 'n-r1', kind: 'RESERVATION' }] }],
     ['RESERVATION 간선의 끝점 불일치', { edges: [{ id: 'e-1', source: 'n-a1', target: 'n-a2', kind: 'RESERVATION' }] }],
     ['신호 노드가 없는 SHARED_SIGNAL 간선', { edges: [{ id: 'e-1', source: 'n-a1', target: 'n-a2', kind: 'SHARED_SIGNAL' }] }],
-    ['다른 coverage', { coverage: 'COMPLETE' }],
+    ['알 수 없는 coverage', { coverage: 'COMPLETE' }],
+    ['목록과 상세의 coverage', { coverage: 'STORED_EVIDENCE_ONLY' }],
     ['warnings 누락', { warnings: undefined }],
   ])('%s 응답을 거부한다', (_name, overrides) => {
     expect(track1ClusterGraphSchema.safeParse(graph(overrides)).success).toBe(false)
@@ -55,6 +56,16 @@ describe('Track 1 그래프 계약', () => {
     expect(model.edges.map((edge) => [edge.id, edge.source, edge.target])).toEqual(graph().edges.map((edge) => [edge.id, edge.source, edge.target]))
     expect(model.edges.map((edge) => edge.relation)).toEqual(['reservation', 'shared-signal', 'shared-signal'])
     expect(model.edges[1].label).toBe('공유 기기')
+  })
+
+  it('signalType 값으로만 신호 종류를 구분하고 label에서 추측하지 않는다', () => {
+    const nodes = [
+      { id: 's-ip', label: '공유 기기 1', kind: 'SIGNAL', signalType: 'IP_HASH' },
+      { id: 's-none', label: '공유 IP 2', kind: 'SIGNAL' },
+      { id: 's-null', label: '공유 기기 3', kind: 'SIGNAL', signalType: null },
+    ]
+    const model = toGraphModel(track1ClusterGraphSchema.parse(graph({ nodes, edges: [] })))
+    expect(model.nodes.map((node) => node.graphLabel)).toEqual(['공유 IP 1', '공유 신호 1', '공유 신호 2'])
   })
 
   it('서버 label을 화면 모델로 옮기지 않는다', () => {

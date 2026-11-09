@@ -5,9 +5,10 @@ import type { SharedSignalType, Track1ClusterKey } from './track1Api'
 import type { SignalKind } from './demoData'
 import type { GraphEdge, GraphModel, GraphNode } from './track1Model'
 
-// PROPOSED 계약이다. Backend의 GET /api/v1/admin/track1/clusters/graph 구현이 확정되면 실제 DTO에 맞춰 조정한다.
-// signalType은 Frontend가 제안한 필드이며 값은 Backend Track1ClusterDto.SharedSignalType과 같다.
-// 서버 label에는 원본 식별자가 포함될 수 있으므로 검증만 하고 화면 모델로 옮기지 않는다.
+// Backend Track1ClusterDto.Graph(GET /api/v1/admin/track1/clusters/graph) 계약이다.
+// coverage는 MySQL 저장 근거로 재구성했다는 뜻이며 목록과 상세의 STORED_EVIDENCE_ONLY와 다른 값이다.
+// signalType은 Backend 추가가 진행 중인 선택 필드다. 없으면 일반 공유 신호로 표시하고 label에서 종류를 추측하지 않는다.
+// 서버 label은 검증만 하고 화면 모델로 옮기지 않는다.
 // demoData는 타입만 참조한다. 값을 가져오면 합성 데이터가 실제 화면 번들에 포함된다.
 
 const opaqueIdSchema = z.string().min(1).max(512)
@@ -47,7 +48,7 @@ export const track1ClusterGraphSchema = z.object({
   analysisRequestId: z.string().min(1),
   clusterId: z.string().min(1),
   algorithmVersion: z.string().min(1).nullable(),
-  coverage: z.literal('STORED_EVIDENCE_ONLY'),
+  coverage: z.literal('STORED_EVIDENCE_RECONSTRUCTION'),
   nodes: z.array(graphNodeSchema),
   edges: z.array(graphEdgeSchema),
   warnings: z.array(z.string().min(1).max(500)).max(50),

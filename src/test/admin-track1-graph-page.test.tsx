@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
@@ -42,7 +42,7 @@ const event = { id: EVENT_A, externalEventId: 'synthetic-a', name: '합성 공�
 const summary = (clusterId: string) => ({ analysisRequestId: 'run-1', clusterId, riskScore: 0.82, analysisAlgorithm: 'LOUVAIN', analysisAlgorithmVersion: '1.0.0', analyzedAt: '2026-10-08T10:15:30Z', storedMemberCount: 2 })
 const clusters = [summary('cluster-1'), summary('cluster-2')]
 const graph = (clusterId: string, overrides: Record<string, unknown> = {}) => ({
-  analysisRequestId: 'run-1', clusterId, algorithmVersion: 'graph-1.0.0', coverage: 'STORED_EVIDENCE_ONLY', warnings: ['합성 경고 문구'],
+  analysisRequestId: 'run-1', clusterId, algorithmVersion: 'graph-1.0.0', coverage: 'STORED_EVIDENCE_RECONSTRUCTION', warnings: ['합성 경고 문구'],
   nodes: [
     { id: 'node-opaque-a1', label: 'raw-account-synthetic-9001', kind: 'ACCOUNT' },
     { id: 'node-opaque-r1', label: 'raw-reservation-synthetic', kind: 'RESERVATION' },
@@ -54,7 +54,6 @@ const graph = (clusterId: string, overrides: Record<string, unknown> = {}) => ({
   ],
   ...overrides,
 })
-const detail = (clusterId: string) => ({ event, cluster: summary(clusterId), members: [], coverage: 'STORED_EVIDENCE_ONLY' })
 
 type GraphResponder = (clusterId: string) => Response
 function stub(graphResponse: GraphResponder = (clusterId) => json(200, graph(clusterId))) {
@@ -64,10 +63,11 @@ function stub(graphResponse: GraphResponder = (clusterId) => json(200, graph(clu
     if (url.pathname === '/api/v1/admin/events') return json(200, { items: [event], page: 0, pageSize: 100, totalItems: 1, hasNext: false })
     if (url.pathname === '/api/v1/admin/track1/clusters') return json(200, { event, items: clusters, page: 0, pageSize: 20, totalItems: 2, hasNext: false, coverage: 'STORED_EVIDENCE_ONLY' })
     if (url.pathname === '/api/v1/admin/track1/clusters/graph') return graphResponse(clusterId)
-    if (url.pathname === '/api/v1/admin/track1/clusters/detail') return json(200, detail(clusterId))
     throw new Error(`예상하지 못한 요청: ${url.pathname}`)
   }))
 }
+
+const requestedPaths = () => vi.mocked(fetch).mock.calls.map(([input]) => new URL(String(input), 'http://local').pathname)
 
 const renderPage = () => render(<MemoryRouter initialEntries={[ROUTE]}><App adminAuthAdapter={adapter()} /></MemoryRouter>)
 
@@ -84,6 +84,9 @@ describe('Track 1 관계 그래프 화면', () => {
     expect(screen.getByRole('button', { name: '1번째 그룹 구성원 2건, 조사 우선순위 0.82 LOUVAIN 1.0.0' })).toHaveAttribute('aria-current', 'true')
     expect(screen.getByText(/부정거래 확률이 아닙니다\.$/, { selector: 'small' })).toBeInTheDocument()
     expect(graphMock.created).toBe(1)
+    expect(within(screen.getByRole('region', { name: '분석 정보' })).getByText(/^0\.82/)).toBeInTheDocument()
+    expect(requestedPaths()).toContain('/api/v1/admin/track1/clusters/graph')
+    expect(requestedPaths()).not.toContain('/api/v1/admin/track1/clusters/detail')
     for (const raw of RAW) expect(document.body.textContent).not.toContain(raw)
     expect(document.querySelector('img[src="x"]')).toBeNull()
   })
