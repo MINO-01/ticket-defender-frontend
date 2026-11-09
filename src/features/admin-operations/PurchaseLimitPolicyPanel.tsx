@@ -52,7 +52,7 @@ export function PurchaseLimitPolicyPanel({ eventId }: { eventId: string }) {
   if (result === null) content = <LoadingSkeleton label="구매 한도 정책을 불러오는 중" />
   else if (result.kind !== 'success') {
     const message = result.kind === 'forbidden'
-      ? { title: '구매 한도 정책을 볼 역할이 없습니다', description: '고객사 관리자(TENANT_ADMIN)만 조회할 수 있습니다.' }
+      ? { title: '구매 한도 정책을 조회하지 못했습니다', description: '고객사 관리자(TENANT_ADMIN) 역할이 없거나, 이 서버에 구매 한도 정책 API가 아직 배포되지 않아 서버가 거부했습니다.' }
       : describeAdminApiFailure(result, '이 서버에 구매 한도 정책 API가 아직 없거나 공연이 접근 범위 밖입니다')
     content = <ErrorState title={message.title} description={message.description} onRetry={retry} />
   } else if (result.data.length === 0) {

@@ -207,6 +207,6 @@ describe('구매 한도 정책 조회', () => {
   it('403은 필요한 역할을 안내한다', async () => {
     stub(base(() => problem(403, 'ACCESS_DENIED')))
     open(route)
-    expect(await within(await region()).findByText('구매 한도 정책을 볼 역할이 없습니다')).toBeInTheDocument()
+    expect(await within(await region()).findByText('구매 한도 정책을 조회하지 못했습니다')).toBeInTheDocument()
   })
 })
