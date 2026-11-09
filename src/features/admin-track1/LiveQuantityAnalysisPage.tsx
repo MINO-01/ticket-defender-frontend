@@ -226,7 +226,7 @@ function RunResult({ run: listed, eventId }: { run: QuantityAnalysisRun; eventId
     {run.nettedExcludedRowCount > 0 && <p className={styles.muted}>취소와 환불로 제외된 행 {run.nettedExcludedRowCount}개</p>}
     {run.clusterCount !== null && <p>관계 군집 {run.clusterCount}개. <Link to={track1ListRoute(eventId)}>예매 관계 분석에서 보기</Link></p>}
     {run.clusters.length > 0 && <ul aria-label="관계 군집">{run.clusters.map((cluster) => <li key={cluster.clusterId}>구성원 {cluster.memberCount}건, 조사 우선순위 {cluster.riskScore.toFixed(4)}</li>)}</ul>}
-    <SharedSignalObservationPanel observations={run.sharedSignalObservations} />
+    <SharedSignalObservationPanel observations={run.sharedSignalObservations} count={run.sharedSignalObservationCount} />
     {evaluation && <>
       <p><strong>구매 한도 평가: {evaluationLabels[evaluation.status].label}</strong></p>
       <p className={styles.muted}>{evaluationLabels[evaluation.status].help}</p>

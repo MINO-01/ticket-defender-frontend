@@ -111,6 +111,7 @@ export const analysisRunSchema = z.object({
   evaluation: evaluationSchema.nullable(),
   // Data 계약의 대량 공유 관찰이다. Backend가 아직 반환하지 않으면 없다.
   sharedSignalObservations: sharedSignalObservationsSchema.optional(),
+  sharedSignalObservationCount: z.number().int().nonnegative().optional(),
   requestedAt: utcDateTime,
   completedAt: utcDateTime.nullable(),
 })

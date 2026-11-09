@@ -180,6 +180,19 @@ describe('구매 수량 분석', () => {
     expect(within(panel).getAllByText('미확인').length).toBe(2)
   })
 
+  it('목록의 빈 배열과 건수는 관찰 없음으로 표시하지 않고 단건 조회에서 상세를 보여 준다', async () => {
+    const observation = { observationId: 'obs-1', scopeType: 'PERFORMANCE', scopeId: PERF, signalType: 'IP', distinctAccountCount: 30, scopeAccountCount: 64, distinctReservationCount: 30, totalTicketQuantity: 30, ticketQuantityStatus: 'VERIFIED', corroboration: { paymentSharedAccountCount: 0, deviceSharedAccountCount: 0 }, ipNetworkType: null, purchaseWindowSeconds: 60, excludedFromLouvain: true }
+    stub({ [`GET ${RUNS}${LIST_QUERY}`]: () => json(200, page([run({ sharedSignalObservations: [], sharedSignalObservationCount: 1 })])), [`GET ${RUNS}/${RUN}`]: () => json(200, run({ sharedSignalObservations: [observation], sharedSignalObservationCount: 1 })) })
+    open()
+    const node = await region('분석 실행 결과')
+    expect(await within(node).findByText(/대량 공유 관찰 1건이 저장되어 있습니다/)).toBeInTheDocument()
+    expect(within(node).queryByText(/서버가 빈 목록을 반환했습니다/)).not.toBeInTheDocument()
+    fireEvent.click(within(node).getByRole('button', { name: '이 실행 다시 조회' }))
+    const panel = await within(node).findByRole('region', { name: '대량 공유 관찰' })
+    expect(within(panel).getByText('미확인')).toBeInTheDocument()
+    expect(within(panel).getByText('30매')).toBeInTheDocument()
+  })
+
   it('성공인데 평가가 없는 응답은 계약 위반으로 표시한다', async () => {
     stub({ [`GET ${RUNS}${LIST_QUERY}`]: () => json(200, page([run({ evaluation: null })])) })
     open()
