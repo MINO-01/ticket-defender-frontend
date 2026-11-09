@@ -121,9 +121,9 @@ function ClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey }) {
         <Card className={`${styles.panel} ${styles.graphPanel}`}>
           <div className={styles.sectionHeading}><div><h2>공유 근거</h2><p>서버가 저장된 기기와 IP 신호로 계산한 요약만 표시합니다. 연결 그래프는 그리지 않습니다.</p></div></div>
           <RelationshipEvidence relationship={result.data.relationship} />
-          {result.data.graph
-            ? <StoredGraph graph={result.data.graph} />
-            : <p className={styles.muted}>저장된 연결 관계 API가 없어 그래프를 표시하지 않습니다(BLOCKED). 요약 수치로 간선을 추정하지 않습니다.</p>}
+          {result.data.graph && result.data.graph.nodes.length > 0
+            ? <><StoredGraph graph={result.data.graph} /><p className={styles.muted}>저장된 기기와 IP 공유 근거만 그립니다. 결제와 주소 연결은 저장 근거가 없어 표시되지 않습니다.</p></>
+            : <p className={styles.muted}>서버에 저장된 연결 관계가 없어 그래프를 표시하지 않습니다. 요약 수치로 간선을 추정하지 않습니다.</p>}
         </Card>
         <Card id="cluster-members" className={styles.tableCard}>
           <div className={styles.sectionHeading}><h2>저장된 예매 기록</h2><span>{members.length}건</span></div>

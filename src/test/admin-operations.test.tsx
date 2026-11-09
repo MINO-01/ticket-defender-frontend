@@ -199,7 +199,7 @@ describe('운영 메뉴 실제 조회', () => {
     expect(within(status).getByText('사용 중')).toBeInTheDocument()
     expect(within(status).getByText('설정되지 않음')).toBeInTheDocument()
     expect(screen.queryByText(/must-not-render|internal-bucket/)).not.toBeInTheDocument()
-    expect(screen.getByRole('region', { name: '내 역할과 감사 담당 권한 (Backend 계약 대기)' })).toHaveTextContent('표시하지 않습니다')
+    expect(screen.getByRole('region', { name: '감사 담당 권한 (Backend 계약 대기)' })).toHaveTextContent('표시하지 않습니다')
     expect(screen.queryByRole('button', { name: /저장|변경/ })).not.toBeInTheDocument()
   })
 

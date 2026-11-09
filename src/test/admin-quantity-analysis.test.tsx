@@ -5,7 +5,7 @@ import App from '../App'
 import type { AdminAuthAdapter } from '../features/admin-auth/authAdapter'
 import { buildLedgerImport } from '../features/admin-track1/quantityAnalysisApi'
 
-// Backend Issue #81 PROPOSED 계약의 화면을 Mock 인증과 Mock fetch로 검증한다. 실제 Backend 연동 결과가 아니며 모든 값은 합성 데이터다.
+// Backend track1-quantity-v1 계약의 화면을 Mock 인증과 Mock fetch로 검증한다. 실제 Backend 연동 결과가 아니며 모든 값은 합성 데이터다.
 const SYNTHETIC_TOKEN = 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJzeW50aGV0aWMtYWRtaW4ifQ.c3ludGhldGljLXNpZ25hdHVyZQ'
 const EVENT = '33333333-3333-4333-8333-333333333333'
 const PERF = '77777777-7777-4777-8777-777777777771'
@@ -16,7 +16,7 @@ const IMPORTS = `${BASE}/ledger-imports`
 const RUNS = `${BASE}/analysis-runs`
 const LIST_QUERY = '?page=0&pageSize=20'
 const ROUTE = `/app/analysis/quantity?eventId=${EVENT}`
-const VALID_ROW = 'syn-account,syn-res,syn-line-1,2026-11-02T10:00:00Z,1,TICKET,ACTIVE'
+const VALID_ROW = 'syn-account,syn-res,syn-line-1,2026-11-02T10:00:00Z,1,TICKET,ACTIVE,,,syn-device,'
 
 const adapter = () => ({
   availability: { status: 'ready' },
@@ -30,8 +30,8 @@ const problem = (status: number, code: string) => new Response(JSON.stringify({ 
 const page = (items: unknown[]) => ({ items, page: 0, pageSize: 20, hasNext: false })
 const events = { items: [{ id: EVENT, externalEventId: 'syn', name: '합성 공연' }], page: 0, pageSize: 100, totalItems: 1, hasNext: false }
 const performance = { performanceId: PERF, eventId: EVENT, performanceRef: 'syn-perf', status: 'ACTIVE', revision: 1, sourceVersion: 'src', verifiedAt: '2026-11-01T00:00:00Z', withdrawnAt: null }
-const batch = (overrides = {}) => ({ batchId: BATCH, eventId: EVENT, performanceId: PERF, sourceVersion: 'syn-ledger-1', sourceAsOf: '2026-11-08T10:00:00Z', ledgerVersion: 1, status: 'ACCEPTED', inputRowCount: 1, acceptedRowCount: 1, rejectedRowCount: 0, errors: [], completedAt: '2026-11-08T10:01:00Z', ...overrides })
-const run = (overrides = {}) => ({ runId: RUN, eventId: EVENT, performanceId: PERF, ledgerBatchId: BATCH, sourceVersion: 'syn-ledger-1', executionStatus: 'SUCCEEDED', failureCode: null, retryable: false, policyId: null, policyVersion: 'r1', algorithmVersion: 'gds-2.6.6;projection-v2-account;score-v2-exp1', analysisRequestId: 'a1', clusterCount: 1, evaluation: { status: 'EVALUATED', policyVersion: 'r1', findings: [] }, requestedAt: '2026-11-08T10:02:00Z', completedAt: '2026-11-08T10:03:00Z', ...overrides })
+const batch = (overrides = {}) => ({ batchId: BATCH, eventId: EVENT, performanceId: PERF, inputType: 'INDIVIDUAL_TICKET', sourceVersion: 'syn-ledger-1', sourceAsOf: '2026-11-08T10:00:00Z', ledgerVersion: 1, quantityBasis: 'syn-basis', completeSnapshot: true, status: 'ACCEPTED', inputRowCount: 1, acceptedRowCount: 1, rejectedRowCount: 0, errors: [], completedAt: '2026-11-08T10:01:00Z', ...overrides })
+const run = (overrides = {}) => ({ runId: RUN, eventId: EVENT, performanceId: PERF, ledgerBatchId: BATCH, sourceVersion: 'syn-ledger-1', executionStatus: 'SUCCEEDED', failureCode: null, retryable: false, policyId: null, policyVersion: 'r1', algorithmVersion: 'gds-2.6.6;projection-v2-account;score-v2-exp1', analysisRequestId: 'a1', clusterCount: 1, clusters: [{ clusterId: 'c1', riskScore: 0.4, memberCount: 2 }], nettedExcludedRowCount: 0, evaluation: { status: 'EVALUATED', reasonCode: null, policyVersion: 'r1', findings: [] }, requestedAt: '2026-11-08T10:02:00Z', completedAt: '2026-11-08T10:03:00Z', ...overrides })
 
 type Call = { method: string; url: string; headers: Record<string, string>; body: unknown }
 type Handler = (count: number) => Response
@@ -71,7 +71,7 @@ describe('구매 수량 분석', () => {
     stub({ [`GET ${IMPORTS}${LIST_QUERY}`]: () => problem(status, code) })
     open()
     const node = await region('구매 수량 분석 사용 불가')
-    expect(within(node).getByText(/Backend Issue #81 API가 이 서버에 아직 배포되지 않았습니다/)).toBeInTheDocument()
+    expect(within(node).getByText(/이 서버에 구매 수량 API가 없습니다/)).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: '구매 수량 원장 반입' })).not.toBeInTheDocument()
     expect(screen.queryByText('반입된 원장이 없습니다')).not.toBeInTheDocument()
   })
@@ -92,19 +92,20 @@ describe('구매 수량 분석', () => {
     fireEvent.change(within(form).getByLabelText(/원장 버전/), { target: { value: 'syn-ledger-1' } })
     fireEvent.change(within(form).getByLabelText(/데이터 기준시각/), { target: { value: '2026-11-08T10:00:00Z' } })
     fireEvent.change(within(form).getByLabelText(/수량 산정 기준/), { target: { value: 'syn-basis' } })
+    fireEvent.change(within(form).getByLabelText(/완전한 스냅샷 여부/), { target: { value: 'true' } })
     const rows = within(form).getByLabelText(/티켓 또는 주문 라인 행/) as HTMLTextAreaElement
     rows.value = VALID_ROW
     fireEvent.click(within(form).getByRole('button', { name: '원장 반입' }))
     await waitFor(() => expect(calls.some((call) => call.method === 'POST')).toBe(true))
     const post = calls.find((call) => call.method === 'POST')!
-    expect(post.body).toEqual({ performanceId: PERF, inputType: 'INDIVIDUAL_TICKET', sourceVersion: 'syn-ledger-1', sourceAsOf: '2026-11-08T10:00:00Z', quantityBasis: 'syn-basis', rows: [{ accountReference: 'syn-account', reservationReference: 'syn-res', ticketReference: 'syn-line-1', purchasedAt: '2026-11-02T10:00:00Z', quantity: 1, quantityUnit: 'TICKET', ticketStatus: 'ACTIVE' }] })
+    expect(post.body).toEqual({ performanceId: PERF, inputType: 'INDIVIDUAL_TICKET', sourceVersion: 'syn-ledger-1', sourceAsOf: '2026-11-08T10:00:00Z', quantityBasis: 'syn-basis', completeSnapshot: true, rows: [{ accountReference: 'syn-account', reservationReference: 'syn-res', ticketReference: 'syn-line-1', purchasedAt: '2026-11-02T10:00:00Z', quantity: 1, quantityUnit: 'TICKET', ticketStatus: 'ACTIVE', deviceReference: 'syn-device' }] })
     expect(post.headers['Idempotency-Key']).toMatch(/^[0-9a-f-]{36}$/)
     await waitFor(() => expect(rows.value).toBe(''))
     await waitFor(() => expect(calls.filter((call) => call.url === `${IMPORTS}${LIST_QUERY}`).length).toBeGreaterThan(1))
   })
 
   it('수락된 배치로 분석을 요청한다', async () => {
-    const calls = stub({ [`GET ${IMPORTS}${LIST_QUERY}`]: () => json(200, page([batch()])), [`POST ${RUNS}`]: () => json(202, run({ executionStatus: 'QUEUED', evaluation: null, clusterCount: null, completedAt: null })) })
+    const calls = stub({ [`GET ${IMPORTS}${LIST_QUERY}`]: () => json(200, page([batch()])), [`POST ${RUNS}`]: () => json(202, run()) })
     open()
     const form = await region('Louvain과 구매 한도 분석 실행')
     fireEvent.click(await within(form).findByRole('button', { name: '분석 실행' }))
@@ -121,7 +122,7 @@ describe('구매 수량 분석', () => {
   })
 
   it('한도 초과는 조사 신호로 표시하고 예매별 수량을 함께 보여 준다', async () => {
-    stub({ [`GET ${RUNS}${LIST_QUERY}`]: () => json(200, page([run({ evaluation: { status: 'EVALUATED', policyVersion: 'r1', findings: [{ accountToken: 'tok-account-123456', effectiveTicketQuantity: 3, maxTicketsPerAccount: 2, policyVersion: 'r1', reservationQuantities: [{ reservationToken: 'tok-res-1234567', effectiveTicketQuantity: 3 }] }] } })])) })
+    stub({ [`GET ${RUNS}${LIST_QUERY}`]: () => json(200, page([run({ evaluation: { status: 'EVALUATED', reasonCode: null, policyVersion: 'r1', findings: [{ accountToken: 'tok-account-123456', effectiveTicketQuantity: 3, maxTicketsPerAccount: 2, policyVersion: 'r1', reservationQuantities: [{ reservationToken: 'tok-res-1234567', effectiveTicketQuantity: 3 }] }] } })])) })
     open()
     const node = await region('분석 실행 결과')
     expect(await within(node).findByText(/유효 3매, 한도 2매/)).toBeInTheDocument()
@@ -133,19 +134,63 @@ describe('구매 수량 분석', () => {
     ['QUANTITY_DATA_INCOMPLETE', /수량 자료 불완전/],
     ['POLICY_TIME_NOT_APPLICABLE', /정책 기간 불일치/],
   ])('%s는 초과 없음으로 표시하지 않는다', async (status, label) => {
-    stub({ [`GET ${RUNS}${LIST_QUERY}`]: () => json(200, page([run({ evaluation: { status, policyVersion: null, findings: [] } })])) })
+    stub({ [`GET ${RUNS}${LIST_QUERY}`]: () => json(200, page([run({ evaluation: { status, reasonCode: 'NEW_REASON', policyVersion: null, findings: [] } })])) })
     open()
     const node = await region('분석 실행 결과')
     expect(await within(node).findByText(label, { selector: 'strong' })).toBeInTheDocument()
     expect(within(node).queryByText('이 정책 기준의 계정별 한도 초과 신호가 없습니다.')).not.toBeInTheDocument()
+    expect(within(node).getByText(/알 수 없는 서버 사유 \(NEW_REASON\)/)).toBeInTheDocument()
   })
 
   it('분석 실패는 실패로 표시하고 결과를 만들지 않는다', async () => {
-    stub({ [`GET ${RUNS}${LIST_QUERY}`]: () => json(200, page([run({ executionStatus: 'FAILED', failureCode: 'ANALYSIS_UNAVAILABLE', retryable: true, evaluation: null, clusterCount: null })])) })
+    stub({ [`GET ${RUNS}${LIST_QUERY}`]: () => json(200, page([run({ executionStatus: 'FAILED', failureCode: 'ANALYZER_TIMEOUT', retryable: true, evaluation: null, clusterCount: null, clusters: [] })])) })
     open()
     const node = await region('분석 실행 결과')
-    expect(await within(node).findByText(/분석에 실패했습니다 \(ANALYSIS_UNAVAILABLE\)/)).toBeInTheDocument()
+    expect(await within(node).findByText(/분석에 실패했습니다: 분석 서버 응답 시간 초과 \(ANALYZER_TIMEOUT\)/)).toBeInTheDocument()
     expect(within(node).queryByText(/구매 한도 평가/)).not.toBeInTheDocument()
+  })
+
+  it('완전한 스냅샷 여부를 고르지 않으면 보내지 않는다', () => {
+    const built = buildLedgerImport({ performanceId: PERF, sourceVersion: 'v', sourceAsOf: '2026-11-08T10:00:00Z', quantityBasis: 'b', completeSnapshot: null, rowsText: VALID_ROW })
+    expect(built.ok).toBe(false)
+  })
+
+  it('실행 하나를 단건 조회로 갱신하고 다른 실행 응답은 표시하지 않는다', async () => {
+    const calls = stub({ [`GET ${RUNS}${LIST_QUERY}`]: () => json(200, page([run({ executionStatus: 'RUNNING', evaluation: null, clusterCount: null, clusters: [], completedAt: null })])), [`GET ${RUNS}/${RUN}`]: () => json(200, run()) })
+    open()
+    const node = await region('분석 실행 결과')
+    fireEvent.click(await within(node).findByRole('button', { name: '이 실행 다시 조회' }))
+    expect(await within(node).findByText('완료 (SUCCEEDED)')).toBeInTheDocument()
+    expect(calls.some((call) => call.url === `${RUNS}/${RUN}`)).toBe(true)
+  })
+
+  it('서버가 대량 공유 관찰을 주지 않으면 BLOCKED로 표시한다', async () => {
+    stub({ [`GET ${RUNS}${LIST_QUERY}`]: () => json(200, page([run()])) })
+    open()
+    expect(await within(await region('분석 실행 결과')).findByText(/서버가 아직 이 값을 제공하지 않습니다\(BLOCKED\)/)).toBeInTheDocument()
+  })
+
+  it('대량 공유 관찰은 군집과 분리하고 미확인 값을 만들지 않는다', async () => {
+    const observation = { observationId: 'obs-1', scopeType: 'PERFORMANCE', scopeId: PERF, signalType: 'IP', distinctAccountCount: 20, scopeAccountCount: 64, distinctReservationCount: 20, totalTicketQuantity: null, ticketQuantityStatus: 'UNAVAILABLE', corroboration: { paymentSharedAccountCount: 0, deviceSharedAccountCount: 0 }, ipNetworkType: 'UNKNOWN', purchaseWindowSeconds: null, excludedFromLouvain: true }
+    stub({ [`GET ${RUNS}${LIST_QUERY}`]: () => json(200, page([run({ sharedSignalObservations: [observation] })])) })
+    open()
+    const panel = await within(await region('분석 실행 결과')).findByRole('region', { name: '대량 공유 관찰' })
+    expect(within(panel).getByText(/Louvain 군집과 별개의 관찰입니다/)).toBeInTheDocument()
+    expect(within(panel).getByText('허브로 제외됨')).toBeInTheDocument()
+    expect(within(panel).getAllByText('미확인').length).toBe(2)
+  })
+
+  it('목록의 빈 배열과 건수는 관찰 없음으로 표시하지 않고 단건 조회에서 상세를 보여 준다', async () => {
+    const observation = { observationId: 'obs-1', scopeType: 'PERFORMANCE', scopeId: PERF, signalType: 'IP', distinctAccountCount: 30, scopeAccountCount: 64, distinctReservationCount: 30, totalTicketQuantity: 30, ticketQuantityStatus: 'VERIFIED', corroboration: { paymentSharedAccountCount: 0, deviceSharedAccountCount: 0 }, ipNetworkType: null, purchaseWindowSeconds: 60, excludedFromLouvain: true }
+    stub({ [`GET ${RUNS}${LIST_QUERY}`]: () => json(200, page([run({ sharedSignalObservations: [], sharedSignalObservationCount: 1 })])), [`GET ${RUNS}/${RUN}`]: () => json(200, run({ sharedSignalObservations: [observation], sharedSignalObservationCount: 1 })) })
+    open()
+    const node = await region('분석 실행 결과')
+    expect(await within(node).findByText(/대량 공유 관찰 1건이 저장되어 있습니다/)).toBeInTheDocument()
+    expect(within(node).queryByText(/서버가 빈 목록을 반환했습니다/)).not.toBeInTheDocument()
+    fireEvent.click(within(node).getByRole('button', { name: '이 실행 다시 조회' }))
+    const panel = await within(node).findByRole('region', { name: '대량 공유 관찰' })
+    expect(within(panel).getByText('미확인')).toBeInTheDocument()
+    expect(within(panel).getByText('30매')).toBeInTheDocument()
   })
 
   it('성공인데 평가가 없는 응답은 계약 위반으로 표시한다', async () => {
@@ -158,19 +203,20 @@ describe('구매 수량 분석', () => {
 })
 
 describe('수량 원장 입력 해석', () => {
-  const form = { performanceId: PERF, sourceVersion: 'v', sourceAsOf: '2026-11-08T10:00:00Z', quantityBasis: 'b' }
+  const form = { performanceId: PERF, sourceVersion: 'v', sourceAsOf: '2026-11-08T10:00:00Z', quantityBasis: 'b', completeSnapshot: true }
 
   it('같은 예매의 여러 라인을 각각 유지한다', () => {
-    const built = buildLedgerImport({ ...form, rowsText: `${VALID_ROW}\nsyn-account,syn-res,syn-line-2,2026-11-02T10:00:00Z,2,ORDER_LINE,ACTIVE` })
+    const built = buildLedgerImport({ ...form, rowsText: `${VALID_ROW}\nsyn-account,syn-res,syn-line-2,2026-11-02T10:00:00Z,2,ORDER_LINE,ACTIVE,,,syn-device,` })
     expect(built.ok && built.body.rows.map((row) => [row.ticketReference, row.quantity, row.quantityUnit])).toEqual([['syn-line-1', 1, 'TICKET'], ['syn-line-2', 2, 'ORDER_LINE']])
   })
 
   it.each([
-    ['시간대 없는 구매시각', 'a,r,l,2026-11-02T10:00:00,1,TICKET,ACTIVE'],
-    ['수량 0', 'a,r,l,2026-11-02T10:00:00Z,0,TICKET,ACTIVE'],
-    ['알 수 없는 상태', 'a,r,l,2026-11-02T10:00:00Z,1,TICKET,VALID'],
-    ['알 수 없는 단위', 'a,r,l,2026-11-02T10:00:00Z,1,SEAT,ACTIVE'],
+    ['시간대 없는 구매시각', 'a,r,l,2026-11-02T10:00:00,1,TICKET,ACTIVE,p,,,'],
+    ['수량 0', 'a,r,l,2026-11-02T10:00:00Z,0,TICKET,ACTIVE,p,,,'],
+    ['알 수 없는 상태', 'a,r,l,2026-11-02T10:00:00Z,1,TICKET,VALID,p,,,'],
+    ['알 수 없는 단위', 'a,r,l,2026-11-02T10:00:00Z,1,SEAT,ACTIVE,p,,,'],
     ['빠진 값', 'a,r,l,2026-11-02T10:00:00Z,1,TICKET'],
+    ['관계 참조 없음', 'a,r,l,2026-11-02T10:00:00Z,1,TICKET,ACTIVE,,,,'],
   ])('%s은 보내지 않고 입력 값을 오류에 넣지 않는다', (_name, rowsText) => {
     const built = buildLedgerImport({ ...form, rowsText })
     expect(built.ok).toBe(false)

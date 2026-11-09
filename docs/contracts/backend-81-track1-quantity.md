@@ -1,6 +1,6 @@
 # Backend Issue #81 연동 계약 (PROPOSED)
 
-상태: **PROPOSED, Backend 미확정.** Issue #81은 필요한 정보만 정의하고 Endpoint를 확정하지 않았습니다. 아래는 Frontend가 구현해 둔 형식입니다. Backend 계약이 다르면 Frontend `src/features/admin-track1/quantityAnalysisApi.ts`를 맞춥니다. Backend를 이 문서에 맞추라는 지시가 아닙니다.
+상태: **대체됨.** 실제 계약은 Backend `docs/api/track1-quantity-v1.md`와 `.yaml`(main a4be847)이며 Frontend `quantityAnalysisApi.ts`는 그 계약에 맞췄습니다. 아래는 제안 당시 기록이고 `QUEUED`는 실제로 없습니다. 시연 공백은 `docs/contracts/demo-v1-gaps.md`를 봅니다.
 
 공통: 관리자 JWT, 서버 권한 판단, 범위 밖은 404, 역할 없음은 403, 오류는 `application/problem+json`의 `code`. 시각은 오프셋 포함 UTC. 원문 계정과 예매 참조는 응답에 넣지 않습니다.
 

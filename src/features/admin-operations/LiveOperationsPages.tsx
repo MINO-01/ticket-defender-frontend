@@ -19,6 +19,7 @@ import { caseDetailRoute, caseListPath, casePageSchema, caseTypeLabels } from '.
 import { AdminEventGate } from '../admin-events/AdminEventGate'
 import type { AdminEvent } from '../admin-events/adminEventsApi'
 import { BackendAuthCheckPanel } from '../admin-settings/BackendAuthCheckPanel'
+import { EventAuditPanel, MyAccessPanel } from './AdminConsolePanels'
 import { PurchaseLimitPolicyPanel } from './PurchaseLimitPolicyPanel'
 import { StatusPill } from '../admin-track2/StatusPill'
 import { analysisStatusLabels, executionStatusLabels, fanReportDetailRoute, fanReportPageSchema, formatUtc, intakeStatusHelp, intakeStatusLabels } from '../admin-track2/track2Api'
@@ -169,7 +170,7 @@ export function AuditRoute() {
 function AuditPage() {
   return <div className={styles.page}>
     <PageHeader eyebrow="운영" title="감사 기록" description={`${terms.case}별로 서버에 저장된 활동 기록(상태 변경, 담당자 지정, 근거 연결, 보고서와 승인 관련 기록)을 확인합니다. 기록은 수정할 수 없습니다.`} />
-    <AdminEventGate>{(event) => <CaseAudit key={event.id} event={event} />}</AdminEventGate>
+    <AdminEventGate>{(event) => <><EventAuditPanel key={`audit:${event.id}`} eventId={event.id} /><CaseAudit key={event.id} event={event} /></>}</AdminEventGate>
     <PendingContract title="고객사 전체 감사 로그">
       <p>조사 사건에 속하지 않은 기록(로그인, 증거 열람, 공식 PDF 다운로드, 설정 변경 등)을 함께 보는 고객사 단위 감사 로그 조회 API가 없습니다. 필요한 응답 계약은 docs/contracts/backend-requests.md의 감사 기록 조회 항목에 정리했습니다.</p>
     </PendingContract>
@@ -236,8 +237,9 @@ function SettingsPage() {
     </Card>
     <AdminEventGate>{(event) => <><OperationStatus key={event.id} eventId={event.id} /><PurchaseLimitPolicyPanel key={`policy:${event.id}`} eventId={event.id} /></>}</AdminEventGate>
     <BackendAuthCheckPanel />
-    <PendingContract title="내 역할과 감사 담당 권한">
-      <p>로그인한 계정의 전체 역할 목록, 고객사 이름, 감사 담당(AUDITOR) 역할과 권한은 아직 서버에 없어 표시하지 않습니다. 설정 변경 기능도 제공하지 않습니다.</p>
+    <MyAccessPanel />
+    <PendingContract title="감사 담당 권한">
+      <p>고객사 이름과 감사 담당(AUDITOR) 역할은 아직 서버에 없어 표시하지 않습니다. 설정 변경 기능도 제공하지 않습니다.</p>
     </PendingContract>
   </div>
 }

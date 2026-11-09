@@ -105,11 +105,11 @@ export const track1ClusterDetailSchema = z.object({
   members: z.array(memberSchema),
   relationship: relationshipSchema.optional(),
   coverage: coverageSchema,
-  // Backend에 제안한 저장 간선 응답이다. 서버가 주지 않으면 그래프를 만들지 않는다.
+  // 저장된 기기와 IP 공유 근거만 담는다. 결제, 주소 간선과 예매 노드는 저장 근거가 없어 서버가 주지 않는다.
   graph: z.object({
-    nodes: z.array(z.object({ id: z.string().min(1), kind: z.enum(['account', 'signal', 'reservation']), label: z.string().min(1).max(64) })).min(1),
+    nodes: z.array(z.object({ id: z.string().min(1), kind: z.enum(['account', 'signal', 'reservation']), label: z.string().min(1).max(64) })),
     edges: z.array(z.object({ id: z.string().min(1), source: z.string().min(1), target: z.string().min(1), signalKind: z.enum(['PAYMENT', 'DEVICE', 'ADDRESS', 'IP']).nullable() })),
-  }).refine((graph) => { const ids = new Set(graph.nodes.map((node) => node.id)); return graph.edges.every((edge) => ids.has(edge.source) && ids.has(edge.target)) }).optional(),
+  }).refine((graph) => { const ids = new Set(graph.nodes.map((node) => node.id)); return graph.edges.every((edge) => ids.has(edge.source) && ids.has(edge.target)) }).nullable().optional(),
 })
 
 export type Track1ClusterSummary = z.infer<typeof summarySchema>

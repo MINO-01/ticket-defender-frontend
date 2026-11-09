@@ -9,6 +9,7 @@ import { Input, Select, Textarea } from '../../components/common/FormControls'
 import { PageHeader } from '../../components/common/PageHeader'
 import { AdminPagePlaceholder } from '../../pages/admin/AdminPagePlaceholder'
 import { useAdminAuth } from '../admin-auth/AdminAuthProvider'
+import { useAdminQuery } from '../admin-auth/useAdminQuery'
 import { MutationStatus } from '../admin-cases/MutationStatus'
 import { useCaseMutation } from '../admin-cases/useCaseMutation'
 import type { SettledAttempt } from '../admin-cases/useCaseMutation'
@@ -21,7 +22,7 @@ import { StatusPill } from '../admin-track2/StatusPill'
 import { formatUtc } from '../admin-track2/track2Api'
 import trackStyles from '../admin-track2/Track2.module.css'
 import {
-  buildImportRequest, importErrorCodeLabels, importMessages, importResultSchema, importStatusLabels, isSyntheticImportUiEnabled,
+  buildImportRequest, importErrorCodeLabels, importHistorySchema, reservationImportHistoryPath, importMessages, importResultSchema, importStatusLabels, isSyntheticImportUiEnabled,
   matchesImport, maxImportRows, maxRowsTextLength, reservationImportPath, summarizeImport,
 } from './reservationImportApi'
 import type { ImportFormErrors, ImportRequestBody, ImportResult, SentImport } from './reservationImportApi'
@@ -155,7 +156,24 @@ function ImportForm({ eventId, eventName, performances, onRejected }: { eventId:
       <p className={trackStyles.subtleNote}>회차 등록과 철회는 <Link to={verifiedPerformanceRoute(eventId)}>검증 회차 관리</Link>에서 합니다.</p>
     </Card>
     {attempt?.kind === 'succeeded' && <ImportResultView result={attempt.data} />}
+    <ImportHistory key={attempt?.kind === 'succeeded' ? attempt.key : 'initial'} eventId={eventId} />
   </>
+}
+
+/** 서버에 기록된 반입 배치 이력이다. 조회 실패를 빈 이력으로 바꾸지 않는다. */
+function ImportHistory({ eventId }: { eventId: string }) {
+  const { result, retry } = useAdminQuery(reservationImportHistoryPath(eventId), importHistorySchema)
+  let body
+  if (result === null) body = <LoadingSkeleton label="반입 이력을 불러오는 중" />
+  else if (result.kind !== 'success') {
+    const message = describeAdminApiFailure(result, '공연을 찾을 수 없거나 접근 범위 밖입니다')
+    body = <ErrorState title={message.title} description={message.description} onRetry={retry} />
+  } else if (result.data.items.length === 0) body = <EmptyState title="반입 이력이 없습니다" description="서버가 빈 목록을 반환했습니다." />
+  else body = <ul aria-label="반입 배치">{result.data.items.map((item) => <li key={item.batchId}>{item.sourceVersion}: {importStatusLabels[item.status]}, 입력 {item.inputRowCount}, 수락 {item.acceptedRowCount}, 거부 {item.rejectedRowCount}, {formatUtc(item.completedAt)}</li>)}</ul>
+  return <Card className={trackStyles.panel} aria-label="반입 이력">
+    <h2>반입 이력</h2>
+    {body}
+  </Card>
 }
 
 function ImportResultView({ result }: { result: ImportResult }) {

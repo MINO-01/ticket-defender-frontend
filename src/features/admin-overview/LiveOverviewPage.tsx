@@ -17,10 +17,11 @@ import { track1ClusterPageSchema, track1ListRoute } from '../admin-track1/track1
 import { terms } from '../../app/terms'
 import { verifiedPerformanceRoute } from '../admin-track2/candidatePipelineApi'
 import { analysisRunPageSchema, analysisRunsPath, isAnalysisRunPageFor } from '../admin-operations/operationsApi'
+import { workflowSummaryPath, workflowSummarySchema } from '../admin-operations/adminConsoleApi'
 import { fanReportListRoute, fanReportPageSchema, formatUtc, intakeStatusLabels } from '../admin-track2/track2Api'
 import type { IntakeStatus } from '../admin-track2/track2Api'
 import {
-  isClusterCountFor, isFanReportCountFor, isRecentCasesFor, overviewClusterCountPath, overviewFanReportCountPath, overviewIntakeCountPath, overviewRecentCasesPath, recentCasePageSize, unresolvedIntakeStatuses,
+  isClusterCountFor, isFanReportCountFor, isRecentCasesFor, isWorkflowSummaryFor, overviewClusterCountPath, overviewFanReportCountPath, overviewIntakeCountPath, overviewRecentCasesPath, recentCasePageSize, unresolvedIntakeStatuses,
 } from './overviewApi'
 import styles from './Overview.module.css'
 
@@ -50,6 +51,7 @@ function EventOverview({ event }: { event: AdminEvent }) {
     <div className={styles.grid}>
       <FanReportSection eventId={event.id} />
       <ClusterSection eventId={event.id} />
+      <WorkflowSummarySection eventId={event.id} />
       <UnresolvedIntakeSection eventId={event.id} />
       <RecentAnalysisSection eventId={event.id} />
       <RecentCaseSection eventId={event.id} />
@@ -132,6 +134,33 @@ function ClusterSection({ eventId }: { eventId: string }) {
   return <Section title="연결된 예매 그룹 (예매 관계 분석)" role="고객사 관리자, 분석, 검토, 승인 담당">
     {body}
     <div className={styles.links}><Link to={track1ListRoute(eventId)}>예매 관계 분석</Link></div>
+  </Section>
+}
+
+function SummaryCounts({ title, counts }: { title: string; counts: Record<string, number> }) {
+  const entries = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b))
+  return <div><h3>{title}</h3>{entries.length === 0
+    ? <p className={styles.empty}>서버에 저장된 행이 없습니다.</p>
+    : <ul className={styles.caseList}>{entries.map(([status, value]) => <li key={status}><span>{status}</span> <strong>{value.toLocaleString('ko-KR')}건</strong></li>)}</ul>}</div>
+}
+
+function WorkflowSummarySection({ eventId }: { eventId: string }) {
+  const { result, retry } = useAdminQuery(workflowSummaryPath(eventId), workflowSummarySchema)
+  let body: ReactNode
+  if (result === null) body = <LoadingSkeleton label="업무 진행 집계를 불러오는 중" />
+  else {
+    const outcome = checked(result, (data) => isWorkflowSummaryFor(eventId, data))
+    body = 'failure' in outcome
+      ? <SectionFailure failure={outcome.failure} forbidden="업무 진행 집계를 조회할 역할이 없습니다." onRetry={retry} />
+      : <>
+        <SummaryCounts title="조사 사건" counts={outcome.data.casesByStatus} />
+        <SummaryCounts title="승인 요청" counts={outcome.data.approvalRequestsByStatus} />
+        <SummaryCounts title="구매 수량 분석" counts={outcome.data.track1QuantityRunsByStatus} />
+      </>
+  }
+  return <Section title="업무 진행 집계" role="조회 역할">
+    <p className={styles.note}>서버에 저장된 행의 상태별 집계입니다. 판정 결과가 아닙니다.</p>
+    {body}
   </Section>
 }
 
