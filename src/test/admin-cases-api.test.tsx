@@ -564,7 +564,7 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     for (const name of ['상태 변경', '담당자 변경', 'EvidenceSnapshot', '보고서 초안']) expect(screen.getByRole('region', { name })).toBeInTheDocument()
     expect(screen.queryByText(/DEMO-|합성 데모 데이터|시연 담당/)).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: '← 조사 사건 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
-    expect([...requestedUrls(fetchMock)].sort()).toEqual([detailPath(), workflowPath(), sourcesPath(), linksPath(), snapshotsPath(), reportVersionsPath(), activitiesPath(), approvalAuditPath()].sort())
+    expect([...requestedUrls(fetchMock)].sort()).toEqual([detailPath(), workflowPath(), sourcesPath(), sourcesPath(), linksPath(), snapshotsPath(), snapshotsPath(), reportVersionsPath(), reportVersionsPath(), activitiesPath(), approvalAuditPath(), `/api/v1/cases/${CASE_1}/evidence-verifications?page=0&pageSize=20`].sort())
   })
 
   it.each([
@@ -606,7 +606,7 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     expect(screen.getByRole('link', { name: '← 조사 사건 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
     await screen.findByRole('region', { name: '활동 이력' })
     await screen.findByText('승인 감사 이력이 없습니다')
-    expect([...requestedUrls(fetchMock)].sort()).toEqual([detailPath(), workflowPath(), sourcesPath(), linksPath(), snapshotsPath(), reportVersionsPath(), activitiesPath(), approvalAuditPath()].sort())
+    expect([...requestedUrls(fetchMock)].sort()).toEqual([detailPath(), workflowPath(), sourcesPath(), sourcesPath(), linksPath(), snapshotsPath(), snapshotsPath(), reportVersionsPath(), reportVersionsPath(), activitiesPath(), approvalAuditPath(), `/api/v1/cases/${CASE_1}/evidence-verifications?page=0&pageSize=20`].sort())
   })
 
   it('UUID가 아닌 Case 주소나 잘못된 공연 값은 API를 호출하지 않는다', async () => {

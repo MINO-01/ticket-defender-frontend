@@ -19,6 +19,7 @@ import { caseDetailRoute, caseListPath, casePageSchema, caseTypeLabels } from '.
 import { AdminEventGate } from '../admin-events/AdminEventGate'
 import type { AdminEvent } from '../admin-events/adminEventsApi'
 import { BackendAuthCheckPanel } from '../admin-settings/BackendAuthCheckPanel'
+import { PurchaseLimitPolicyPanel } from './PurchaseLimitPolicyPanel'
 import { StatusPill } from '../admin-track2/StatusPill'
 import { analysisStatusLabels, executionStatusLabels, fanReportDetailRoute, fanReportPageSchema, formatUtc, intakeStatusHelp, intakeStatusLabels } from '../admin-track2/track2Api'
 import type { FanReportPage, IntakeStatus } from '../admin-track2/track2Api'
@@ -233,7 +234,7 @@ function SettingsPage() {
       <h2>현재 세션</h2>
       <p className={styles.note}>인증된 관리자 세션입니다. 화면은 토큰 내용에서 역할을 추정하지 않으며, 권한이 없는 작업은 서버가 403으로 거부합니다.</p>
     </Card>
-    <AdminEventGate>{(event) => <OperationStatus key={event.id} eventId={event.id} />}</AdminEventGate>
+    <AdminEventGate>{(event) => <><OperationStatus key={event.id} eventId={event.id} /><PurchaseLimitPolicyPanel key={`policy:${event.id}`} eventId={event.id} /></>}</AdminEventGate>
     <BackendAuthCheckPanel />
     <PendingContract title="내 역할과 감사 담당 권한">
       <p>로그인한 계정의 전체 역할 목록, 고객사 이름, 감사 담당(AUDITOR) 역할과 권한은 아직 서버에 없어 표시하지 않습니다. 설정 변경 기능도 제공하지 않습니다.</p>
