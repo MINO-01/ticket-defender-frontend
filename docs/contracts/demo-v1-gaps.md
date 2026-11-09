@@ -2,6 +2,8 @@
 
 기준: Backend main `a4be847`, Frontend `feat/final-demo-backend81-alignment-20261110`. 없는 API는 Frontend에서 추측해 호출하지 않습니다.
 
+갱신: Backend `feat/capstone-demo-v1-backend` `db47220`(main 미병합)이 DEMO_V1 후보 허용과 `sharedSignalObservations`를 구현했습니다. 실행 목록은 건수만 주고 상세는 단건 조회로 주며 `ipNetworkType`은 `null`일 수 있어 Frontend를 맞췄습니다. 아래 표는 그 브랜치 병합 전 main 기준입니다. 수량 원장에는 네트워크 유형 입력이 없어 R4, N2 유형은 미확인으로 표시됩니다.
+
 ## DEMO_V1 승인 정책 (미구현)
 
 현재 Backend는 승인 근거 적격성을 차단합니다. Case에 `LISTING_CANDIDATE_MATCH`가 있으면 `APPROVAL_BASIS_BLOCKED`, 무결성 평가의 `approvalEligibility`는 항상 `BLOCKED`입니다.
