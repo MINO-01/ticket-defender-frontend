@@ -10,7 +10,7 @@ export const adminPages = [
   { path: 'fan-reports', label: '팬 제보 조사', group: '조사', support: 'live', description: '팬 제보를 열어 이미지 정보 추출, 검증 회차 연결, 예매 기록 비교, 조사 사건 생성을 진행합니다.' },
   { path: 'verified-performances', label: '검증 회차 관리', group: '조사', support: 'live', description: '공연의 검증된 회차를 등록하고 관리합니다. 예매 기록 비교의 기준이 됩니다.' },
   { path: 'analysis/findings', label: '예매 관계 분석', group: '조사', support: 'live', description: '저장된 연결된 예매 그룹을 조사 우선순위 순으로 확인하고 조사 사건으로 연결합니다.' },
-  { path: 'analysis/quantity', label: '구매 수량 분석', group: '조사', support: 'pending', description: '티켓 또는 주문 라인 원장을 반입하고 관계 분석과 구매 한도 평가를 실행합니다. Backend Issue #81 API가 필요합니다.' },
+  { path: 'analysis/quantity', label: '구매 수량 분석', group: '조사', support: 'live', description: '티켓 또는 주문 라인 원장을 반입하고 관계 분석과 구매 한도 평가를 실행합니다.' },
   { path: 'cases', label: '조사 사건', group: '조사', support: 'live', description: '조사 사건의 상태, 연결 근거, 담당자, 보고서 초안, 승인과 발급 기록 연결을 관리합니다.' },
   { path: 'approvals', label: '보고서 승인 요청', group: '검토', support: 'partial', description: '조사 보고서 초안의 승인 요청을 열어 독립 검토와 결정을 진행합니다.' },
   { path: 'report-center', label: '조사 보고서 발급', group: '검토', support: 'partial', description: '승인 결정을 기준으로 공식 보고서 PDF 발급 가능 여부와 발급 기록을 확인합니다.' },
