@@ -2,7 +2,8 @@ import type { z } from 'zod'
 import { adminApiPath } from '../../api/adminApiClient'
 import type { casePageSchema } from '../admin-cases/caseApi'
 import type { Track1ClusterPage } from '../admin-track1/track1Api'
-import type { FanReportPage } from '../admin-track2/track2Api'
+import { intakeStatuses } from '../admin-track2/track2Api'
+import type { FanReportPage, IntakeStatus } from '../admin-track2/track2Api'
 
 // 관리자 전체 현황(/app/overview)이 쓰는 기존 조회 API 경로와 응답 범위 확인이다. 새 API나 집계 API를 쓰지 않는다.
 // 공연 하나를 고르면 팬 제보 목록, 저장된 Track 1 군집 목록, Case 목록을 각각 첫 페이지 한 번씩만 조회한다. 페이지 순회와 자동 재조회는 하지 않는다.
@@ -17,6 +18,13 @@ export const recentCasePageSize = 5
 
 export function overviewFanReportCountPath(eventId: string) {
   return adminApiPath('/api/v1/admin/fan-reports', { eventId, page: 0, pageSize: countPageSize })
+}
+
+/** 접수 완료(RECEIVED) 외의 접수 상태다. 저장 실패, 분석 실패, 확인 불가, 처리 대기를 서버 건수로 구분해 보여 준다. */
+export const unresolvedIntakeStatuses = intakeStatuses.filter((status) => status !== 'RECEIVED')
+
+export function overviewIntakeCountPath(eventId: string, intakeStatus: IntakeStatus) {
+  return adminApiPath('/api/v1/admin/fan-reports', { eventId, page: 0, pageSize: countPageSize, intakeStatus })
 }
 
 export function overviewClusterCountPath(eventId: string) {

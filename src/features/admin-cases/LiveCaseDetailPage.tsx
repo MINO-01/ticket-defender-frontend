@@ -22,6 +22,7 @@ import {
 import type { CaseActivity, CaseSource, CaseStatus, CaseView } from './caseApi'
 import { ApprovalSubmitPanel } from '../admin-approvals/ApprovalSubmitPanel'
 import { ApprovalAuditPanel, CaseWorkflowPanel } from './CaseLinkPanels'
+import { EvidenceIntegrityPanel } from './EvidenceIntegrityPanel'
 import { Track1CandidateLinkPanel } from './Track1CandidateLinkPanel'
 import { AssigneePanel, PreparationPanels, TransitionPanel } from './CaseWorkflowPanels'
 import type { WorkflowOutcome } from './CaseWorkflowPanels'
@@ -108,6 +109,7 @@ function CaseDetail({ caseId, eventId }: { caseId: string; eventId: string | nul
         <div id="case-preparation" />
         <PreparationPanels view={item} locked={locked} onOutcome={onOutcome} refreshKey={refreshKey}
           approvalPanel={(drafts) => <ApprovalSubmitPanel view={item} locked={locked} drafts={drafts} onOutcome={onOutcome} onRefresh={refresh} />} />
+        <div id="case-integrity"><EvidenceIntegrityPanel view={item} locked={locked} onOutcome={onOutcome} refreshKey={refreshKey} /></div>
       </div>
       <aside className={styles.sideColumn} aria-label="활동 이력과 업무 동작">
         {reviewerDenied && <p className={styles.blocked} role="note">현재 계정은 검토 담당(REVIEWER) 역할이 없어 서버가 변경 요청을 거부했습니다. 이 화면의 변경 동작을 막았습니다. 역할은 고객사 관리자에게 확인해 주세요.</p>}

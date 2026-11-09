@@ -12,7 +12,10 @@
 | 저장된 군집 | `GET /api/v1/admin/track1/clusters?eventId&page=0&pageSize=1&sort=recent` | TENANT_ADMIN, ANALYST, REVIEWER, APPROVER | 서버 `totalItems` (저장된 증거 기준) |
 | 최근 Case | `GET /api/v1/cases?eventId&page=0&pageSize=5` | TENANT_ADMIN, ANALYST, REVIEWER | 생성 시각 최신순 최대 5건, `hasNext` 안내 |
 
-- 공연 선택 1회에 영역별 요청 1회씩, 모두 3회입니다. 페이지 순회, 상세 N+1 조회, 자동 폴링은 없습니다. 실패한 영역의 `다시 시도`는 그 영역만 다시 조회합니다.
+| 미처리와 실패 제보 | 같은 목록 API + `intakeStatus` (접수 완료 외 5개 상태) | ANALYST, REVIEWER | 상태별 서버 `totalItems` |
+| 최근 이미지 정보 추출 | `GET /api/v1/admin/analysis-runs?eventId&page=0&pageSize=20` | 서버 판단 | 첫 페이지 안의 실패와 진행 중 건수만. 전체 합계 아님 |
+
+- 공연 선택 1회에 영역별 요청 1회씩, 모두 9회입니다. 페이지 순회, 상세 N+1 조회, 자동 폴링은 없습니다. 실패한 영역의 `다시 시도`는 그 영역만 다시 조회합니다.
 - Case 목록 API는 전체 건수를 주지 않습니다. Case 합계와 승인 대기 총건수는 표시하지 않습니다. ANALYST는 자신이 만들었거나 담당한 Case만 받습니다.
 - 위험 점수는 표시하지 않습니다. 위험 점수는 조사 우선순위이며 불법 거래 확률이 아닙니다.
 

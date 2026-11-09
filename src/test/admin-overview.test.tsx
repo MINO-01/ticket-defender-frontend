@@ -16,6 +16,9 @@ const EVENTS_PATH = '/api/v1/admin/events?page=0&pageSize=100'
 const FAN_PATH = `/api/v1/admin/fan-reports?eventId=${EVENT_A}&page=0&pageSize=1`
 const CLUSTER_PATH = `/api/v1/admin/track1/clusters?eventId=${EVENT_A}&page=0&pageSize=1&sort=recent`
 const CASE_PATH = `/api/v1/cases?eventId=${EVENT_A}&page=0&pageSize=5`
+const RUNS_PATH = `/api/v1/admin/analysis-runs?eventId=${EVENT_A}&page=0&pageSize=20`
+const intakePath = (status: string) => `${FAN_PATH}&intakeStatus=${status}`
+const UNRESOLVED = ['PENDING_STORAGE', 'STORAGE_FAILED', 'ANALYSIS_PENDING', 'ANALYSIS_FAILED', 'UNVERIFIABLE']
 const ROUTE = `/app/overview?eventId=${EVENT_A}`
 
 function createMockAdapter() {
@@ -76,6 +79,8 @@ function stubFetch(routes: Record<string, Handler> = {}) {
     [FAN_PATH]: () => json(200, fanPage(37)),
     [CLUSTER_PATH]: () => json(200, clusterPage(12)),
     [CASE_PATH]: () => json(200, casePage([caseView(CASE_1, { type: 'COMBINED', status: 'IN_REVIEW' }), caseView(CASE_2)], true)),
+    [RUNS_PATH]: () => json(200, { items: [], page: 0, pageSize: 20, hasNext: false, coverage: 'PERSISTED_TRACK2_LISTING_CONTEXT_ANALYSES_ONLY' }),
+    ...Object.fromEntries(UNRESOLVED.map((status) => [intakePath(status), () => json(200, fanPage(0))])),
     ...routes,
   }
   vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (input, init) => {
@@ -117,7 +122,7 @@ describe('관리자 전체 현황', () => {
     expect(screen.getByTestId('location').textContent).toBe(ROUTE)
     // 페이지 순회, 상세 N+1 조회, 자동 재조회를 하지 않는다.
     await new Promise((resolve) => setTimeout(resolve, 50))
-    expect(urls(calls).sort()).toEqual([CASE_PATH, CLUSTER_PATH, EVENTS_PATH, FAN_PATH].sort())
+    expect(urls(calls).sort()).toEqual([CASE_PATH, CLUSTER_PATH, EVENTS_PATH, FAN_PATH, RUNS_PATH, ...UNRESOLVED.map(intakePath)].sort())
   })
 
   it('서버 totalItems와 최근 Case를 표시하고 실제 상세와 목록 화면으로 연결한다', async () => {

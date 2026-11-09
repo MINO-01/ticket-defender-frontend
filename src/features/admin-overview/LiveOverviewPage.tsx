@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { describeAdminApiFailure } from '../../api/adminApiFailure'
 import type { AdminApiFailure } from '../../api/adminApiFailure'
+import { Button } from '../../components/common/Button'
 import { Card } from '../../components/common/Card'
 import { ErrorState, LoadingSkeleton } from '../../components/common/Feedback'
 import { PageHeader } from '../../components/common/PageHeader'
@@ -15,9 +16,11 @@ import type { AdminEvent } from '../admin-events/adminEventsApi'
 import { track1ClusterPageSchema, track1ListRoute } from '../admin-track1/track1Api'
 import { terms } from '../../app/terms'
 import { verifiedPerformanceRoute } from '../admin-track2/candidatePipelineApi'
-import { fanReportListRoute, fanReportPageSchema, formatUtc } from '../admin-track2/track2Api'
+import { analysisRunPageSchema, analysisRunsPath, isAnalysisRunPageFor } from '../admin-operations/operationsApi'
+import { fanReportListRoute, fanReportPageSchema, formatUtc, intakeStatusLabels } from '../admin-track2/track2Api'
+import type { IntakeStatus } from '../admin-track2/track2Api'
 import {
-  isClusterCountFor, isFanReportCountFor, isRecentCasesFor, overviewClusterCountPath, overviewFanReportCountPath, overviewRecentCasesPath, recentCasePageSize,
+  isClusterCountFor, isFanReportCountFor, isRecentCasesFor, overviewClusterCountPath, overviewFanReportCountPath, overviewIntakeCountPath, overviewRecentCasesPath, recentCasePageSize, unresolvedIntakeStatuses,
 } from './overviewApi'
 import styles from './Overview.module.css'
 
@@ -47,6 +50,8 @@ function EventOverview({ event }: { event: AdminEvent }) {
     <div className={styles.grid}>
       <FanReportSection eventId={event.id} />
       <ClusterSection eventId={event.id} />
+      <UnresolvedIntakeSection eventId={event.id} />
+      <RecentAnalysisSection eventId={event.id} />
       <RecentCaseSection eventId={event.id} />
     </div>
   </>
@@ -127,6 +132,57 @@ function ClusterSection({ eventId }: { eventId: string }) {
   return <Section title="연결된 예매 그룹 (예매 관계 분석)" role="고객사 관리자, 분석, 검토, 승인 담당">
     {body}
     <div className={styles.links}><Link to={track1ListRoute(eventId)}>예매 관계 분석</Link></div>
+  </Section>
+}
+
+/** 접수 상태 하나의 서버 건수다. 조회 실패는 0건이 아니라 조회 실패로 표시하고 그 행만 다시 조회한다. */
+function IntakeStatusRow({ eventId, status }: { eventId: string; status: IntakeStatus }) {
+  const { result, retry } = useAdminQuery(overviewIntakeCountPath(eventId, status), fanReportPageSchema)
+  const to = `/app/fan-reports?${new URLSearchParams({ eventId, intakeStatus: status })}`
+  let value: ReactNode
+  if (result === null) value = <span>조회 중</span>
+  else {
+    const outcome = checked(result, (data) => isFanReportCountFor(eventId, data))
+    value = 'failure' in outcome
+      ? <><span>{outcome.failure.kind === 'forbidden' ? '역할 없음' : '조회 실패'}</span> <Button variant="secondary" size="small" onClick={retry}>다시 시도</Button></>
+      : <strong>{outcome.data.totalItems.toLocaleString('ko-KR')}건</strong>
+  }
+  return <li><Link to={to}>{intakeStatusLabels[status]}</Link> {value}</li>
+}
+
+function UnresolvedIntakeSection({ eventId }: { eventId: string }) {
+  return <Section title="미처리와 실패 제보" role="분석 담당, 검토 담당">
+    <p className={styles.note}>접수 완료 외의 상태별 서버 건수입니다. 실패와 확인 불가는 위반 없음이나 정상 처리가 아닙니다.</p>
+    <ul className={styles.caseList}>{unresolvedIntakeStatuses.map((status) => <IntakeStatusRow key={status} eventId={eventId} status={status} />)}</ul>
+  </Section>
+}
+
+const failedExecutions = new Set(['INPUT_REJECTED', 'STORAGE_FAILED', 'ANALYZER_FAILED', 'ABANDONED'])
+
+/** 이미지 정보 추출 최근 실행의 첫 페이지만 요약한다. 서버가 전체 건수를 주지 않으므로 합계나 실패율을 만들지 않는다. */
+function RecentAnalysisSection({ eventId }: { eventId: string }) {
+  const { result, retry } = useAdminQuery(analysisRunsPath(eventId, 0), analysisRunPageSchema)
+  let body: ReactNode
+  if (result === null) body = <LoadingSkeleton label="최근 분석 실행을 불러오는 중" />
+  else {
+    const outcome = checked(result, (data) => isAnalysisRunPageFor(0, data))
+    if ('failure' in outcome) {
+      body = <SectionFailure failure={outcome.failure} forbidden="분석 실행 이력을 조회할 역할이 없습니다." onRetry={retry} />
+    } else if (outcome.data.items.length === 0) {
+      body = <p className={styles.empty}>저장된 이미지 정보 추출 실행이 없습니다. 서버가 빈 목록을 반환했습니다.</p>
+    } else {
+      const { items, hasNext } = outcome.data
+      const failed = items.filter((item) => failedExecutions.has(item.executionStatus)).length
+      const running = items.filter((item) => item.executionStatus === 'IN_PROGRESS').length
+      body = <>
+        <Count label={`최근 실행 ${items.length}건 중 실패`} value={failed} />
+        <p className={styles.note}>진행 중 {running}건.{hasNext ? ' 더 이전 실행이 있어 전체 합계가 아닙니다.' : ''} 예매 관계 분석 실행 이력은 서버에 없어 포함하지 않습니다.</p>
+      </>
+    }
+  }
+  return <Section title="최근 이미지 정보 추출" role="서버 역할 기준">
+    {body}
+    <div className={styles.links}><Link to="/app/analysis/jobs">분석 작업 화면</Link></div>
   </Section>
 }
 

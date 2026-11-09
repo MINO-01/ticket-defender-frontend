@@ -44,7 +44,7 @@
 
 ## 실제 캡처 조사 시연 연결 현황
 
-확인 기준: Frontend `feat/capstone-demo-flow-20261108`, Backend `feat/capstone-demo-evidence-link-20261108` 9cda95f (2026-11-08, main 미병합)
+확인 기준: Frontend main d3d6921, Backend main 576cc9c (PR #78, #47 병합 후 2026-11-09)
 
 | 단계 | 화면 | Backend API | 상태 |
 |---|---|---|---|
@@ -60,9 +60,26 @@
 - 군집 구성원 응답은 `auditId`와 `ledgerSeat`만 사용합니다. 계정 식별자와 예매참조는 응답에도 화면에도 없습니다.
 - 수렴 조회는 Case 생성 이후의 현재 조회이며 Case 생성 전 연결 여부로 표시하지 않습니다. 군집 상세의 원장 좌석 조회는 `LINKED` 판정을 만들지 않습니다.
 - 저장된 간선 API가 없으므로 Cytoscape 그래프를 실제 데이터에 연결하지 않고, 공유 근거나 Risk Score로 간선을 추정하지 않습니다.
-- 두 API는 Backend 작업 브랜치에만 있으므로 해당 브랜치가 배포되지 않은 서버에서는 연결 비교 영역에 조회 실패가 표시됩니다.
 - 팬 작성 화면의 공연명은 공개 공연 목록 API가 없어 `VITE_FAN_REPORT_EVENT_LABEL` 설정값을 표시합니다. 관리자 화면의 공연명은 서버 응답을 사용합니다.
 - 이미지 정보 추출과 후보 대조는 제보별로 관리자가 직접 눌러야 실행되며 자동 재시도, 일괄 실행 기능은 없습니다.
+
+## 2026-11-09 Live API 통합 현황
+
+기준: Backend main 576cc9c, Backend Issue #79 eed2106 (미병합). 아래 항목은 Mock fetch 테스트 기준이며 실제 Backend 연동 결과는 통합 보고서를 따릅니다.
+
+| 영역 | 상태 | 내용 |
+|---|---|---|
+| 증거 무결성 검증과 평가 | 연결 완료 | `evidence-verifications`, `integrity-evaluation`. 기술 무결성과 승인 근거 적격성을 분리해 표시 |
+| 전체 현황 미처리와 실패 | 연결 완료 | 기존 팬 제보 목록의 `intakeStatus` 필터 건수, 분석 실행 첫 페이지 요약 |
+| 구매 한도 정책 조회 | 부분 연결 | #79 목록 API만 조회. 등록, 수정, 철회는 #79 완료 후 연결. API가 없는 서버는 404 안내 |
+| Track 1 v2 한도 평가 결과 | BLOCKED | Spring v2 소비자와 조회 API 없음 |
+| Track 1 분석 실행 | BLOCKED | 관리자 실행 API 없음. `/api/v1/audits/analyze`는 레거시로 공통 클라이언트가 차단 |
+| Track 1 관계 그래프 | BLOCKED | 저장 간선 API 없음. 공유 근거 집계만 표시 |
+| 내 역할, 고객사 표시 | BLOCKED | `/admin/me` 없음. 접근 가능 공연만 서버 값으로 표시 |
+| 승인 요청 목록, 승인 대기 건수, 보고서 상태 집계 | BLOCKED | 목록 및 집계 API 없음 |
+| Track 2 후보 현황 집계 | BLOCKED | 공연 단위 후보 집계 API 없음 |
+| 예매 반입 이력과 배치 조회 | BLOCKED | 반입 POST 응답만 존재, 조회 API 없음 |
+| 고객사 전체 감사 로그, 통합 분석 작업 이력 | BLOCKED | 조회 API 없음 |
 
 ## 최초 요청 초안 (참고)
 
