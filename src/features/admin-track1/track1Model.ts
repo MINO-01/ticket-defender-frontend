@@ -56,7 +56,7 @@ export function filterClusters(data: Track1Dataset, filters: ListFilters): Clust
 }
 
 export type GraphNode = { id: string; label: string; graphLabel: string; kind: 'account' | 'reservation' | 'signal'; signalKind?: SignalKind; detail: string }
-export type GraphEdge = { id: string; source: string; target: string; label: string; evidence: string; signalKind?: SignalKind; caution?: string }
+export type GraphEdge = { id: string; source: string; target: string; label: string; evidence: string; signalKind?: SignalKind; caution?: string; relation?: 'reservation' | 'shared-signal' }
 export type GraphModel = { nodes: GraphNode[]; edges: GraphEdge[] }
 
 function edgeId(source: string, target: string): string {
