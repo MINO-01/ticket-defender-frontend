@@ -21,6 +21,7 @@ import styles from './App.module.css'
 const Track1ListRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1ListRoute })))
 const Track1DetailRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1DetailRoute })))
 const Track1DemoDetailRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1DemoDetailRoute })))
+const QuantityAnalysisRoute = lazy(() => import('./features/admin-track1/LiveQuantityAnalysisPage').then((module) => ({ default: module.QuantityAnalysisRoute })))
 const Track2ListRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.Track2ListRoute })))
 const VerifiedPerformanceRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.VerifiedPerformanceRoute })))
 const Track2DetailRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.Track2DetailRoute })))
@@ -64,6 +65,7 @@ export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuth
     <Route path="/app" element={<RequireAdminAuth><ApprovalAttemptProvider><AdminLayout /></ApprovalAttemptProvider></RequireAdminAuth>}>
       <Route index element={<Navigate to="overview" replace />} />
       <Route path="overview" element={<AdminRouteErrorBoundary backTo="/" backLabel="첫 화면으로 이동"><Suspense fallback={<LoadingSkeleton label="전체 현황을 여는 중" />}><OverviewRoute /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="analysis/quantity" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="구매 수량 분석을 여는 중" />}><QuantityAnalysisRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 목록을 여는 중" />}><Track1ListRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings/detail" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings/:clusterId" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DemoDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
