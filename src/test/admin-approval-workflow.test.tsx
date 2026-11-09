@@ -355,7 +355,7 @@ describe('승인 요청 ID 진입 화면', () => {
   it('목록 API가 없음을 밝히고 UUID 형식의 ID로만 이동한다', async () => {
     stubFetch(requestRoutes())
     renderApp('/app/approvals')
-    expect(await screen.findByText(/승인 대기 목록 API가 없어/)).toBeInTheDocument()
+    expect(await screen.findByText(/목록은 공연 단위로 서버가 반환합니다/)).toBeInTheDocument()
     expect(screen.queryByText(/합성 데모 데이터/)).not.toBeInTheDocument()
     const input = screen.getByRole('textbox', { name: /승인 요청 ID/ })
     fireEvent.change(input, { target: { value: 'not-a-uuid' } })

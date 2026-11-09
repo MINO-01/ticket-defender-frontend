@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { adminApiPath } from '../../api/adminApiClient'
 import type { OperationMessages, WorkflowMessage } from '../admin-cases/caseWorkflowApi'
 import { utcDateTime } from '../admin-track2/track2Api'
 import { isUuid } from '../fan-report/intakeConfig'
@@ -8,7 +9,7 @@ import { isUuid } from '../fan-report/intakeConfig'
 // 역할은 TENANT_ADMIN만 허용되고, 서버 게이트(SYNTHETIC_ISOLATED 모드, 격리 ID, 격리 DB, 등록된 synthetic tenant, HMAC 키)가 모두 확인될 때만 동작한다.
 // 화면 설정은 화면 표시 여부만 정하며 서버 게이트를 대체하지 않는다. 실제 고객사 예매 반입이나 보존기간 승인이 아니다.
 // 원문 예매번호(reservationReference)는 요청 본문에만 담고 화면 상태, 주소, 브라우저 저장소, 콘솔, 오류 문구에 남기지 않는다. 응답에도 포함되지 않는다.
-// 배치 이력 조회 GET API는 Backend에 없으므로 이 화면은 방금 보낸 요청의 응답만 표시한다.
+// 배치 이력은 GET 페이지 응답으로 표시한다.
 
 export const maxImportRows = 1000
 const maxText = 128
@@ -56,6 +57,13 @@ export const importResultSchema = z.object({
 })
 
 export type ImportResult = z.infer<typeof importResultSchema>
+
+export const importHistorySchema = z.object({ items: z.array(importResultSchema), page: z.number().int().nonnegative(), pageSize: z.number().int().min(1).max(100), hasNext: z.boolean() })
+export const importHistoryPageSize = 20
+
+export function reservationImportHistoryPath(eventId: string) {
+  return adminApiPath(reservationImportPath(eventId), { page: 0, pageSize: importHistoryPageSize })
+}
 
 export function reservationImportPath(eventId: string) {
   return `/api/v1/admin/events/${eventId}/reservation-imports`

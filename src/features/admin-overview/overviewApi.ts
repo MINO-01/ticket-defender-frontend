@@ -27,6 +27,10 @@ export function overviewIntakeCountPath(eventId: string, intakeStatus: IntakeSta
   return adminApiPath('/api/v1/admin/fan-reports', { eventId, page: 0, pageSize: countPageSize, intakeStatus })
 }
 
+export function isWorkflowSummaryFor(eventId: string, data: { eventId: string }) {
+  return data.eventId === eventId
+}
+
 export function overviewClusterCountPath(eventId: string) {
   return adminApiPath('/api/v1/admin/track1/clusters', { eventId, page: 0, pageSize: countPageSize, sort: 'recent' })
 }

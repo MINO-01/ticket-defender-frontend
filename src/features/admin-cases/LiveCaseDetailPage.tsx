@@ -113,7 +113,7 @@ function CaseDetail({ caseId, eventId }: { caseId: string; eventId: string | nul
       </div>
       <aside className={styles.sideColumn} aria-label="활동 이력과 업무 동작">
         {reviewerDenied && <p className={styles.blocked} role="note">현재 계정은 검토 담당(REVIEWER) 역할이 없어 서버가 변경 요청을 거부했습니다. 이 화면의 변경 동작을 막았습니다. 역할은 고객사 관리자에게 확인해 주세요.</p>}
-        {!reviewerDenied && <p className={styles.caution}>현재 계정의 역할을 조회하는 API가 없어 변경 동작을 표시합니다. 상태 변경, 담당자, Snapshot, 초안은 검토 담당 역할만 가능하며 서버가 최종 확인합니다.</p>}
+        {!reviewerDenied && <p className={styles.caution}>변경 동작은 역할과 관계없이 표시합니다. 상태 변경, 담당자, Snapshot, 초안은 검토 담당 역할만 가능하며 서버가 최종 확인합니다.</p>}
         <TransitionPanel view={item} locked={locked} onOutcome={onOutcome} />
         <AssigneePanel view={item} locked={locked} onOutcome={onOutcome} />
         {/* 활동 이력은 변경 성공이나 충돌 뒤 첫 페이지부터 다시 조회한다. */}
