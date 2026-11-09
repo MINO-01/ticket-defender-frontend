@@ -249,7 +249,7 @@ describe('Track 1 군집에서 Case 생성', () => {
   const clusterBody = (analysisRequestId = ANALYSIS_1) => ({
     event: eventPage.items[0],
     cluster: { analysisRequestId, clusterId: 'cluster-1', riskScore: 0.82, analysisAlgorithm: 'LOUVAIN', analysisAlgorithmVersion: '1.0.0', analyzedAt: '2026-10-08T10:15:30Z', storedMemberCount: 2 },
-    members: [{ auditId: 123, accountId: 'account-1', reservationNo: 'reservation-1' }],
+    members: [{ auditId: 123, ledgerSeat: null }],
     coverage: 'STORED_EVIDENCE_ONLY',
   })
   const baseRoutes = (create: Handler): Record<string, Handler> => ({

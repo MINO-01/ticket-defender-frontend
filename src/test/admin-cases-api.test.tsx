@@ -89,6 +89,7 @@ const activitiesPath = (id = CASE_1, page = 0) => `/api/v1/cases/${id}/activitie
 const snapshotsPath = (id = CASE_1, page = 0) => `/api/v1/cases/${id}/evidence-snapshots?page=${page}&pageSize=20`
 const reportVersionsPath = (id = CASE_1, page = 0) => `/api/v1/cases/${id}/report-versions?page=${page}&pageSize=20`
 const workflowPath = (id = CASE_1) => `/api/v1/cases/${id}/workflow`
+const linksPath = (id = CASE_1) => `/api/v1/cases/${id}/track1-candidate-links`
 const approvalAuditPath = (id = CASE_1, page = 0) => `/api/v1/cases/${id}/approval-audit-events?page=${page}&pageSize=20`
 const REPORT_VERSION_1 = '77777777-7777-4777-8777-777777777771'
 const SNAPSHOT_1 = '77777777-7777-4777-8777-777777777772'
@@ -143,6 +144,7 @@ function detailRoute(overrides: Partial<Record<string, () => Response | Promise<
     [snapshotsPath()]: () => json(200, { items: [], page: 0, pageSize: 20, hasNext: false }),
     [reportVersionsPath()]: () => json(200, { items: [], page: 0, pageSize: 20, hasNext: false }),
     [workflowPath()]: () => json(200, workflowView()),
+    [linksPath()]: () => json(200, { status: 'NOT_APPLICABLE', items: [] }),
     [approvalAuditPath()]: () => json(200, { items: [], page: 0, pageSize: 20, hasNext: false }),
     [activitiesPath()]: () => json(200, activityPage([
       activity(),
@@ -391,6 +393,71 @@ describe('Case 목록 실제 API', () => {
   })
 })
 
+describe('Case 상세 Track 1 연결 비교 실제 API', () => {
+  const RUN = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'
+  const CANDIDATE_SOURCE = '77777777-7777-4777-8777-777777777774'
+  const seats = [
+    { auditId: 123, status: 'FOUND', zone: 'A', row: '1', seat: '2' },
+    { auditId: 124, status: 'NOT_IN_LEDGER', zone: null, row: null, seat: null },
+    { auditId: 125, status: 'LEDGER_UNAVAILABLE', zone: null, row: null, seat: null },
+  ]
+  const item = (status: string, ledgerSeats: unknown[] = seats) => ({ graphSourceId: SOURCE_CLUSTER, candidateSourceId: CANDIDATE_SOURCE, candidateRunId: RUN, status, ledgerSeats })
+  const route = `/app/cases/${CASE_1}?eventId=${EVENT_A}`
+  const region = () => screen.findByRole('region', { name: 'Track 1 연결 비교' })
+  const open = (respond: () => Response | Promise<Response>) => {
+    stubFetch((url) => url === EVENTS_PATH ? json(200, eventPage()) : detailRoute({ [linksPath()]: respond })(url))
+    renderApp(route)
+  }
+
+  it.each([
+    ['LINKED', '팬 제보의 예매 후보와 Track 1에 저장된 예매 기록이 연결됩니다.'],
+    ['NO_TRACK1_LINK', '현재 연결된 Track 1 출처에는 동일한 예매 기록이 없습니다.'],
+    ['NOT_APPLICABLE', '현재 사건의 출처 조합에는 연결 비교를 적용할 수 없습니다.'],
+    ['LEDGER_UNAVAILABLE', '현재 원장 또는 비교 근거를 확인할 수 없습니다.'],
+  ])('%s 상태 문구를 표시하고 Case 생성 이후 조회임을 밝힌다', async (status, message) => {
+    open(() => json(200, { status, items: [item(status)] }))
+    const panel = await region()
+    expect(await within(panel).findAllByText(message)).toHaveLength(2)
+    expect(within(panel).getByRole('note')).toHaveTextContent('Case 생성 이전의 연결 여부를 확인한 것이 아닙니다')
+    expect(within(panel).getByText('Case 생성 이후 조회')).toBeInTheDocument()
+  })
+
+  it('원장 좌석 3개 상태를 구분하고 출처 참조를 표시하며 FOUND가 아닌 값과 계약 밖 필드는 표시하지 않는다', async () => {
+    const leaked = [{ ...seats[0], reservationNo: 'SYN-LEAK-RESERVATION', hmac: 'SYN-LEAK-HMAC' }, { ...seats[1], zone: 'SYN-LEAK-ZONE' }, seats[2]]
+    open(() => json(200, { status: 'LINKED', items: [item('LINKED', leaked)] }))
+    const article = await within(await region()).findByRole('article', { name: `연결 비교 ${RUN}` })
+    expect(article).toHaveTextContent(SOURCE_CLUSTER)
+    expect(article).toHaveTextContent(CANDIDATE_SOURCE)
+    const rows = within(article).getAllByRole('listitem')
+    expect(rows[0]).toHaveTextContent('저장 기록 123')
+    expect(rows[0]).toHaveTextContent('원장 좌석 확인 (FOUND)')
+    expect(rows[0]).toHaveTextContent('구역 A, 열 1, 좌석 2')
+    expect(rows[1]).toHaveTextContent('원장에 없음 (NOT_IN_LEDGER)')
+    expect(rows[2]).toHaveTextContent('원장 확인 불가 (LEDGER_UNAVAILABLE)')
+    expect(screen.queryByText(/SYN-LEAK/)).not.toBeInTheDocument()
+  })
+
+  it('비교 항목이 없으면 정상 0건으로 표시하지 않는다', async () => {
+    open(() => json(200, { status: 'NOT_APPLICABLE', items: [] }))
+    const panel = await region()
+    expect(await within(panel).findByText(/정상적으로 0건이라는 뜻이 아닙니다/)).toBeInTheDocument()
+  })
+
+  it.each([
+    ['404', () => new Response(null, { status: 404 }), 'Case를 찾을 수 없거나 접근 범위 밖입니다'],
+    ['403', () => new Response(null, { status: 403 }), '이 화면에 필요한 역할이 없습니다'],
+    ['500', () => problem(500, 'INTERNAL_ERROR'), '서버 오류로 조회하지 못했습니다'],
+    ['계약 밖 상태', () => json(200, { status: 'MAYBE_LINKED', items: [] }), '서버 응답 형식이 계약과 다릅니다'],
+  ])('%s 실패는 연결 없음으로 바꾸지 않고 이 영역에만 표시한다', async (_label, respond, message) => {
+    open(respond)
+    const panel = await region()
+    expect(await within(panel).findByRole('alert')).toHaveTextContent(message)
+    expect(within(panel).queryByRole('status')).not.toBeInTheDocument()
+    expect(within(panel).queryByText(/동일한 예매 기록이 없습니다/)).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '조사 사건 상세' })).toBeInTheDocument()
+  })
+})
+
 describe('Case 상세, 출처, 활동 이력 실제 API', () => {
   it('업무 연결이 없으면 각 기록을 없음으로 표시하고 다음 단계는 안내로만 보여 준다', async () => {
     stubFetch(detailRoute())
@@ -465,7 +532,7 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     expect(within(overview).getByText('현재 보고서 버전').nextElementSibling).toHaveTextContent('기록 없음')
 
     const sources = await screen.findByRole('region', { name: '연결 출처' })
-    const cluster = within(sources).getByRole('article', { name: 'Track 1 저장 군집 증거' })
+    const cluster = await within(sources).findByRole('article', { name: 'Track 1 저장 군집 증거' })
     expect(within(cluster).getByText('synthetic-run/2026-11')).toBeInTheDocument()
     expect(within(cluster).getByText('cluster-7')).toBeInTheDocument()
     expect(within(cluster).getByText('4건')).toBeInTheDocument()
@@ -497,7 +564,7 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     for (const name of ['상태 변경', '담당자 변경', 'EvidenceSnapshot', '보고서 초안']) expect(screen.getByRole('region', { name })).toBeInTheDocument()
     expect(screen.queryByText(/DEMO-|합성 데모 데이터|시연 담당/)).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: '← 조사 사건 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
-    expect([...requestedUrls(fetchMock)].sort()).toEqual([detailPath(), workflowPath(), sourcesPath(), snapshotsPath(), reportVersionsPath(), activitiesPath(), approvalAuditPath()].sort())
+    expect([...requestedUrls(fetchMock)].sort()).toEqual([detailPath(), workflowPath(), sourcesPath(), linksPath(), snapshotsPath(), reportVersionsPath(), activitiesPath(), approvalAuditPath()].sort())
   })
 
   it.each([
@@ -539,7 +606,7 @@ describe('Case 상세, 출처, 활동 이력 실제 API', () => {
     expect(screen.getByRole('link', { name: '← 조사 사건 목록' })).toHaveAttribute('href', `/app/cases?eventId=${EVENT_A}`)
     await screen.findByRole('region', { name: '활동 이력' })
     await screen.findByText('승인 감사 이력이 없습니다')
-    expect([...requestedUrls(fetchMock)].sort()).toEqual([detailPath(), workflowPath(), sourcesPath(), snapshotsPath(), reportVersionsPath(), activitiesPath(), approvalAuditPath()].sort())
+    expect([...requestedUrls(fetchMock)].sort()).toEqual([detailPath(), workflowPath(), sourcesPath(), linksPath(), snapshotsPath(), reportVersionsPath(), activitiesPath(), approvalAuditPath()].sort())
   })
 
   it('UUID가 아닌 Case 주소나 잘못된 공연 값은 API를 호출하지 않는다', async () => {

@@ -253,6 +253,9 @@ describe('Track 2 이미지 분석 결과 상태', () => {
     expect(alert).not.toHaveTextContent('secret.png')
     expect(within(runRegion()).queryByRole('button', { name: '같은 요청 재확인' })).not.toBeInTheDocument()
     expect(await screen.findByText('이 시도는 관찰값이 없습니다')).toBeInTheDocument()
+    expect(screen.getByText(/실패한 분석은 자동으로 다시 요청하지 않습니다/)).toBeInTheDocument()
+    expect(screen.queryByText(/예매 원장의 정답이 아닙니다/)).not.toBeInTheDocument()
+    expect(posts(calls)).toHaveLength(1)
     expect(screen.queryByRole('heading', { name: '아직 분석 이력이 없습니다' })).not.toBeInTheDocument()
 
     await clickRun('새 분석 실행')

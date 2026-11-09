@@ -181,6 +181,16 @@ describe('팬 제보 API 클라이언트', () => {
 describe('팬 제보 실제 제출 화면', () => {
   beforeEach(() => vi.stubEnv('VITE_FAN_REPORT_EVENT_ID', EVENT_ID))
 
+  it('실제 접수 환경의 작성 화면은 권한, 합성 대조, 분석 크기 안내를 표시하고 제출 전 요청을 보내지 않는다', () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    renderRoute('/fan/write')
+    expect(screen.getByText(/본인이 촬영했거나 사용할 권한이 있는 게시물 이미지만 제출하세요/)).toBeInTheDocument()
+    expect(screen.getByText('이번 시연은 합성 예매 데이터와 대조합니다.')).toBeInTheDocument()
+    expect(screen.getByText(/이미지 정보 추출은 5MiB 이하 파일만/)).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('응답 유실 뒤 같은 키, 비밀, 입력, 파일 순서로 재시도하고 200 복구 결과를 표시한다', async () => {
     mockFetch(new TypeError('Failed to fetch'), json(200, RECEIPT))
     await fillAndReview()

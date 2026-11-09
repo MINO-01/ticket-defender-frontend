@@ -214,6 +214,10 @@ describe('후보 실행 이력에서 신규 Case 출처 선택', () => {
     expect(selected).toHaveTextContent(RUN_1)
     expect(selected).toHaveTextContent('부정 거래나 불법 거래 확정이 아닙니다')
     expect(within(selected).getByRole('note')).toHaveTextContent('APPROVAL_BASIS_BLOCKED')
+    expect(within(selected).getByRole('note')).toHaveTextContent('별도의 적격 합성 Case')
+    expect(screen.getAllByText(/일치 후보가 있는 좌석이라는 뜻일 뿐 실제 티켓 확인이나 판매자 소유권 확인이 아닙니다/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/좌석 번호 없는 2연석/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/예매 원장의 정답이 아닙니다/).length).toBeGreaterThan(0)
 
     selectEvidenceAndReason()
     fireEvent.click(within(caseRegion()).getByRole('button', { name: 'Case 생성' }))
@@ -227,6 +231,7 @@ describe('후보 실행 이력에서 신규 Case 출처 선택', () => {
     expect(source).toHaveTextContent(RUN_1)
     expect(source).toHaveTextContent('단일 조사 후보 (MATCH_CANDIDATE)')
     expect(source).toHaveTextContent('APPROVAL_BASIS_BLOCKED')
+    expect(source).toHaveTextContent('별도의 적격 합성 Case')
     expect(screen.queryByText(/SYN-RAW|hmac/)).not.toBeInTheDocument()
   })
 

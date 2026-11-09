@@ -15,6 +15,7 @@ import {
   formatAlgorithm, formatAnalyzedAt, formatRiskScore, readTrack1ClusterKey, sharedSignalTypes, track1ClusterDetailPath, track1ClusterDetailSchema, track1ListRoute,
 } from './track1Api'
 import type { SharedSignalType, Track1ClusterDetail, Track1ClusterKey, Track1Relationship } from './track1Api'
+import { LedgerSeatLookupPanel } from './LedgerSeatLookupPanel'
 import styles from './Track1.module.css'
 
 // 인증된 관리자의 Track 1 군집 상세다. eventId, analysisRequestId, clusterId를 주소에서 읽어 함께 조회하므로 직접 주소로 접근해도 같은 군집을 연다.
@@ -71,8 +72,6 @@ function ClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey }) {
   const { event, cluster, members } = result.data
   const memberColumns = [
     { key: 'auditId', header: '저장 기록 번호', render: (member: Member) => member.auditId },
-    { key: 'account', header: '계정 참조 (가명 처리)', render: (member: Member) => member.accountId ?? '기록 없음' },
-    { key: 'reservation', header: '예매 참조 (가명 처리)', render: (member: Member) => member.reservationNo ?? '기록 없음' },
   ]
   const confirmed: GuideItem[] = [
     { key: 'event', content: <>대상 공연: {event.name}</> },
@@ -125,11 +124,12 @@ function ClusterDetail({ clusterKey }: { clusterKey: Track1ClusterKey }) {
           {members.length === 0
             ? <EmptyState title="저장된 예매 기록이 없습니다" description="이 그룹에 저장된 예매 기록이 없습니다." />
             : <DataTable caption="저장된 그룹 구성원" columns={memberColumns} rows={members} getRowKey={(member) => member.auditId} />}
-          <p className={styles.muted}>계정 참조와 예매 참조는 가명 처리된 값이며 실제 예매번호나 신원이 아닙니다.</p>
+          <p className={styles.muted}>저장 기록 번호는 내부 참조이며 계정, 예매번호, 신원 정보가 아닙니다. 서버는 계정과 예매 참조를 응답하지 않습니다.</p>
         </Card>
+        <LedgerSeatLookupPanel clusterKey={clusterKey} />
       </div>
       <div id="cluster-case" className={styles.detailColumn}>
-        <Card className={styles.panel}><h2>판단 시 주의</h2><p>분석 요청에서 이 그룹에 속한 것으로 저장된 계정과 예매 참조만 표시했습니다. 전체 분석 스냅샷이나 확정 판정으로 해석하지 마세요.</p><p className={styles.warning}>그룹 소속이나 조사 우선순위만으로 동일인 또는 부정 거래를 판단하지 마세요.</p></Card>
+        <Card className={styles.panel}><h2>판단 시 주의</h2><p>분석 요청에서 이 그룹에 속한 것으로 저장된 기록 번호만 표시했습니다. 전체 분석 스냅샷이나 확정 판정으로 해석하지 마세요.</p><p className={styles.warning}>그룹 소속이나 조사 우선순위만으로 동일인 또는 부정 거래를 판단하지 마세요.</p></Card>
         <CreateCasePanel context="연결된 예매 그룹" sources={{ eventId: event.id, graphClusters: [{ analysisRequestId: cluster.analysisRequestId, clusterId: cluster.clusterId }], fanReportIds: [], evidenceIds: [] }}
           blockedReason={isCanonicalAnalysisRequestId(cluster.analysisRequestId) ? null : '이 그룹의 분석 요청 ID가 소문자 UUID 형식이 아니어서 서버 계약상 조사 사건 출처로 연결할 수 없습니다. 분석 결과를 다시 반입해야 하며 화면에서 ID를 바꾸지 않습니다.'} />
       </div>

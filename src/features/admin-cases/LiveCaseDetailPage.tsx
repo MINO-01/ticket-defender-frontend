@@ -22,6 +22,7 @@ import {
 import type { CaseActivity, CaseSource, CaseStatus, CaseView } from './caseApi'
 import { ApprovalSubmitPanel } from '../admin-approvals/ApprovalSubmitPanel'
 import { ApprovalAuditPanel, CaseWorkflowPanel } from './CaseLinkPanels'
+import { Track1CandidateLinkPanel } from './Track1CandidateLinkPanel'
 import { AssigneePanel, PreparationPanels, TransitionPanel } from './CaseWorkflowPanels'
 import type { WorkflowOutcome } from './CaseWorkflowPanels'
 import styles from './Cases.module.css'
@@ -103,6 +104,7 @@ function CaseDetail({ caseId, eventId }: { caseId: string; eventId: string | nul
       <div className={styles.mainColumn}>
         <CaseWorkflowPanel caseId={item.caseId} refreshKey={refreshKey} />
         <div id="case-sources"><SourcePanel caseId={item.caseId} eventId={item.eventId} /></div>
+        <Track1CandidateLinkPanel caseId={item.caseId} refreshKey={refreshKey} />
         <div id="case-preparation" />
         <PreparationPanels view={item} locked={locked} onOutcome={onOutcome} refreshKey={refreshKey}
           approvalPanel={(drafts) => <ApprovalSubmitPanel view={item} locked={locked} drafts={drafts} onOutcome={onOutcome} onRefresh={refresh} />} />
@@ -266,7 +268,7 @@ function SourceItem({ source, eventId }: { source: CaseSource; eventId: string }
         <div><dt>현재 적용 여부</dt><dd>{label(applicabilityLabels, source.candidateApplicability)}</dd></div>
         {common}
       </dl>
-      <p className={styles.caution}>연결 시점의 후보 실행 기록이며 조사 참고 자료입니다. 부정 거래나 불법 거래 확정이 아닙니다. 예매 기록 비교 실행이 연결된 조사 사건은 비교 결과를 승인 근거로 쓰는 정책이 아직 확정되지 않아 승인 요청과 공식 PDF 발급이 서버에서 차단됩니다(APPROVAL_BASIS_BLOCKED).</p>
+      <p className={styles.caution}>연결 시점의 후보 실행 기록이며 조사 참고 자료입니다. 부정 거래나 불법 거래 확정이 아닙니다. 예매 기록 비교 실행이 연결된 조사 사건은 비교 결과를 승인 근거로 쓰는 정책이 아직 확정되지 않아 승인 요청과 공식 PDF 발급이 서버에서 차단됩니다(APPROVAL_BASIS_BLOCKED). 승인과 공식 PDF 흐름은 후보 실행을 출처로 넣지 않은 별도의 적격 합성 Case에서 진행하며, 적격 여부는 서버가 다시 확인합니다.</p>
       <Link className={styles.detailLink} to={fanReportDetailRoute(fanReportId)}>소속 제보 상세 보기</Link>
     </article>
   }
