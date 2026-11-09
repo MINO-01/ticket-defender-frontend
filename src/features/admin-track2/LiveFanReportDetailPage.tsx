@@ -259,6 +259,8 @@ function AnalysisAttempt({ analysis, candidates, selection }: { analysis: Listin
         ? <EmptyState title="분석이 아직 끝나지 않았습니다" description="실행 중인 시도이므로 관찰값이 없습니다." />
         : <ErrorState title="이 시도는 관찰값이 없습니다" description="분석이 실패해 관찰값을 만들지 못했습니다. 정상적인 빈 추출 결과가 아닙니다." />
       : <div className={styles.fields}>{listingFieldNames.map((name) => <ObservedField key={name} name={name} field={analysis.fields![name]} />)}</div>}
+    {failed && <p className={styles.caution} role="note">실패한 분석은 자동으로 다시 요청하지 않습니다. 실패 분류 코드를 확인한 뒤 필요할 때만 이미지 분석 실행 버튼으로 새 분석을 직접 요청해 주세요.</p>}
+    {analysis.fields !== null && <p className={styles.caution} role="note">구역, 열, 좌석 관찰값은 모델이 게시물 이미지에서 읽은 그대로이며 예매 원장의 정답이 아닙니다. 화면에서 원장에 맞춰 보정하지 않습니다.</p>}
     {analysis.reviewRequired && <p className={styles.caution}>관찰값은 모델이 이미지에서 읽은 후보이며 사람의 확인이 필요합니다. 사실 확인, 예매 일치, 부정 거래 판정이 아닙니다.</p>}
     <CandidateMatchSection fanReportId={analysis.fanReportId} evidenceId={analysis.evidenceId} analysis={analysis} attempt={candidates.attempts[analysis.analysisId]}
       historyVersion={candidates.historyVersions[analysis.analysisId] ?? 0} onStart={() => candidates.start(analysis.evidenceId, analysis.analysisId)}

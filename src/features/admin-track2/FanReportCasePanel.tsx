@@ -76,7 +76,7 @@ export function FanReportCasePanel({ report, selection }: { report: FanReportDet
           <Button size="small" variant="secondary" onClick={() => selection.remove(run.runId)}>선택 해제</Button>
         </li>)}</ul>}
       <p className={styles.caution}>후보 대조 결과는 조사 참고 자료이며 부정 거래나 불법 거래 확정이 아닙니다. 후보 없음(NO_MATCH)과 확인 불가(UNVERIFIABLE), 후보 여러 건(AMBIGUOUS)은 서로 다른 결과입니다. 실행 상태와 소속 제보, 증거, 현재 기준 여부는 서버가 다시 확인합니다.</p>
-      {runs.length > 0 && <p className={styles.blocked} role="note">후보 실행이 연결된 Case는 승인 근거 정책이 확정되지 않아 현재 승인 요청과 공식 PDF 발급이 차단됩니다(APPROVAL_BASIS_BLOCKED). 조사 기록용으로만 사용해 주세요.</p>}
+      {runs.length > 0 && <p className={styles.blocked} role="note">후보 실행이 연결된 Case는 승인 근거 정책이 확정되지 않아 현재 승인 요청과 공식 PDF 발급이 차단됩니다(APPROVAL_BASIS_BLOCKED). 조사 기록용으로만 사용해 주세요. 승인과 공식 PDF 흐름은 후보 실행을 출처로 넣지 않은 별도의 적격 합성 Case에서 진행하며, 적격 여부는 서버가 다시 확인합니다.</p>}
     </fieldset>}
     <OptionalClusterFields value={cluster} onChange={setCluster} />
   </CreateCasePanel>
