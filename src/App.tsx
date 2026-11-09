@@ -20,6 +20,7 @@ import styles from './App.module.css'
 
 const Track1ListRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1ListRoute })))
 const Track1DetailRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1DetailRoute })))
+const Track1GraphRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1GraphRoute })))
 const Track1DemoDetailRoute = lazy(() => import('./features/admin-track1/Track1Routes').then((module) => ({ default: module.Track1DemoDetailRoute })))
 const Track2ListRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.Track2ListRoute })))
 const VerifiedPerformanceRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.VerifiedPerformanceRoute })))
@@ -66,6 +67,7 @@ export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuth
       <Route path="overview" element={<AdminRouteErrorBoundary backTo="/" backLabel="첫 화면으로 이동"><Suspense fallback={<LoadingSkeleton label="전체 현황을 여는 중" />}><OverviewRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 목록을 여는 중" />}><Track1ListRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings/detail" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DetailRoute /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="analysis/findings/graph" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="관계 그래프를 여는 중" />}><Track1GraphRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings/:clusterId" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DemoDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="fan-reports" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="팬 제보 목록을 여는 중" />}><Track2ListRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="verified-performances" element={<AdminRouteErrorBoundary backTo="/app/fan-reports" backLabel="팬 제보 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="검증 회차 관리를 여는 중" />}><VerifiedPerformanceRoute /></Suspense></AdminRouteErrorBoundary>} />

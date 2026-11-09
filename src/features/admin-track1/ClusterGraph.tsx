@@ -4,6 +4,8 @@ import type { Core, ElementDefinition } from 'cytoscape'
 import type { GraphModel } from './track1Model'
 import styles from './Track1.module.css'
 
+const maxRowsPerColumn = 12
+
 function positionsFor(graph: GraphModel, compact: boolean) {
   const positions = new Map<string, { x: number; y: number }>()
   const columns = [
@@ -11,9 +13,16 @@ function positionsFor(graph: GraphModel, compact: boolean) {
     graph.nodes.filter((node) => node.kind === 'signal'),
     graph.nodes.filter((node) => node.kind === 'reservation'),
   ]
-  columns.forEach((nodes, column) => nodes.forEach((node, index) => positions.set(node.id, compact
-    ? { x: 60 + column * 100, y: 80 + index * 72 }
-    : { x: 120 + column * 205, y: 90 + index * 78 })))
+  // 실제 군집은 구성원이 많을 수 있어 종류별 열을 일정 행 수마다 나눈다. 행 수 이하의 군집은 배치가 바뀌지 않는다.
+  let columnOffset = 0
+  columns.forEach((nodes) => {
+    nodes.forEach((node, index) => {
+      const column = columnOffset + Math.floor(index / maxRowsPerColumn)
+      const row = index % maxRowsPerColumn
+      positions.set(node.id, compact ? { x: 60 + column * 100, y: 80 + row * 72 } : { x: 120 + column * 205, y: 90 + row * 78 })
+    })
+    columnOffset += Math.max(1, Math.ceil(nodes.length / maxRowsPerColumn))
+  })
   return positions
 }
 
@@ -29,7 +38,7 @@ export function ClusterGraph({ graph, selectedId, onSelect }: { graph: GraphMode
     const positions = positionsFor(graph, compact)
     const elements: ElementDefinition[] = [
       ...graph.nodes.map((node) => ({ data: { id: node.id, label: node.graphLabel, kind: node.kind }, position: positions.get(node.id) })),
-      ...graph.edges.map((edge) => ({ data: { id: edge.id, source: edge.source, target: edge.target, kind: edge.signalKind ?? 'reservation' } })),
+      ...graph.edges.map((edge) => ({ data: { id: edge.id, source: edge.source, target: edge.target, kind: edge.signalKind ?? 'reservation', relation: edge.relation } })),
     ]
     const cy = cytoscape({
       container: containerRef.current,
@@ -43,6 +52,7 @@ export function ClusterGraph({ graph, selectedId, onSelect }: { graph: GraphMode
         { selector: 'node[kind = "signal"]', style: { 'background-color': '#f5af45', 'shape': 'diamond' } },
         { selector: 'node[kind = "reservation"]', style: { 'background-color': '#93b8da', 'shape': 'round-rectangle', 'width': 26, 'height': 26 } },
         { selector: 'edge', style: { 'width': 2, 'line-color': '#a7b8cd', 'curve-style': 'bezier', 'target-arrow-shape': 'triangle', 'target-arrow-color': '#a7b8cd' } },
+        { selector: 'edge[relation = "shared-signal"]', style: { 'line-color': '#f5af45', 'target-arrow-color': '#f5af45', 'line-style': 'dashed' } },
         { selector: '.related', style: { 'line-color': '#2785e6', 'target-arrow-color': '#2785e6', 'border-color': '#2785e6', 'border-width': 2 } },
         { selector: ':selected', style: { 'background-color': '#155496', 'line-color': '#155496', 'target-arrow-color': '#155496', 'width': 5 } },
       ],

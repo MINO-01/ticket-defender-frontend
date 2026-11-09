@@ -12,6 +12,7 @@ import {
   formatAlgorithm, formatAnalyzedAt, formatRiskScore, readTrack1Page, readTrack1Sort, track1ClusterListPath, track1ClusterPageSchema, track1DetailRoute,
 } from './track1Api'
 import type { Track1ClusterSummary, Track1Sort } from './track1Api'
+import { track1GraphRoute } from './track1GraphApi'
 import styles from './Track1.module.css'
 
 // 인증된 관리자의 Track 1 군집 목록이다. 선택한 공연의 서버 페이지와 서버 정렬만 사용하며 합성 데모 데이터와 섞지 않는다.
@@ -79,7 +80,7 @@ function ClusterList({ event }: { event: AdminEvent }) {
       : data.items.length === 0
         ? <div className={styles.page}><EmptyState title="이 페이지에 표시할 군집이 없습니다" description="요청한 페이지가 전체 결과 범위를 벗어났습니다." /><Button variant="secondary" onClick={() => navigate({ page: 0 })}>첫 페이지로 이동</Button></div>
         : <Card className={styles.tableCard}>
-          <div className={styles.sectionHeading}><h2>{event.name} 연결된 예매 그룹</h2><span>전체 {data.totalItems}건 중 {first}~{first + data.items.length - 1}번째</span></div>
+          <div className={styles.sectionHeading}><h2>{event.name} 연결된 예매 그룹</h2><span>전체 {data.totalItems}건 중 {first}~{first + data.items.length - 1}번째</span><Link className={styles.detailLink} to={track1GraphRoute(event.id)}>관계 그래프 보기</Link></div>
           <DataTable caption="연결된 예매 그룹 목록" columns={columns} rows={data.items} getRowKey={(cluster) => JSON.stringify([cluster.analysisRequestId, cluster.clusterId])} />
           <nav className={styles.pagination} aria-label="군집 목록 페이지"><Button variant="secondary" size="small" disabled={data.page === 0} onClick={() => navigate({ page: data.page - 1 })}>이전</Button><span>{data.page + 1} / {pageCount} 페이지</span><Button variant="secondary" size="small" disabled={!data.hasNext} onClick={() => navigate({ page: data.page + 1 })}>다음</Button></nav>
         </Card>}

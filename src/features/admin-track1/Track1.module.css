@@ -68,3 +68,10 @@
 .signalList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .signalList li { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-control); font-size: 13px; }
 .signalList strong { font-size: 14px; }
+.posterGrid { display: grid; grid-template-columns: minmax(240px, .7fr) minmax(520px, 2.4fr) minmax(290px, .95fr); align-items: start; gap: 16px; min-width: 0; }
+.posterGrid .graphCanvas { height: min(720px, 70vh); }
+.posterPager { display: flex; justify-content: space-between; gap: 8px; }
+.graphLegend { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 0; color: var(--color-text-secondary); font-size: 12px; list-style: none; }
+.nodeChips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.nodeChips button { min-height: 32px; padding: 4px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-subtle); color: var(--color-text); font: inherit; font-size: 12px; cursor: pointer; }
+@media (max-width: 1180px) { .posterGrid { grid-template-columns: minmax(0, 1fr); } }

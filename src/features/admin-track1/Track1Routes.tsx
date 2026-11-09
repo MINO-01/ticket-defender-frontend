@@ -10,6 +10,8 @@ import styles from './Track1.module.css'
 const ClusterListPage = lazy(() => import('./ClusterListPage').then((module) => ({ default: module.ClusterListPage })))
 const ClusterDetailPage = lazy(() => import('./ClusterDetailPage').then((module) => ({ default: module.ClusterDetailPage })))
 
+const LiveClusterGraphPage = lazy(() => import('./LiveClusterGraphPage').then((module) => ({ default: module.LiveClusterGraphPage })))
+
 // 인증 세션에서는 실제 API 화면만, 개발 전용 미리보기에서는 합성 데모 화면만 연다.
 // 두 데이터 출처를 한 화면에 섞지 않으며, 인증 세션에서 데모 데이터를 업무 데이터처럼 표시하지 않는다.
 
@@ -24,6 +26,16 @@ export function Track1DetailRoute() {
   if (state.status !== 'preview') return <LiveClusterDetailPage />
   return <div className={styles.page}>
     <EmptyState title="미리보기에서는 실제 군집을 조회하지 않습니다" description="개발 전용 합성 데이터 미리보기는 인증 세션이 아니어서 관리자 API를 호출하지 않습니다." />
+    <Link className={styles.detailLink} to="/app/analysis/findings">군집 목록으로 돌아가기</Link>
+  </div>
+}
+
+/** 실제 관계 그래프 주소. 그래프 라이브러리를 일반 목록 번들에 넣지 않도록 지연 로드하고, 미리보기에서는 API를 호출하지 않는다. */
+export function Track1GraphRoute() {
+  const { state } = useAdminAuth()
+  if (state.status !== 'preview') return <LiveClusterGraphPage />
+  return <div className={styles.page}>
+    <EmptyState title="미리보기에서는 실제 그래프를 조회하지 않습니다" description="개발 전용 합성 데이터 미리보기는 인증 세션이 아니어서 관리자 API를 호출하지 않습니다." />
     <Link className={styles.detailLink} to="/app/analysis/findings">군집 목록으로 돌아가기</Link>
   </div>
 }
