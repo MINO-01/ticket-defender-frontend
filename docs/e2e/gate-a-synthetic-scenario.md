@@ -2,7 +2,7 @@
 
 기준: Backend `feat/capstone-demo-v1-backend` `db47220`(main 미병합), Backend main `a4be847`, Data `feat/#30-shared-signal-observations`, Frontend `feat/final-demo-backend81-alignment-20261110`. 이 문서는 실행 절차이며 결과 기록이 아닙니다. 전체 흐름은 아직 실행되지 않았습니다(NOT_RUN).
 
-공연: 악동뮤지션 대전 콘서트 (합성 시연), 2026-12-05 18:00 KST, 대전 공연장 (가상), 19, 20, 21구역. 자료는 Data `demo/capture-akmu-v1/`에 있으며 `finalForImport: false`입니다. MATCH_CANDIDATE, LINKED, 위험 점수, 한도 초과는 조사 근거이며 부정 거래 확정이 아닙니다.
+공연: 악동뮤지션 대전 콘서트 (합성 시연), 2026-12-05 18:00 KST, 대전 공연장 (가상), 19, 20, 21구역. 자료는 Data `demo/capture-akmu-v1/`에 있으며 `finalForImport: false`입니다. Frontend에는 시연 이미지를 넣지 않고 이 폴더의 파일을 업로드합니다. listing_A: 19구역 8열 12번, 표시 판매가 200,000원 (KRW), 숫자 판매가 200000, 통화 KRW. MATCH_CANDIDATE, LINKED, 위험 점수, 한도 초과는 조사 근거이며 부정 거래 확정이 아닙니다.
 
 ## 준비
 
@@ -57,7 +57,7 @@ R2는 실측에서 2개 커뮤니티로 분할됩니다. R4, N2의 네트워크 
 | 순서 | 역할 | 화면 | 동작 | 기대 상태 |
 | --- | --- | --- | --- | --- |
 | 1 | 비로그인 | `/fan/write` | 공연 시각 2026-12-05 18:00, `listing_A.png` 업로드 후 제출 | 접수번호 |
-| 2 | ANALYST 또는 REVIEWER | `/app/fan-reports` → 제보 열기 | 이미지 정보 추출 실행 | COMPLETED, 구역 19, 열 8, 좌석 12 FOUND, 근거 인용 표시. **`MODEL_RESPONSE_INVALID`가 나올 수 있음(아래 오류 점검)** |
+| 2 | ANALYST 또는 REVIEWER | `/app/fan-reports` → 제보 열기 | 이미지 정보 추출 실행 | COMPLETED, 구역 19, 열 8, 좌석 12, 가격 200000, 통화 KRW FOUND, 근거 인용 표시. 사전 호출 1회에서 통과했으나 **`MODEL_RESPONSE_INVALID`가 나올 수 있음(아래 오류 점검)** |
 | 3 | 동일 | 같은 화면 | 회차 연결 | ACTIVE 연결 |
 | 4 | 동일 | 같은 화면 | 예매 기록 비교 실행 | MATCH_CANDIDATE 목표. 확정 판정이 아님 |
 | 5 | REVIEWER | 같은 화면 Case 생성 | 제보, 증거, 후보 실행 선택 | FAN_REPORT OPEN |
@@ -70,7 +70,7 @@ R2는 실측에서 2개 커뮤니티로 분할됩니다. R4, N2의 네트워크 
 | 순서 | 역할 | 화면 | 동작 | 기대 상태 |
 | --- | --- | --- | --- | --- |
 | 1 | REVIEWER | `/app/analysis/findings` | R2 그룹 중 19구역 8열 12번이 있는 그룹 찾기. 원장 좌석 조회에 회차와 `akmu-demo-reservations-v1` 입력 | 좌석 19/8/12 |
-| 2 | REVIEWER | Case 생성 | 양 트랙 출처를 함께 연결. Case 2에 쓰지 않은 새 listing_A 제보로 진행 | COMBINED OPEN |
+| 2 | REVIEWER | Case 생성 | 새 `listing_A.png` 제보를 접수하고 Case 2의 2~4단계(실제 Gemini 분석, 회차 연결, 예매 기록 비교)를 마친 뒤 R2 군집과 함께 연결 | COMBINED OPEN |
 | 3 | REVIEWER | `/app/cases/:id` Track 1 연결 비교 | 조회 | LINKED, 연결 근거 예매 참조 일치 |
 | 4~ | | Case 1의 5~9 | 근거 묶음부터 발급까지 | 발급 완료 |
 
@@ -86,6 +86,15 @@ R2는 실측에서 2개 커뮤니티로 분할됩니다. R4, N2의 네트워크 
 | 승인 요청 `APPROVAL_BASIS_BLOCKED` | `OFFICIAL_PDF_DEMO_V1_ENABLED`, 합성 격리 ID, 등록부 등록 시각 |
 | PDF 적격성 차단 | 무결성 검증, Object Lock, STALE, IssuanceHold |
 | 403 | 역할. 요청자와 승인자가 같은지 확인 |
+
+## 현재 검증 상태
+
+| 항목 | 상태 |
+| --- | --- |
+| 실제 Gemini의 listing_A 필드 추출 (Data 경로, 1회) | PASS |
+| MATCH_CANDIDATE 후보 대조 | NOT_RUN |
+| LINKED 연결 비교 | NOT_RUN |
+| 공식 PDF 3건 | NOT_RUN |
 
 ## 기록 방법
 
