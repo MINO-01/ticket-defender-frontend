@@ -27,6 +27,7 @@ const VerifiedPerformanceRoute = lazy(() => import('./features/admin-track2/Trac
 const Track2DetailRoute = lazy(() => import('./features/admin-track2/Track2Routes').then((module) => ({ default: module.Track2DetailRoute })))
 const OverviewRoute = lazy(() => import('./features/admin-overview/LiveOverviewPage').then((module) => ({ default: module.OverviewRoute })))
 const ReservationImportRoute = lazy(() => import('./features/admin-imports/LiveReservationImportPage').then((module) => ({ default: module.ReservationImportRoute })))
+const LedgerImportsRoute = lazy(() => import('./features/admin-ledger-imports/LiveLedgerImportsPage').then((module) => ({ default: module.LedgerImportsRoute })))
 const CaseListRoute = lazy(() => import('./features/admin-cases/CaseRoutes').then((module) => ({ default: module.CaseListRoute })))
 const CaseDetailRoute = lazy(() => import('./features/admin-cases/CaseRoutes').then((module) => ({ default: module.CaseDetailRoute })))
 const ApprovalListRoute = lazy(() => import('./features/admin-approvals/ApprovalRoutes').then((module) => ({ default: module.ApprovalListRoute })))
@@ -73,6 +74,7 @@ export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuth
       <Route path="verified-performances" element={<AdminRouteErrorBoundary backTo="/app/fan-reports" backLabel="팬 제보 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="검증 회차 관리를 여는 중" />}><VerifiedPerformanceRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="fan-reports/:reportId" element={<AdminRouteErrorBoundary backTo="/app/fan-reports" backLabel="제보 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="제보 상세를 여는 중" />}><Track2DetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="imports" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="예매 자료 준비 화면을 여는 중" />}><ReservationImportRoute /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="ledger-imports" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="대용량 원장 화면을 여는 중" />}><LedgerImportsRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="cases" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="사건 목록을 여는 중" />}><CaseListRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="cases/:caseId" element={<AdminRouteErrorBoundary backTo="/app/cases" backLabel="사건 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="사건 상세를 여는 중" />}><CaseDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="approvals" element={<AdminRouteErrorBoundary backTo="/app/cases" backLabel="사건 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="승인 검토 화면을 여는 중" />}><ApprovalListRoute /></Suspense></AdminRouteErrorBoundary>} />

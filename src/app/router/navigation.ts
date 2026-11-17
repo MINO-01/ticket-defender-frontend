@@ -15,6 +15,7 @@ export const adminPages = [
   { path: 'approvals', label: '보고서 승인 요청', group: '검토', support: 'partial', description: '조사 보고서 초안의 승인 요청을 열어 독립 검토와 결정을 진행합니다.' },
   { path: 'report-center', label: '조사 보고서 발급', group: '검토', support: 'partial', description: '승인 결정을 기준으로 공식 보고서 PDF 발급 가능 여부와 발급 기록을 확인합니다.' },
   { path: 'imports', label: '예매 자료 준비', group: '운영', support: 'live', description: '합성 격리 테스트 환경에서 예매 스냅샷을 반입합니다.' },
+  { path: 'ledger-imports', label: '대용량 원장 관리', group: '운영', support: 'live', description: '대용량 CSV 원장을 등록·비공개 업로드·공개하고 Track 1 분석 상태를 확인합니다.' },
   { path: 'analysis/jobs', label: '분석 작업', group: '운영', support: 'partial', description: '저장된 이미지 정보 추출 실행 이력과 접수 상태별 제보를 확인합니다. 통합 작업 이력은 아닙니다.' },
   { path: 'audit', label: '감사 기록', group: '운영', support: 'partial', description: '조사 사건별 활동 기록과 승인 감사 이력을 확인합니다. 고객사 전체 감사 로그는 아닙니다.' },
   { path: 'settings', label: '설정', group: '운영', support: 'partial', description: '고객사 관리자용 운영 기능 상태와 서버 인증 상태를 확인합니다.' },
