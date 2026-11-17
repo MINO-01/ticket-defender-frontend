@@ -16,6 +16,7 @@ export const publicationSchema = z.object({ publicationId: uuid, importId: uuid,
 export const analysisJobSchema = z.object({ jobId: uuid, outboxId: uuid, versionId: uuid, status: z.enum(['PENDING', 'PROCESSING', 'RETRYABLE', 'BLOCKED', 'DELIVERED']), attemptCount: z.number().int().nonnegative(), failureCode: z.string().nullable(), runId: uuid.nullable(), analysisRequestId: uuid.nullable(), executionStatus: z.string().nullable(), evaluationStatus: z.string().nullable(), policyVersion: z.string().nullable(), algorithmVersion: z.string().nullable(), completedAt: dateTime.nullable() })
 export type AnalysisJob = z.infer<typeof analysisJobSchema>
 export const analysisJobListSchema = z.array(analysisJobSchema)
+export const signalListSchema = z.array(z.object({ ticketReferenceHmac: sha256, hmacKeyVersion: z.string().trim().min(1).max(32), paymentHmac: sha256.nullable().optional(), addressHmac: sha256.nullable().optional(), deviceHmac: sha256.nullable().optional(), ipHmac: sha256.nullable().optional(), sourceVersion: z.string().trim().min(1).max(128) }).superRefine((value, context) => { if (![value.paymentHmac, value.addressHmac, value.deviceHmac, value.ipHmac].some(Boolean)) context.addIssue({ code: 'custom', message: '결제·주소·기기·IP HMAC 중 하나 이상이 필요합니다.' }) })).min(1)
 export const emptySchema = z.undefined()
 
 export function ledgerImportsPath() { return adminApiPath('/api/v1/admin/ledger-imports', { page: 0, pageSize: 20 }) }
