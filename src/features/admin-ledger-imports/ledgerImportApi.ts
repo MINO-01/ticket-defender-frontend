@@ -30,7 +30,7 @@ export function analysisRunsPath(eventId: string, performanceId: string) { retur
 export function analysisRunPath(eventId: string, performanceId: string, jobId: string) { return `${analysisRunsPath(eventId, performanceId)}/${jobId}` }
 export function signalsPath(eventId: string, versionId: string) { return `/api/v1/admin/events/${eventId}/ledger-track1/versions/${versionId}/signals` }
 
-export type CsvMetadata = { bytes: number; sha256: string; rows: number }
+export type CsvMetadata = { bytes: number; sha256: string; rows: number; scopeRows: ReadonlyMap<string, number> }
 const shaConstants = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2])
 class StreamingSha256 {
   private state = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]); private tail = new Uint8Array(64); private tailLength = 0; private length = 0n
@@ -39,21 +39,33 @@ class StreamingSha256 {
   hex() { const padded=new Uint8Array(this.tailLength+1+((119-this.tailLength)%64)+8);padded.set(this.tail.subarray(0,this.tailLength));padded[this.tailLength]=0x80;let bits=this.length*8n;for(let i=0;i<8;i+=1){padded[padded.length-1-i]=Number(bits&255n);bits>>=8n}for(let i=0;i<padded.length;i+=64)this.block(padded,i);return [...this.state].map((word)=>word.toString(16).padStart(8,'0')).join('') }
 }
 /** CSV 레코드 수는 인용부호 안의 줄바꿈을 구분자로 보지 않는다. 파일 바이트는 state에 저장하지 않는다. */
+/** RFC4180의 헤더는 행 수에서 제외한다. callback은 한 레코드만 보유하므로 대용량 파일을 복사하지 않는다. */
 export async function inspectCsv(file: File): Promise<CsvMetadata> {
   if (file.size === 0) throw new Error('빈 CSV 파일은 등록할 수 없습니다.')
-  const reader = file.stream().getReader(); const decoder = new TextDecoder(); const digest = new StreamingSha256(); let text = ''; let rows = 0; let quoted = false; let saw = false
-  for (;;) { const next = await reader.read(); if (next.done) break; digest.update(next.value); text += decoder.decode(next.value, { stream: true }); let start = 0
-    for (let i = 0; i < text.length; i += 1) { const c = text[i]; if (c === '"') { if (quoted && text[i + 1] === '"') { i += 1 } else quoted = !quoted } else if ((c === '\n' || c === '\r') && !quoted) { if (c === '\r' && text[i + 1] === '\n') i += 1; if (text.slice(start, i).trim() !== '') rows += 1; start = i + 1 } }
-    saw ||= text.slice(start).trim() !== ''; text = text.slice(start)
-  }
+  const reader = file.stream().getReader(); const decoder = new TextDecoder(); const digest = new StreamingSha256(); const scopeRows = new Map<string, number>(); let header: string[] | null = null; let eventIndex = -1; let performanceIndex = -1; let field = ''; let record: string[] = []; let quoted = false; let quotePending = false; let skipLf = false; let rows = 0
+  const finishRecord = () => { record.push(field); field = ''; if (header === null) { header = record.map((value, index) => index === 0 ? value.replace(/^\uFEFF/, '') : value); eventIndex = header.indexOf('event_id'); performanceIndex = header.indexOf('performance_id'); if (eventIndex < 0 || performanceIndex < 0) throw new Error('CSV 헤더에 event_id와 performance_id가 필요합니다.') } else { if (record.length !== header.length) throw new Error('CSV 열 수가 헤더와 맞지 않습니다.'); const eventId = record[eventIndex]?.trim().toLowerCase(); const performanceId = record[performanceIndex]?.trim().toLowerCase(); if (!isUuid(eventId) || !isUuid(performanceId)) throw new Error('CSV의 event_id 또는 performance_id가 UUID가 아닙니다.'); const key = `${eventId}:${performanceId}`; scopeRows.set(key, (scopeRows.get(key) ?? 0) + 1); rows += 1 } record = [] }
+  const consume = (text: string) => { for (let index = 0; index < text.length; index += 1) { const char = text[index]; if (skipLf) { skipLf = false; if (char === '\n') continue } if (quotePending) { quotePending = false; if (char === '"') { field += '"'; quoted = true; continue } quoted = false }
+      if (quoted) { if (char === '"') { quotePending = true } else field += char; continue }
+      if (char === '"') { if (field.length !== 0) throw new Error('CSV 따옴표 위치가 올바르지 않습니다.'); quoted = true; continue }
+      if (char === ',') { record.push(field); field = ''; continue }
+      if (char === '\r' || char === '\n') { finishRecord(); if (char === '\r') skipLf = true; continue }
+      field += char
+    } }
+  for (;;) { const next = await reader.read(); if (next.done) break; digest.update(next.value); consume(decoder.decode(next.value, { stream: true })) }
+  consume(decoder.decode())
+  if (quotePending) quoted = false
   if (quoted) throw new Error('CSV 인용부호가 닫히지 않았습니다.')
-  if (text.trim() !== '' || saw && rows === 0) rows += 1
-  return { bytes: file.size, sha256: digest.hex(), rows }
+  if (field.length !== 0 || record.length !== 0) finishRecord()
+  if (header === null) throw new Error('CSV 헤더가 필요합니다.')
+  return { bytes: file.size, sha256: digest.hex(), rows, scopeRows }
 }
 
-export function validateScope(mode: 'FULL_SNAPSHOT' | 'CHANGE_FEED', scope: { performanceId: string; scopeAsOf: string; cursorStart: string; cursorEnd: string; sequenceStart: string; sequenceEnd: string }) {
+export function validateScope(mode: 'FULL_SNAPSHOT' | 'CHANGE_FEED', scope: { performanceId: string; scopeAsOf: string; cursorStart: string; cursorEnd: string; sequenceStart: string; sequenceEnd: string; declaredRowCount: string }) {
   if (!isUuid(scope.performanceId)) return 'ACTIVE 회차를 선택해 주세요.'
+  const count = Number(scope.declaredRowCount)
+  if (!Number.isSafeInteger(count) || count < 0) return 'scope 행 수는 0 이상의 정수여야 합니다.'
   if (mode === 'FULL_SNAPSHOT' && (!scope.scopeAsOf || !scope.cursorEnd || !scope.sequenceEnd)) return 'FULL_SNAPSHOT에는 기준시각, cursorEnd, sourceSequenceEnd가 필요합니다.'
   if (mode === 'CHANGE_FEED' && (!scope.cursorStart || !scope.cursorEnd || !scope.sequenceStart || !scope.sequenceEnd)) return 'CHANGE_FEED에는 시작·종료 cursor와 source sequence가 필요합니다.'
+  if (mode === 'CHANGE_FEED' && (!Number.isSafeInteger(Number(scope.sequenceStart)) || !Number.isSafeInteger(Number(scope.sequenceEnd)) || Number(scope.sequenceStart) < 0 || Number(scope.sequenceEnd) < Number(scope.sequenceStart) || Number(scope.sequenceEnd) - Number(scope.sequenceStart) + 1 !== count)) return 'CHANGE_FEED sourceSequence 범위는 scope 행 수와 정확히 일치해야 합니다.'
   return null
 }
