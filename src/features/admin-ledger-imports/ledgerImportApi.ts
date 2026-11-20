@@ -19,9 +19,9 @@ export const analysisJobListSchema = z.array(analysisJobSchema)
 export const signalListSchema = z.array(z.object({ ticketReferenceHmac: sha256, hmacKeyVersion: z.string().trim().min(1).max(32), paymentHmac: sha256.nullable().optional(), addressHmac: sha256.nullable().optional(), deviceHmac: sha256.nullable().optional(), ipHmac: sha256.nullable().optional(), sourceVersion: z.string().trim().min(1).max(128) }).superRefine((value, context) => { if (![value.paymentHmac, value.addressHmac, value.deviceHmac, value.ipHmac].some(Boolean)) context.addIssue({ code: 'custom', message: '결제·주소·기기·IP HMAC 중 하나 이상이 필요합니다.' }) })).min(1)
 export const emptySchema = z.undefined()
 
-export function ledgerImportsPath() { return adminApiPath('/api/v1/admin/ledger-imports', { page: 0, pageSize: 20 }) }
+export function ledgerImportsPath(page = 0, pageSize = 20) { return adminApiPath('/api/v1/admin/ledger-imports', { page, pageSize }) }
 export function ledgerImportPath(importId: string) { return `/api/v1/admin/ledger-imports/${importId}` }
-export function ledgerErrorsPath(importId: string) { return adminApiPath(`${ledgerImportPath(importId)}/errors`, { page: 0, pageSize: 100 }) }
+export function ledgerErrorsPath(importId: string, page = 0, pageSize = 100) { return adminApiPath(`${ledgerImportPath(importId)}/errors`, { page, pageSize }) }
 export function uploadSessionPath(importId: string) { return `${ledgerImportPath(importId)}/upload-session` }
 export function completeUploadPath(importId: string) { return `${ledgerImportPath(importId)}/complete-upload` }
 export function publishPath(importId: string) { return `${ledgerImportPath(importId)}/publish` }
