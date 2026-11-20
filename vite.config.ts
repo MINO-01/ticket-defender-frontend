@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./src/test/setup.ts'],
       css: true,
       testTimeout: 30000,
+      // 병렬 jsdom 초기화가 기존 Testing Library 5초 조회 창을 소진하면 실제 렌더링 완료 전 findBy가 실패한다.
+      // 전역 timeout을 늘리지 않고 worker 수만 제한해 파일 간 격리는 유지한다.
+      maxWorkers: 2,
     },
   }
 })
