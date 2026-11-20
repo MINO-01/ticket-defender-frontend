@@ -145,8 +145,10 @@ function FindingTable({ job, page, setPage, query, evaluation }: { job: BulkJob;
   if (query.result === null) return <LoadingSkeleton label="한도 초과 후보를 불러오는 중" />
   if (query.result.kind !== 'success') { const message = describeAdminApiFailure(query.result, '한도 초과 후보를 찾을 수 없거나 접근 범위 밖입니다'); return <ErrorState title={message.title} description={message.description} onRetry={query.retry} /> }
   if (!isBulkPageForJob(query.result.data, job) || query.result.data.page !== page) return <InvalidScopedResponse retry={query.retry} />
-  const data = query.result.data; const final = evaluation?.status === 'EVALUATED' && evaluation.findingsCollectionStatus === 'COMPLETED'
-  return <section aria-label="구매 한도 초과 후보"><h3>구매 한도 초과 후보</h3>{!final && <p className={styles.warning}>{evaluation === null ? '평가가 아직 없거나 수집 중입니다.' : evaluation.status !== 'EVALUATED' ? `${evaluationHelp(evaluation.status)}: 정상 0건이 아닙니다.` : `finding 수집 상태가 ${evaluation.findingsCollectionStatus}입니다. 최종 목록으로 취급하지 않습니다.`}</p>}<p className={styles.muted}>후보는 조사 대상일 뿐 자동 확정, Case 생성, 취소 또는 제재 근거가 아닙니다. 표시되는 ID는 원본 HMAC이 아닌 job 범위 opaque 식별자입니다.</p>
+  const data = query.result.data; const final = job.status === 'COMPLETED' && job.sharedSignalObservationsStatus === 'COMPLETED' && job.purchaseLimitEvaluationsStatus === 'COMPLETED'
+    && evaluation?.status === 'EVALUATED' && evaluation.findingsCollectionStatus === 'COMPLETED' && evaluation.accountLimitFindingCount === 0
+    && page === 0 && data.page === 0 && data.items.length === 0 && !data.hasNext
+  return <section aria-label="구매 한도 초과 후보"><h3>구매 한도 초과 후보</h3>{!final && <p className={styles.warning}>{evaluation === null ? '평가가 아직 없거나 수집 중입니다.' : evaluation.status !== 'EVALUATED' ? `${evaluationHelp(evaluation.status)}: 정상 0건이 아닙니다.` : evaluation.findingsCollectionStatus !== 'COMPLETED' ? `finding 수집 상태가 ${evaluation.findingsCollectionStatus}입니다. 최종 목록으로 취급하지 않습니다.` : 'Job 완료, 보조 수집, 기대 finding 수 또는 첫 페이지 결과가 정상 0건 조건과 일치하지 않습니다.'}</p>}<p className={styles.muted}>후보는 조사 대상일 뿐 자동 확정, Case 생성, 취소 또는 제재 근거가 아닙니다. 표시되는 ID는 원본 HMAC이 아닌 job 범위 opaque 식별자입니다.</p>
     <DataTable caption="구매 한도 초과 후보 목록" rows={data.items} getRowKey={(item) => item.accountId} emptyMessage={final ? '정상 평가가 완료되었고 한도 초과 후보는 0건입니다.' : '정상 0건으로 해석하지 않는 결과입니다.'} columns={[
       { key: 'account', header: 'opaque 계정 ID', render: (item: BulkFinding) => item.accountId },
       { key: 'quantity', header: '확인 수량 / 한도', render: (item: BulkFinding) => `${item.effectiveTicketQuantity} / ${item.maxTicketsPerAccount}` },

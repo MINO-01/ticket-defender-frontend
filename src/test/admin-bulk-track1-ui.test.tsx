@@ -19,14 +19,14 @@ const page = (items: unknown[], current = job()) => ({ job: current, items, page
 function panel(event = eventId) { return <MemoryRouter><AdminAuthProvider adapter={adapter()}><RequireAdminAuth><BulkTrack1Results eventId={event} performanceId={performanceId} /></RequireAdminAuth></AdminAuthProvider></MemoryRouter> }
 function renderPanel(event = eventId) { return render(panel(event)) }
 
-function successMock(current = job()) {
+function successMock(current = job(), expectedFindingCount = 0) {
   return vi.fn<typeof fetch>(async (input) => {
     const url = String(input)
     if (url.endsWith('/bulk-analysis-jobs')) return json([current])
     if (url.includes('/clusters/cluster-01/members?')) return json({ clusterId: 'cluster-01', items: [{ memberId: 'a'.repeat(24) }], page: 0, pageSize: 100, hasNext: false })
     if (url.includes('/clusters?')) return json(page([{ clusterId: 'cluster-01', riskScore: 0.7, memberCount: 2, paymentSharedSignalCount: 1, addressSharedSignalCount: 1, deviceSharedSignalCount: 1, ipSharedSignalCount: 1 }], current))
     if (url.includes('/shared-signal-observations?')) return json(page([{ observationId: 'obs-1', signalType: 'IP', distinctAccountCount: 2, scopeAccountCount: 3, distinctReservationCount: 2, totalTicketQuantity: null, ticketQuantityStatus: 'UNAVAILABLE', paymentSharedAccountCount: 1, deviceSharedAccountCount: 1, ipNetworkType: 'PUBLIC', purchaseWindowSeconds: 30, excludedFromLouvain: true }], current))
-    if (url.includes('/purchase-limit-evaluations?')) return json(page([{ performanceId, status: 'EVALUATED', policyVersion: 'policy-v1', accountLimitFindingCount: 0, findingsCollectionStatus: 'COMPLETED' }], current))
+    if (url.includes('/purchase-limit-evaluations?')) return json(page([{ performanceId, status: 'EVALUATED', policyVersion: 'policy-v1', accountLimitFindingCount: expectedFindingCount, findingsCollectionStatus: 'COMPLETED' }], current))
     if (url.includes('/purchase-limit-findings?')) return json(page([], current))
     return new Response(null, { status: 404 })
   })
@@ -35,7 +35,7 @@ function successMock(current = job()) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('BL-07 대용량 Track 1 관리자 결과 UI', () => {
-  it('선택한 Job의 군집, 구성원, IP 관찰, 정상 평가 0건을 실제 API 경로에서 표시한다', async () => {
+  it('COMPLETED Job의 평가 finding 0건과 비어 있는 첫 findings 페이지에서만 정상 0건을 표시한다', async () => {
     const fetchMock = successMock(); vi.stubGlobal('fetch', fetchMock)
     renderPanel()
     fireEvent.click(await screen.findByRole('button', { name: '상세 열기' }))
@@ -48,17 +48,31 @@ describe('BL-07 대용량 Track 1 관리자 결과 UI', () => {
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/clusters/cluster-01/members?page=0&pageSize=100'), expect.any(Object))
   })
 
-  it('정책 미확정과 수량 자료 불완전은 정상 0건과 구분한다', async () => {
+  it.each(['FAILED', 'BLOCKED'] as const)('%s Job은 완료된 평가 기록이 있어도 정상 0건으로 표시하지 않는다', async (status) => {
+    vi.stubGlobal('fetch', successMock(job(otherJobId, status)))
+    renderPanel(); fireEvent.click(await screen.findByRole('button', { name: '상세 열기' }))
+    expect(await screen.findByText(status === 'FAILED' ? /실패함 \(FAILED\)/ : /차단됨 \(BLOCKED\)/)).toBeInTheDocument()
+    expect(screen.queryByText('정상 평가가 완료되었고 한도 초과 후보는 0건입니다.')).not.toBeInTheDocument()
+  })
+
+  it('평가의 기대 finding 수가 1건 이상이면 빈 findings 페이지를 정상 0건으로 표시하지 않는다', async () => {
+    vi.stubGlobal('fetch', successMock(job(), 1))
+    renderPanel(); fireEvent.click(await screen.findByRole('button', { name: '상세 열기' }))
+    expect(await screen.findByText('구매 한도 초과 후보')).toBeInTheDocument()
+    expect(screen.queryByText('정상 평가가 완료되었고 한도 초과 후보는 0건입니다.')).not.toBeInTheDocument()
+  })
+
+  it.each(['POLICY_NOT_CONFIRMED', 'QUANTITY_DATA_INCOMPLETE'] as const)('%s 평가는 정상 0건과 구분한다', async (status) => {
     const current = job()
     vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (input) => {
       const url = String(input)
       if (url.endsWith('/bulk-analysis-jobs')) return json([current])
       if (url.includes('/clusters?') || url.includes('/shared-signal-observations?') || url.includes('/purchase-limit-findings?')) return json(page([], current))
-      if (url.includes('/purchase-limit-evaluations?')) return json(page([{ performanceId, status: 'POLICY_NOT_CONFIRMED', policyVersion: null, accountLimitFindingCount: 0, findingsCollectionStatus: 'NOT_APPLICABLE' }], current))
+      if (url.includes('/purchase-limit-evaluations?')) return json(page([{ performanceId, status, policyVersion: null, accountLimitFindingCount: 0, findingsCollectionStatus: 'NOT_APPLICABLE' }], current))
       return new Response(null, { status: 404 })
     }))
     renderPanel(); fireEvent.click(await screen.findByRole('button', { name: '상세 열기' }))
-    expect(await screen.findByText('정책 미확정 (POLICY_NOT_CONFIRMED)')).toBeInTheDocument()
+    expect(await screen.findByText(status === 'POLICY_NOT_CONFIRMED' ? '정책 미확정 (POLICY_NOT_CONFIRMED)' : '수량 자료 불완전 (QUANTITY_DATA_INCOMPLETE)')).toBeInTheDocument()
     expect(screen.queryByText('정상 평가가 완료되었고 한도 초과 후보는 0건입니다.')).not.toBeInTheDocument()
   })
 
