@@ -86,7 +86,7 @@ function JobCard({ listJob, eventId, done }: { listJob: LedgerImportJob; eventId
 function candidateCanPublish(preview: LedgerCandidatePreview, job: LedgerImportJob) {
   if (preview.importId !== job.importId || preview.preparationStatus !== 'READY' || preview.dataStatus !== 'COMPLETE' || preview.scopes.length !== job.scopes.length) return false
   const expected = new Set(job.scopes.map((scope) => `${scope.eventId}:${scope.performanceId}`))
-  return preview.scopes.every((scope) => expected.delete(`${scope.eventId}:${scope.performanceId}`) && scope.versionId !== null && scope.generation !== null && scope.revision !== null && scope.headStatus === 'CURRENT') && expected.size === 0
+  return preview.scopes.every((scope) => expected.delete(`${scope.eventId}:${scope.performanceId}`) && scope.versionId !== null && scope.generation !== null && scope.revision !== null && scope.versionStatus === 'READY' && scope.headStatus === 'CURRENT') && expected.size === 0
 }
 
 function CandidatePreview({ query, job, onRefresh }: { query: ReturnType<typeof useAdminQuery<LedgerCandidatePreview>>; job: LedgerImportJob; onRefresh: () => void }) {
