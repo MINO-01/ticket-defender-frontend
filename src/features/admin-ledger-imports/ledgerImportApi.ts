@@ -13,6 +13,19 @@ export const jobPageSchema = z.object({ items: z.array(jobSchema), page: z.numbe
 export const errorsPageSchema = z.object({ items: z.array(z.object({ sequenceNo: z.number().int().nonnegative(), code: z.string(), createdAt: dateTime })), page: z.number().int().nonnegative(), pageSize: z.number().int().positive(), hasNext: z.boolean() })
 export const uploadSessionSchema = z.object({ uploadUrl: z.string().url(), expiresAt: dateTime })
 export const publicationSchema = z.object({ publicationId: uuid, importId: uuid, sourceSystem: z.string(), sourceBatchId: z.string(), publishedAt: dateTime, scopes: z.array(z.object({ eventId: uuid, performanceId: uuid, previousVersionId: uuid.nullable(), versionId: uuid, generation: z.number().int().nonnegative(), revision: z.number().int().nonnegative(), outboxPending: z.boolean() })) })
+export const candidatePreviewSchema = z.object({
+  importId: uuid,
+  preparationStatus: z.enum(['NOT_STARTED', 'PREPARING', 'READY', 'REJECTED', 'PUBLISHED']),
+  dataStatus: z.enum(['NOT_AVAILABLE', 'PREPARING', 'COMPLETE', 'INCOMPLETE']),
+  failureCode: z.string().nullable(),
+  scopes: z.array(z.object({
+    eventId: uuid, performanceId: uuid, versionId: uuid.nullable(), generation: z.number().int().nonnegative().nullable(),
+    revision: z.number().int().nonnegative().nullable(), baseVersionId: uuid.nullable(), expectedHeadKnown: z.boolean().nullable(),
+    expectedHeadVersionId: uuid.nullable(), currentHeadVersionId: uuid.nullable(),
+    headStatus: z.enum(['UNAVAILABLE', 'UNKNOWN', 'CURRENT', 'CHANGED']), versionStatus: z.enum(['PREPARING', 'READY', 'REJECTED', 'PUBLISHED']).nullable(),
+  })),
+})
+export type LedgerCandidatePreview = z.infer<typeof candidatePreviewSchema>
 export const analysisJobSchema = z.object({ jobId: uuid, outboxId: uuid, versionId: uuid, status: z.enum(['PENDING', 'PROCESSING', 'RETRYABLE', 'BLOCKED', 'DELIVERED']), attemptCount: z.number().int().nonnegative(), failureCode: z.string().nullable(), runId: uuid.nullable(), analysisRequestId: uuid.nullable(), executionStatus: z.string().nullable(), evaluationStatus: z.string().nullable(), policyVersion: z.string().nullable(), algorithmVersion: z.string().nullable(), completedAt: dateTime.nullable() })
 export type AnalysisJob = z.infer<typeof analysisJobSchema>
 export const analysisJobListSchema = z.array(analysisJobSchema)
@@ -26,6 +39,7 @@ export function uploadSessionPath(importId: string) { return `${ledgerImportPath
 export function completeUploadPath(importId: string) { return `${ledgerImportPath(importId)}/complete-upload` }
 export function publishPath(importId: string) { return `${ledgerImportPath(importId)}/publish` }
 export function publicationPath(importId: string) { return `${ledgerImportPath(importId)}/publication` }
+export function candidatesPath(importId: string) { return `${ledgerImportPath(importId)}/candidates` }
 export function analysisRunsPath(eventId: string, performanceId: string) { return `/api/v1/admin/events/${eventId}/ledger-track1/performances/${performanceId}/analysis-runs` }
 export function analysisRunPath(eventId: string, performanceId: string, jobId: string) { return `${analysisRunsPath(eventId, performanceId)}/${jobId}` }
 export function signalsPath(eventId: string, versionId: string) { return `/api/v1/admin/events/${eventId}/ledger-track1/versions/${versionId}/signals` }
