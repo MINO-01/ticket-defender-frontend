@@ -22,6 +22,9 @@ export function describeAdminApiFailure(failure: AdminApiFailure, notFoundTitle:
       if (failure.status === 409 && failure.code === 'TENANT_SELECTION_REQUIRED') {
         return { title: '여러 고객사 소속 계정은 아직 지원하지 않습니다', description: '고객사 선택 정책이 확정되지 않아 조회를 차단했습니다. 고객사를 임의로 선택하거나 합치지 않습니다.' }
       }
+      if (failure.status === 409 && failure.code === 'MULTI_EVENT_DISABLED') {
+        return { title: '다공연 분석 기능이 비활성화되어 있습니다', description: '현재 환경에서 이 기능을 실행하도록 설정되지 않았습니다. 기존 작업의 빈 결과로 처리하지 않습니다.' }
+      }
       if (failure.status === 400) return { title: '요청 값이 올바르지 않습니다', description: '공연, 페이지 또는 정렬 값을 확인해 주세요.' }
       if (failure.status === 503) return { title: '서버가 일시적으로 응답할 수 없습니다', description: `잠시 후 다시 시도해 주세요. ${notVerified}` }
       if (failure.status >= 500) return { title: '서버 오류로 조회하지 못했습니다', description: `잠시 후 다시 시도해 주세요. ${notVerified}` }

@@ -5,6 +5,11 @@ coverage/
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
 
 .DS_Store
 Thumbs.db
