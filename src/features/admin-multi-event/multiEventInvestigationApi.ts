@@ -11,7 +11,7 @@ const candidateId = z.string().regex(/^multi-[a-f0-9]{64}$/)
 
 export const multiEventRunSchema = z.object({
   id: uuid,
-  status: z.enum(['PENDING', 'RUNNING', 'RETRYABLE', 'FAILED', 'BLOCKED', 'COMPLETED']),
+  status: z.enum(['PENDING', 'RUNNING', 'DATA_PENDING', 'RETRYABLE', 'FAILED', 'BLOCKED', 'COMPLETED']),
   failureCode: z.string().max(64).nullable(),
   ledgerVersionSetDigest: z.string().regex(/^[a-f0-9]{64}$/),
   scoreVersion: z.literal('score-v2-exp2-multi-event-recurrence'),
@@ -54,7 +54,7 @@ export const multiEventRelationshipPageSchema = page(z.object({
   memberIds: z.array(opaque).max(20), membersTruncated: z.boolean(), sourceScopes: z.array(multiEventScopeSchema).max(500),
 }))
 export type MultiEventRelationship = z.infer<typeof multiEventRelationshipPageSchema>['items'][number]
-export const multiEventAcceptedSchema = z.object({ runId: uuid, existing: z.boolean(), status: z.enum(['PENDING', 'RUNNING', 'RETRYABLE', 'FAILED', 'BLOCKED', 'COMPLETED']) })
+export const multiEventAcceptedSchema = z.object({ runId: uuid, existing: z.boolean(), status: z.enum(['PENDING', 'RUNNING', 'DATA_PENDING', 'RETRYABLE', 'FAILED', 'BLOCKED', 'COMPLETED']) })
 
 export type MultiEventRun = z.infer<typeof multiEventRunSchema>
 export type MultiEventRunPage = z.infer<typeof multiEventRunListSchema>
