@@ -20,7 +20,8 @@ function randomRequestId() { return typeof crypto !== 'undefined' && typeof cryp
 function localInputDate(date: Date) { const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000); return local.toISOString().slice(0, 16) }
 
 export function MultiEventInvestigationRoute() {
-  const events = useAdminQuery(adminEventsPath(0), adminEventPageSchema)
+  const [eventPage, setEventPage] = useState(0)
+  const events = useAdminQuery(adminEventsPath(eventPage), adminEventPageSchema)
   const client = useAdminApiClient()
   const [selectedEvents, setSelectedEvents] = useState<string[]>([])
   const [selectedPerformanceMap, setSelectedPerformanceMap] = useState<Record<string, string[]>>({})
@@ -68,6 +69,7 @@ export function MultiEventInvestigationRoute() {
           : events.result.data.items.length === 0 ? <EmptyState title="접근 가능한 공연이 없습니다" />
             : <><p>서로 다른 공연을 둘 이상 선택합니다. 서버가 권한, 공개 상태, 공급자 namespace, HMAC 목적 및 키 버전을 재검증합니다.</p>
               <div className={styles.form}>{events.result.data.items.map((event) => <label key={event.id}><input type="checkbox" checked={selected.has(event.id)} onChange={() => toggleEvent(event.id)} /> {event.name}</label>)}</div>
+              <p><Button size="small" variant="secondary" disabled={eventPage===0} onClick={() => setEventPage((value)=>Math.max(0,value-1))}>공연 이전</Button> <Button size="small" variant="secondary" disabled={!events.result.data.hasNext} onClick={() => setEventPage((value)=>value+1)}>공연 다음</Button> <span>선택 {selectedEvents.length}개</span></p>
               <div className={styles.form}><label>분석 시작 <input type="datetime-local" value={periodStart} max={periodEnd} onChange={(event) => setPeriodStart(event.target.value)} /></label><label>분석 종료 <input type="datetime-local" value={periodEnd} max={localInputDate(new Date())} onChange={(event) => setPeriodEnd(event.target.value)} /></label></div>
               {selectedEvents.map((eventId) => <EventPerformancePicker key={eventId} eventId={eventId} values={selectedPerformanceMap[eventId] ?? []} onChange={(values) => setSelectedPerformanceMap((current) => ({ ...current, [eventId]: values }))} />)}
               <Button loading={submitting} disabled={selectedEvents.length < 2} onClick={() => void submit()}>고정 원장으로 다공연 분석 요청</Button>
@@ -121,7 +123,10 @@ function RunDetail({ eventId, run, onRefresh }: { eventId: string; run: MultiEve
   if (run.status !== 'COMPLETED') return <section><h3>작업 상세</h3><p className={styles.warning}>현재 {run.status} 상태입니다. 빈 후보 목록을 정상 결과 0건으로 표시하지 않습니다.</p>{run.status === 'RETRYABLE' && <Button loading={retrying} onClick={() => void retryRun()}>분석 재시도</Button>}{retryMessage && <p role="status">{retryMessage}</p>}</section>
   return <section className={styles.detailColumn}><h3>조사 후보</h3>
     <p>모델 {run.scoreVersion} / {run.projectionVersion} / {run.algorithmVersion ?? '분석기 버전 없음'}. 분석 기준 {formatUtc(run.analysisAsOf)}. 분석 기간 {formatUtc(run.analysisStartAt)} ~ {formatUtc(run.analysisEndAt)}.</p>
-    {sources.result?.kind === 'success' && <p>고정 원장 source: {sources.result.data.length}개 회차 / {sources.result.data.map((source) => `${source.eventReference}/${source.performanceId} batch ${source.sourceBatchId}`).join(', ')}</p>}
+    {sources.result === null ? <LoadingSkeleton label="고정 원장 출처를 불러오는 중" />
+      : sources.result.kind !== 'success' ? <Failure result={sources.result} retry={sources.retry} fallback="고정 원장 출처를 불러오지 못했습니다" />
+        : sources.result.data.length === 0 ? <EmptyState title="고정 원장 출처가 없습니다" />
+          : <p>고정 원장 source: {sources.result.data.length}개 회차 / {sources.result.data.map((source) => `${source.eventReference}/${source.performanceId} batch ${source.sourceBatchId}`).join(', ')}</p>}
     {candidates.result === null ? <LoadingSkeleton label="조사 후보를 불러오는 중" />
       : candidates.result.kind !== 'success' ? <Failure result={candidates.result} retry={candidates.retry} fallback="조사 후보를 불러오지 못했습니다" />
         : <><DataTable caption="다공연 조사 후보" rows={candidates.result.data.items} getRowKey={(item) => item.candidateId} columns={[
@@ -131,22 +136,30 @@ function RunDetail({ eventId, run, onRefresh }: { eventId: string; run: MultiEve
           { key: 'open', header: '근거', render: (item) => <Button size="small" variant="secondary" onClick={() => setCandidate(item)}>열기</Button> },
         ]} />
           <p><Button size="small" variant="secondary" disabled={page === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}>이전</Button> <Button size="small" variant="secondary" disabled={!candidates.result.data.hasNext} onClick={() => setPage((value) => value + 1)}>다음</Button></p>
-          {candidate !== null && <CandidateDetail eventId={eventId} runId={run.id} candidate={candidate} />}
+          {candidate !== null && <CandidateDetail key={candidate.candidateId} eventId={eventId} runId={run.id} candidate={candidate} />}
         </>}
   </section>
 }
 
 function CandidateDetail({ eventId, runId, candidate }: { eventId: string; runId: string; candidate: MultiEventCandidate }) {
-  const members = useAdminQuery(multiEventMembersPath(eventId, runId, candidate.candidateId, 0), multiEventMemberPageSchema)
-  const relationships = useAdminQuery(multiEventRelationshipsPath(eventId, runId, candidate.candidateId, 0), multiEventRelationshipPageSchema)
+  const [memberPage, setMemberPage] = useState(0)
+  const [relationshipPage, setRelationshipPage] = useState(0)
+  const members = useAdminQuery(multiEventMembersPath(eventId, runId, candidate.candidateId, memberPage), multiEventMemberPageSchema)
+  const relationships = useAdminQuery(multiEventRelationshipsPath(eventId, runId, candidate.candidateId, relationshipPage), multiEventRelationshipPageSchema)
   const detail = safeDetail(candidate.scoreBreakdown)
   return <section aria-label="조사 후보 근거"><h3>조사 근거와 관계 그래프</h3>
     <p>그래프는 페이지 범위의 불투명 구성원과 검증된 관계만 표시합니다. 원본 HMAC, 개인정보, 저장소 경로는 브라우저로 전송하지 않습니다.</p>
     <dl className={styles.factList}><div><dt>L / G / B</dt><dd>{String(detail?.L ?? '미확인')} / {String(detail?.G ?? '미확인')} / {String(detail?.B ?? '미확인')}</dd></div><div><dt>Q / 공연 반복 R</dt><dd>{String(detail?.Q ?? '미확인')} / {String(detail?.R ?? '미확인')}</dd></div><div><dt>수량 상태와 사유</dt><dd>{String(detail?.quantityStatus ?? '미확인')} / {String(detail?.quantityReason ?? '정책 미포함')}</dd></div></dl>
     <p>가용 신호: {candidate.availableSignals}. 제외 신호: {candidate.excludedSignals}. 가용하지 않은 신호: {candidate.unavailableSignals}. 정상 공유 가능성: {candidate.normalSharingPossibilities}.</p>
     <h4>다음 확인 항목</h4><ul><li>각 출처 batch와 공개 원장 version을 확인합니다.</li><li>신호가 반복된 계정 관계를 원본 계약 밖으로 내보내지 않은 승인 자료와 대조합니다.</li><li>가족, 공동 주소, 공용 기기 등 정상 공유 가능성을 검토합니다.</li><li>가용하지 않은 신호는 근거가 있다고 간주하지 않습니다.</li></ul>
-    {relationships.result?.kind === 'success' && <><RelationshipGraph relationships={relationships.result.data.items} /><DataTable caption="검증된 관계" rows={relationships.result.data.items} getRowKey={(item) => item.relationshipId} columns={[{ key: 'signal', header: '신호', render: (item) => item.signalType }, { key: 'accounts', header: '계정 수', render: (item) => `${item.accountCount}${item.membersTruncated ? ' (그래프 일부)' : ''}` }, { key: 'scopes', header: '공연 / 회차 출처', render: (item) => item.sourceScopes.map((scope) => `${scope.eventReference}/${scope.performanceId} batch ${scope.sourceBatchId}`).join(', ') }]} /></>}
-    {members.result?.kind === 'success' && <DataTable caption="불투명 구성원" rows={members.result.data.items} getRowKey={(item) => item.memberId} columns={[{ key: 'member', header: '구성원', render: (item) => item.memberId }]} />}
+    {relationships.result === null ? <LoadingSkeleton label="관계 근거를 불러오는 중" />
+      : relationships.result.kind !== 'success' ? <Failure result={relationships.result} retry={relationships.retry} fallback="관계 근거를 불러오지 못했습니다" />
+        : relationships.result.data.items.length === 0 ? <EmptyState title="현재 페이지에 표시할 관계가 없습니다" />
+          : <><RelationshipGraph relationships={relationships.result.data.items} /><DataTable caption="검증된 관계" rows={relationships.result.data.items} getRowKey={(item) => item.relationshipId} columns={[{ key: 'signal', header: '신호', render: (item) => item.signalType }, { key: 'accounts', header: '계정 수', render: (item) => `${item.accountCount}${item.membersTruncated ? ' (그래프 일부)' : ''}` }, { key: 'scopes', header: '공연 / 회차 출처', render: (item) => item.sourceScopes.map((scope) => `${scope.eventReference}/${scope.performanceId} batch ${scope.sourceBatchId}`).join(', ') }]} /><p><Button size="small" variant="secondary" disabled={relationshipPage===0} onClick={() => setRelationshipPage((value)=>Math.max(0,value-1))}>관계 이전</Button> <Button size="small" variant="secondary" disabled={!relationships.result.data.hasNext} onClick={() => setRelationshipPage((value)=>value+1)}>관계 다음</Button></p></>}
+    {members.result === null ? <LoadingSkeleton label="구성원 페이지를 불러오는 중" />
+      : members.result.kind !== 'success' ? <Failure result={members.result} retry={members.retry} fallback="구성원 페이지를 불러오지 못했습니다" />
+        : members.result.data.items.length === 0 ? <EmptyState title="표시할 구성원이 없습니다" />
+          : <><DataTable caption="불투명 구성원" rows={members.result.data.items} getRowKey={(item) => item.memberId} columns={[{ key: 'member', header: '구성원', render: (item) => item.memberId }]} /><p><Button size="small" variant="secondary" disabled={memberPage===0} onClick={() => setMemberPage((value)=>Math.max(0,value-1))}>구성원 이전</Button> <Button size="small" variant="secondary" disabled={!members.result.data.hasNext} onClick={() => setMemberPage((value)=>value+1)}>구성원 다음</Button></p></>}
   </section>
 }
 

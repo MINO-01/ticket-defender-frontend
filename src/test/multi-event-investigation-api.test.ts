@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   multiEventAvailablePerformancesPath, multiEventCandidatesPath, multiEventMembersPath,
-  multiEventRunListSchema, multiEventRetryPath, safeDetail,
+  multiEventRelationshipsPath, multiEventRunListSchema, multiEventRetryPath, safeDetail,
 } from '../features/admin-multi-event/multiEventInvestigationApi'
 
 const eventId = '00000000-0000-4000-8000-000000000001'
@@ -13,6 +13,8 @@ describe('multi-event investigation API contract', () => {
     expect(multiEventCandidatesPath(eventId, runId, 0)).toContain('page=0&pageSize=20')
     expect(multiEventRetryPath(eventId, runId)).toBe(`/api/v1/admin/multi-event-investigations/events/${eventId}/${runId}/retry`)
     expect(multiEventMembersPath(eventId, runId, '../candidate', 0)).toBeNull()
+    expect(multiEventMembersPath(eventId, runId, `multi-${'a'.repeat(64)}`, -1)).toBeNull()
+    expect(multiEventRelationshipsPath(eventId, runId, `multi-${'a'.repeat(64)}`, Number.MAX_SAFE_INTEGER + 1)).toBeNull()
   })
 
   it('does not accept an incomplete completed run response', () => {
