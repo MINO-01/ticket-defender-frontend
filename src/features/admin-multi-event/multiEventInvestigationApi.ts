@@ -8,13 +8,17 @@ const bounded = z.string().min(1).max(160)
 const safeInteger = z.number().int().nonnegative().refine(Number.isSafeInteger)
 const opaque = z.string().regex(/^[a-f0-9]{24}$/)
 const candidateId = z.string().regex(/^multi-[a-f0-9]{64}$/)
+/** R을 서로 다른 회차 수로 계산하는 현재 다회차 점수 모델이다. */
+export const multiPerformanceScoreVersion = 'score-v2-exp2-multi-performance-recurrence'
+/** R을 공연 수로 계산하던 퇴역 모델이다. 이미 저장된 작업은 읽기 전용으로만 보여 준다. */
+export const retiredScoreVersion = 'score-v2-exp2-multi-event-recurrence'
 
 export const multiEventRunSchema = z.object({
   id: uuid,
   status: z.enum(['PENDING', 'RUNNING', 'DATA_PENDING', 'RETRYABLE', 'FAILED', 'BLOCKED', 'COMPLETED']),
   failureCode: z.string().max(64).nullable(),
   ledgerVersionSetDigest: z.string().regex(/^[a-f0-9]{64}$/),
-  scoreVersion: z.literal('score-v2-exp2-multi-event-recurrence'),
+  scoreVersion: z.enum([multiPerformanceScoreVersion, retiredScoreVersion]),
   projectionVersion: z.literal('projection-v2.2-exp2-ipwindow-softhub'),
   algorithmVersion: z.string().max(256).nullable(),
   analysisAsOf: instant,

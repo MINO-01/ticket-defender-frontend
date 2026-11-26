@@ -33,6 +33,19 @@ describe('multi-event investigation API contract', () => {
     expect(multiEventAcceptedSchema.parse({ runId, existing: true, status: 'DATA_PENDING' }).status).toBe('DATA_PENDING')
   })
 
+  it('accepts the multi-performance score version, keeps retired runs readable and rejects unknown versions', () => {
+    const run = (scoreVersion: string) => ({
+      id: runId, status: 'DATA_PENDING', failureCode: null, ledgerVersionSetDigest: 'a'.repeat(64),
+      scoreVersion, projectionVersion: 'projection-v2.2-exp2-ipwindow-softhub', algorithmVersion: null,
+      analysisAsOf: '2026-01-01T00:00:00Z', analysisStartAt: '2025-12-01T00:00:00Z', analysisEndAt: '2026-01-01T00:00:00Z',
+      createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', completedAt: null,
+    })
+    const parse = (scoreVersion: string) => multiEventRunListSchema.safeParse({ items: [run(scoreVersion)], page: 0, pageSize: 20, hasNext: false }).success
+    expect(parse('score-v2-exp2-multi-performance-recurrence')).toBe(true)
+    expect(parse('score-v2-exp2-multi-event-recurrence')).toBe(true)
+    expect(parse('score-v2-exp2-unknown')).toBe(false)
+  })
+
   it('only exposes object-shaped score details', () => {
     expect(safeDetail('{"L":0.8,"R":0.5}')).toEqual({ L: 0.8, R: 0.5 })
     expect(safeDetail('["unexpected"]')).toBeNull()

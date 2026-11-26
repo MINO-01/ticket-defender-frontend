@@ -25,6 +25,30 @@ export function describeAdminApiFailure(failure: AdminApiFailure, notFoundTitle:
       if (failure.status === 409 && failure.code === 'MULTI_EVENT_DISABLED') {
         return { title: '다공연 분석 기능이 비활성화되어 있습니다', description: '현재 환경에서 이 기능을 실행하도록 설정되지 않았습니다. 기존 작업의 빈 결과로 처리하지 않습니다.' }
       }
+      if (failure.status === 409 && failure.code === 'MULTI_EVENT_PERFORMANCE_SCOPE_REQUIRED') {
+        return { title: '회차를 두 개 이상 선택해 주세요', description: '같은 공연이어도 서로 다른 회차가 두 개 이상 있어야 반복 근거를 확인할 수 있습니다. 공개 원장이 있는 회차를 다시 선택해 주세요.' }
+      }
+      if (failure.status === 409 && failure.code === 'SCORE_VERSION_RETIRED') {
+        return { title: '퇴역한 점수 모델의 작업입니다', description: '이전 점수 모델로 저장된 결과는 조회만 할 수 있으며 다시 실행하지 않습니다. 새 분석을 요청해 주세요.' }
+      }
+      if (failure.status === 409 && failure.code === 'MULTI_EVENT_SUPPLIER_MIXED') {
+        return { title: '서로 다른 예매처의 원장은 함께 분석하지 않습니다', description: '선택한 회차의 공급자 namespace가 하나가 아닙니다. 예매처별로 나누어 요청해 주세요.' }
+      }
+      if (failure.status === 409 && failure.code === 'MULTI_EVENT_IDENTITY_CONTRACT_UNAVAILABLE') {
+        return { title: '연결 신호의 키 정보가 하나로 맞지 않습니다', description: '선택한 회차의 HMAC 목적 또는 키 버전이 서로 다르거나 확인되지 않아 함께 분석하지 않습니다.' }
+      }
+      if (failure.status === 409 && failure.code === 'UPLOAD_OBJECT_EXPIRED') {
+        return { title: '업로드 원본이 보존 한도를 넘겨 삭제되었습니다', description: '이 작업은 다시 처리할 수 없습니다. 새 반입 작업으로 등록해 주세요.' }
+      }
+      if (failure.status === 409 && failure.code === 'TRACK1_SIGNAL_KEY_UNAVAILABLE') {
+        return { title: '신호 키 공급원이 설정되지 않았습니다', description: '원본 신호를 안전하게 변환할 키를 확인하지 못해 처리를 중단했습니다. 운영 설정을 확인해 주세요.' }
+      }
+      if (failure.status === 422 && failure.code === 'BULK_V3_RAW_INTAKE_DISABLED') {
+        return { title: '원본 신호 반입(v3)이 비활성화되어 있습니다', description: '현재 환경에서는 v3 원본 신호 파일을 받지 않습니다. v1 또는 v2 형식은 그대로 사용할 수 있습니다.' }
+      }
+      if (failure.status === 503 && failure.code === 'BULK_V3_DELETE_PERMISSION_UNVERIFIED') {
+        return { title: '업로드 원본 삭제 권한을 확인하지 못했습니다', description: `원본을 처리 직후 지울 수 있는지 확인되지 않아 v3 반입을 받지 않습니다. ${notVerified}` }
+      }
       if (failure.status === 400) return { title: '요청 값이 올바르지 않습니다', description: '공연, 페이지 또는 정렬 값을 확인해 주세요.' }
       if (failure.status === 503) return { title: '서버가 일시적으로 응답할 수 없습니다', description: `잠시 후 다시 시도해 주세요. ${notVerified}` }
       if (failure.status >= 500) return { title: '서버 오류로 조회하지 못했습니다', description: `잠시 후 다시 시도해 주세요. ${notVerified}` }
