@@ -17,9 +17,10 @@ import type { LedgerImportJob, SupplierCsvMetadata } from '../admin-ledger-impor
 import { multiEventAcceptedSchema, multiEventAvailablePerformancesPath, multiEventCandidateFamiliesPath, multiEventCandidateFamilyPageSchema, multiEventRunPath, multiEventRunSchema } from '../admin-multi-event/multiEventInvestigationApi'
 import type { MultiEventCandidate, MultiEventCandidateFamily, MultiEventRun } from '../admin-multi-event/multiEventInvestigationApi'
 import { AdminPagePlaceholder } from '../../pages/admin/AdminPagePlaceholder'
+import { CreateCasePanel } from '../admin-cases/CreateCasePanel'
 import { buildSupplierRegistrationRequest, investigationExportPath, investigationRevealPath, investigationTargetPageSchema, investigationTargetsPath, scopeKey } from './investigationWizardApi'
 import type { InvestigationTargetPage } from './investigationWizardApi'
-import { readInvestigationWizardSnapshot, writeInvestigationWizardSnapshot } from './investigationWizardState'
+import { emptyInvestigationWizardSnapshot, investigationStorageNamespace, readInvestigationWizardSnapshot, writeInvestigationWizardSnapshot } from './investigationWizardState'
 import type { InvestigationScopeDraft, InvestigationSelectionRef, InvestigationWizardSnapshot } from './investigationWizardState'
 import styles from './InvestigationWizard.module.css'
 import caseStyles from '../admin-cases/Cases.module.css'
@@ -56,13 +57,28 @@ export function InvestigationWizardRoute() {
 
 function InvestigationWizard({ step }: { step: string }) {
   const navigate = useNavigate()
-  const [snapshot, setSnapshot] = useState<InvestigationWizardSnapshot>(() => readInvestigationWizardSnapshot())
+  const auth = useAdminAuth()
+  const accessToken = auth.state.status === 'authenticated' ? auth.getAccessToken() : null
+  const [snapshot, setSnapshot] = useState<InvestigationWizardSnapshot>(emptyInvestigationWizardSnapshot)
+  const [storageScope, setStorageScope] = useState<{ token: string | null; namespace: string | null; ready: boolean }>({ token: null, namespace: null, ready: false })
   const [selection, setSelection] = useState<SelectedInvestigation | null>(null)
   const goTo = (next: string) => navigate(`/app/investigate/${next}`)
   const updateSnapshot = useCallback((change: Partial<InvestigationWizardSnapshot>) => {
     setSnapshot((current) => ({ ...current, ...change }))
   }, [])
-  useEffect(() => { writeInvestigationWizardSnapshot(snapshot) }, [snapshot])
+  useEffect(() => {
+    let active = true
+    void investigationStorageNamespace(accessToken).then((namespace) => {
+      if (!active) return
+      setSnapshot(namespace === null ? emptyInvestigationWizardSnapshot : readInvestigationWizardSnapshot(namespace))
+      setStorageScope({ token: accessToken, namespace, ready: true })
+    })
+    return () => { active = false }
+  }, [accessToken])
+  useEffect(() => {
+    if (!storageScope.ready || storageScope.token !== accessToken || storageScope.namespace === null) return
+    writeInvestigationWizardSnapshot(snapshot, storageScope.namespace)
+  }, [accessToken, snapshot, storageScope])
   const onPublished = useCallback((scopes: PublishedScope[]) => {
     setSelection(null)
     setSnapshot((current) => ({ ...current, publishedScopes: scopes, runContext: null, selection: null, scopeDraft: null }))
@@ -84,12 +100,19 @@ function InvestigationWizard({ step }: { step: string }) {
   }, [updateSnapshot])
   const onSelectionRestored = useCallback((value: SelectedInvestigation) => setSelection((current) => current ?? value), [])
   const restoreSelection = step === '4' || step === '5' ? snapshot.selection : null
+  const storageReady = storageScope.ready && storageScope.token === accessToken
+
+  if (!storageReady) return <main className={styles.page}>
+    <header className={styles.heading}><p className={styles.eyebrow}>관리자 조사 흐름</p><h1>암표 조사 5단계</h1></header>
+    <LoadingSkeleton label="현재 관리자 범위의 조사 상태를 확인하는 중" />
+  </main>
 
   return <main className={styles.page}>
     <header className={styles.heading}>
       <p className={styles.eyebrow}>관리자 조사 흐름</p>
       <h1>암표 조사 5단계</h1>
       <p>분석 점수는 검토 순서를 돕는 신호입니다. 후보를 위반이나 부정 거래로 확정하지 않습니다.</p>
+      {storageScope.namespace === null && <p className={styles.notice} role="note">관리자 구분을 확인할 수 없어 이 탭에서는 복구 상태를 저장하지 않습니다.</p>}
     </header>
     <nav className={styles.stepNav} aria-label="조사 단계">
       {steps.map((item, index) => <button key={item.path} type="button" aria-current={step === item.path ? 'step' : undefined} onClick={() => goTo(item.path)} className={step === item.path ? styles.currentStep : ''}>
@@ -657,8 +680,11 @@ function FinalResultStep({ selection, restore }: { selection: SelectedInvestigat
       </ul>
     </section>
     <section className={styles.limitations} aria-label="후속 사건과 보고서 업무">
-      <h3>사건과 보고서 업무</h3>
-      <p>이 화면의 다공연 후보를 기존 사건의 근거로 직접 연결하는 기능은 제공되지 않습니다. 지원되는 근거로 사건을 만들거나 연결한 뒤 승인 요청과 보고서를 진행해 주세요.</p>
+      <h3>조사 사건 생성과 보고서 업무</h3>
+      <p>선택한 다공연 후보를 새 조사 사건의 근거로 연결합니다. 기존 사건의 출처는 이 화면에서 수정하지 않으며, 생성 이후 승인과 보고는 기존 업무 화면을 사용합니다.</p>
+      <CreateCasePanel context="다공연 조사 후보" blockedReason={completed ? null : '분석이 완료되지 않아 조사 사건을 만들 수 없습니다.'}
+        sources={{ eventId: selection.eventId, graphClusters: [], fanReportIds: [], evidenceIds: [],
+          multiEventCandidates: [{ runId: selection.runId, candidateId: selection.candidate.candidateId }] }} />
       <div className={styles.actions}>
         <Link to={caseListRoute(selection.eventId)}>사건 목록 열기</Link>
         <Link to="/app/approvals">승인 요청 화면 열기</Link>

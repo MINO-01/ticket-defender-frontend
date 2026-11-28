@@ -112,6 +112,11 @@ const reportSource = {
   analysisAlgorithm: null, analysisAlgorithmVersion: null, analysisCompletedAt: null, riskScore: null, fanReportId: REPORT_1, evidenceId: null, linkedAt: '2026-11-01T09:30:00Z',
 }
 const assetSource = { ...reportSource, sourceReferenceId: SOURCE_ASSET, sourceType: 'EVIDENCE_ASSET', evidenceId: EVIDENCE_1 }
+const multiEventSource = {
+  ...reportSource, sourceReferenceId: '77777777-7777-4777-8777-777777777774', sourceType: 'MULTI_EVENT_CANDIDATE',
+  fanReportId: null, multiEventRunId: '99999999-9999-4999-8999-999999999999',
+  multiEventCandidateId: `multi-${'a'.repeat(64)}`, multiEventCompletedAt: '2026-11-25T00:01:00Z',
+}
 
 function activity(overrides: Record<string, unknown> = {}) {
   return {
@@ -192,6 +197,9 @@ describe('Case 조회 API 계약', () => {
 
   it('출처 유형별로 허용된 필드 조합만 받아들인다', () => {
     expect(caseSourceListSchema.safeParse([clusterSource, reportSource, assetSource]).success).toBe(true)
+    expect(caseSourceListSchema.safeParse([multiEventSource]).success).toBe(true)
+    expect(caseSourceListSchema.safeParse([{ ...multiEventSource, fanReportId: REPORT_1 }]).success).toBe(false)
+    expect(caseSourceListSchema.safeParse([{ ...multiEventSource, multiEventCandidateId: 'account-reference' }]).success).toBe(false)
     expect(caseSourceListSchema.safeParse([{ ...clusterSource, riskScore: null, analysisAlgorithm: null, analysisCompletedAt: null }]).success).toBe(true)
     expect(caseSourceListSchema.safeParse([{ ...clusterSource, fanReportId: REPORT_1 }]).success).toBe(false)
     expect(caseSourceListSchema.safeParse([{ ...clusterSource, clusterId: null }]).success).toBe(false)
@@ -459,6 +467,18 @@ describe('Case 상세 Track 1 연결 비교 실제 API', () => {
 })
 
 describe('Case 상세, 출처, 활동 이력 실제 API', () => {
+  it('다공연 후보 출처를 기존 Case 상세에서 조사 참고 자료로 표시한다', async () => {
+    const fetchMock = stubFetch(detailRoute({ [sourcesPath()]: () => json(200, [multiEventSource]) }))
+    renderApp(`/app/cases/${CASE_1}?eventId=${EVENT_A}`)
+    const sources = await screen.findByRole('region', { name: '연결 출처' })
+    const source = await within(sources).findByRole('article', { name: '다공연 조사 후보' })
+    expect(within(source).getByText(multiEventSource.multiEventRunId)).toBeInTheDocument()
+    expect(within(source).getByText(multiEventSource.multiEventCandidateId)).toBeInTheDocument()
+    expect(within(source).getByText(/조사 우선순위 참고값/)).toBeInTheDocument()
+    expect(within(source).getByText(/실제 참조번호는 이 사건 출처에 저장되지 않습니다/)).toBeInTheDocument()
+    expect(requestedUrls(fetchMock)).toContain(sourcesPath())
+  })
+
   it('업무 연결이 없으면 각 기록을 없음으로 표시하고 다음 단계는 안내로만 보여 준다', async () => {
     stubFetch(detailRoute())
     renderApp(`/app/cases/${CASE_1}?eventId=${EVENT_A}`)

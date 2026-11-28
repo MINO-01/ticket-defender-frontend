@@ -160,6 +160,8 @@ export type CreateCaseInput = {
   evidenceIds: string[]
   /** 선택한 Track 2 후보 실행 ID. 서버 이력 응답의 runId만 넣는다. 비어 있으면 요청 본문에 넣지 않는다. */
   candidateRunIds?: string[]
+  /** 완료된 다공연 분석의 선택 후보. 계정이나 티켓 참조값은 포함하지 않는다. */
+  multiEventCandidates?: { runId: string; candidateId: string }[]
   reason: string
 }
 
@@ -171,6 +173,8 @@ export type CreateCaseBody = {
   evidenceIds: string[]
   /** 후보 실행을 선택한 경우에만 보낸다. 선택하지 않은 기존 요청 본문은 바뀌지 않는다. */
   candidateRunIds?: string[]
+  /** 다공연 후보를 선택한 경우에만 보낸다. */
+  multiEventCandidates?: { runId: string; candidateId: string }[]
   reason: string
   relatedCaseId: null
   relationReason: null
@@ -178,10 +182,11 @@ export type CreateCaseBody = {
 
 const maxCaseSources = 30
 
-/** 출처 구성으로 Case 유형을 정한다. 군집만이면 GRAPH_CLUSTER, 제보만이면 FAN_REPORT, 둘 다면 COMBINED다. 증거 이미지는 제보와 함께만 연결된다. */
-export function caseTypeFor(input: Pick<CreateCaseInput, 'graphClusters' | 'fanReportIds'>): CaseType | null {
-  if (input.graphClusters.length > 0 && input.fanReportIds.length > 0) return 'COMBINED'
-  if (input.graphClusters.length > 0) return 'GRAPH_CLUSTER'
+/** 출처 구성으로 Case 유형을 정한다. 그래프 또는 다공연 후보만이면 GRAPH_CLUSTER, 제보만이면 FAN_REPORT다. */
+export function caseTypeFor(input: Pick<CreateCaseInput, 'graphClusters' | 'fanReportIds' | 'multiEventCandidates'>): CaseType | null {
+  const hasGraphSource = input.graphClusters.length > 0 || (input.multiEventCandidates?.length ?? 0) > 0
+  if (hasGraphSource && input.fanReportIds.length > 0) return 'COMBINED'
+  if (hasGraphSource) return 'GRAPH_CLUSTER'
   if (input.fanReportIds.length > 0) return 'FAN_REPORT'
   return null
 }
@@ -189,15 +194,16 @@ export function caseTypeFor(input: Pick<CreateCaseInput, 'graphClusters' | 'fanR
 /**
  * CaseSourceVerifier 사전 규칙과 같은 조건으로 생성 요청을 만든다. 출처 존재, 고객사와 공연 범위, 보존 기한, 원본 상태는 서버만 확인한다.
  * 후속 Case(relatedCaseId) 연결은 이번 범위에서 제공하지 않아 항상 null로 보낸다.
- * 후보 실행은 제보와 증거 출처에 덧붙는 출처일 뿐이라 후보만으로 Case를 만들지 않고, 군집만 있는 GRAPH_CLUSTER에는 연결하지 않는다.
- * 실행이 종료되었고 CURRENT인지, 소속 제보와 증거가 요청에 함께 있는지는 서버가 다시 확인한다.
+ * Track 2 후보 실행은 제보와 증거 출처에 덧붙일 때만 허용한다. 완료된 다공연 후보는 GRAPH_CLUSTER 출처로 사건을 만들 수 있다.
+ * 두 후보 유형의 범위, 상태, 권한은 서버가 다시 확인한다.
  */
 export function buildCreateCaseRequest(input: CreateCaseInput): Validated<CreateCaseBody> {
   const reason = javaTrim(input.reason)
   const type = caseTypeFor(input)
   const clusterKeys = input.graphClusters.map((item) => `${item.analysisRequestId}\u0000${item.clusterId}`)
   const candidateRunIds = input.candidateRunIds ?? []
-  const total = input.graphClusters.length + input.fanReportIds.length + input.evidenceIds.length + candidateRunIds.length
+  const multiEventCandidates = input.multiEventCandidates ?? []
+  const total = input.graphClusters.length + input.fanReportIds.length + input.evidenceIds.length + candidateRunIds.length + multiEventCandidates.length
   let sources: string | null = null
   if (!isUuid(input.eventId)) sources = '공연 범위를 확인하지 못했습니다.'
   else if (type === null) sources = '연결할 출처가 없습니다.'
@@ -208,8 +214,10 @@ export function buildCreateCaseRequest(input: CreateCaseInput): Validated<Create
   else if (input.graphClusters.some((item) => javaTrim(item.clusterId) === '' || item.clusterId.length > 191)) sources = '군집 ID가 비어 있거나 너무 깁니다.'
   else if (input.fanReportIds.some((id) => !isUuid(id)) || input.evidenceIds.some((id) => !isUuid(id))) sources = '제보 또는 증거 ID 형식이 올바르지 않습니다.'
   else if (candidateRunIds.some((id) => !isUuid(id))) sources = '후보 실행 ID 형식이 올바르지 않습니다.'
+  else if (multiEventCandidates.some((item) => !isUuid(item.runId) || !/^multi-[a-f0-9]{64}$/.test(item.candidateId))) sources = '다공연 후보 ID 형식이 올바르지 않습니다.'
   else if (new Set(clusterKeys).size !== clusterKeys.length || new Set(input.fanReportIds).size !== input.fanReportIds.length || new Set(input.evidenceIds).size !== input.evidenceIds.length
-    || new Set(candidateRunIds.map((id) => id.toLowerCase())).size !== candidateRunIds.length) sources = '같은 출처가 중복되었습니다.'
+    || new Set(candidateRunIds.map((id) => id.toLowerCase())).size !== candidateRunIds.length
+    || new Set(multiEventCandidates.map((item) => `${item.runId.toLowerCase()}\u0000${item.candidateId}`)).size !== multiEventCandidates.length) sources = '같은 출처가 중복되었습니다.'
   return collect({ sources, reason: textError(reason, 3, 2000) }, () => ({
     eventId: input.eventId.toLowerCase(),
     type: type as CaseType,
@@ -217,6 +225,7 @@ export function buildCreateCaseRequest(input: CreateCaseInput): Validated<Create
     fanReportIds: input.fanReportIds.map((id) => id.toLowerCase()),
     evidenceIds: input.evidenceIds.map((id) => id.toLowerCase()),
     ...(candidateRunIds.length > 0 ? { candidateRunIds: candidateRunIds.map((id) => id.toLowerCase()) } : {}),
+    ...(multiEventCandidates.length > 0 ? { multiEventCandidates: multiEventCandidates.map((item) => ({ runId: item.runId.toLowerCase(), candidateId: item.candidateId })) } : {}),
     reason,
     relatedCaseId: null,
     relationReason: null,

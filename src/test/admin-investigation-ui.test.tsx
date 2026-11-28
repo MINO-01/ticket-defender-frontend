@@ -5,6 +5,7 @@ import { AdminAuthProvider } from '../features/admin-auth/AdminAuthProvider'
 import type { AdminAuthAdapter } from '../features/admin-auth/authAdapter'
 import { RequireAdminAuth } from '../features/admin-auth/RequireAdminAuth'
 import { InvestigationWizardRoute } from '../features/admin-investigation/InvestigationWizardPage'
+import { investigationStorageNamespace } from '../features/admin-investigation/investigationWizardState'
 
 const eventA = '11111111-1111-4111-8111-111111111111'
 const eventB = '99999999-9999-4999-8999-999999999999'
@@ -13,7 +14,9 @@ const performanceA = '33333333-3333-4333-8333-333333333333'
 const performanceB = '44444444-4444-4444-8444-444444444444'
 const targetId = '55555555-5555-4555-8555-555555555555'
 const candidateId = `multi-${'a'.repeat(64)}`
-const token = 'e30.eyJzdWIiOiJzeW50aGV0aWMtYWRtaW4ifQ.c3ludGhldGljLXNpZ25hdHVyZQ'
+const tokenPayload = btoa(JSON.stringify({ iss: 'https://synthetic-identity.invalid', sub: 'synthetic-admin', tenant_id: 'synthetic-tenant' }))
+  .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+const token = `e30.${tokenPayload}.c3ludGhldGljLXNpZ25hdHVyZQ`
 const adapter = (): AdminAuthAdapter => ({
   availability: { status: 'ready' },
   initialize: vi.fn(async () => ({ value: token, expiresAt: Date.now() + 600_000 })),
@@ -41,7 +44,19 @@ const targetItem = {
 }
 
 afterEach(() => vi.unstubAllGlobals())
-beforeEach(() => { localStorage.clear(); sessionStorage.clear() })
+beforeEach(() => {
+  localStorage.clear()
+  sessionStorage.clear()
+  vi.stubGlobal('crypto', {
+    randomUUID: () => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    subtle: { digest: async (_algorithm: AlgorithmIdentifier, input: BufferSource) => {
+      const bytes = input instanceof ArrayBuffer ? new Uint8Array(input) : new Uint8Array(input.buffer, input.byteOffset, input.byteLength)
+      const output = new Uint8Array(32)
+      bytes.forEach((value, index) => { output[index % output.length] = (output[index % output.length] + value + index) % 256 })
+      return output.buffer
+    } },
+  })
+})
 
 describe('관리자 조사 5단계 화면', () => {
   it('예약 시각만 표시하고 실제 참조번호는 사유 열람 후 현재 단계에서만 보여 준다', async () => {
@@ -97,7 +112,9 @@ describe('관리자 조사 5단계 화면', () => {
     expect(within(table).queryByText('2026-11-20T03:45:00Z')).not.toBeInTheDocument()
     expect(window.location.href).not.toContain('SYNTHETIC-RESERVATION-REAL')
     expect(localStorage.length).toBe(0)
-    const savedWorkflow = sessionStorage.getItem('td.admin-investigation.v1')
+    const namespace = await investigationStorageNamespace(token)
+    expect(namespace).not.toBeNull()
+    const savedWorkflow = sessionStorage.getItem(`td.admin-investigation.v1.${namespace}`)
     expect(savedWorkflow).not.toBeNull()
     expect(savedWorkflow).not.toContain('SYNTHETIC-ACCOUNT-REAL')
     expect(savedWorkflow).not.toContain('SYNTHETIC-RESERVATION-REAL')
@@ -117,14 +134,26 @@ describe('관리자 조사 5단계 화면', () => {
   })
 
   it('사건 결과에서 기존 사건, 승인 요청, 보고서 화면으로 이동할 수 있다', async () => {
-    sessionStorage.setItem('td.admin-investigation.v1', JSON.stringify({
+    const namespace = await investigationStorageNamespace(token)
+    expect(namespace).not.toBeNull()
+    sessionStorage.setItem(`td.admin-investigation.v1.${namespace}`, JSON.stringify({
       version: 1, importId: null, publishedScopes: [], runContext: { eventId: eventA, runId },
       selection: { familyPage: 0, familyId: candidateId, candidateId }, scopeDraft: null,
     }))
-    vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (input) => {
+    let createBody: unknown = null
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (input, init) => {
       const url = new URL(String(input), window.location.origin)
       if (url.pathname === `/api/v1/admin/multi-event-investigations/events/${eventA}/${runId}`) return json(run)
       if (url.pathname.endsWith('/candidate-families')) return json({ items: [{ familyId: candidateId, familyScore: 0.22, candidates: [candidate] }], page: 0, pageSize: 20, hasNext: false })
+      if (url.pathname === '/api/v1/cases' && init?.method === 'POST') {
+        createBody = JSON.parse(String(init.body)) as unknown
+        return json({
+          caseId: '66666666-6666-4666-8666-666666666666', eventId: eventA, type: 'GRAPH_CLUSTER', status: 'OPEN',
+          caseVersion: 0, evidenceRevision: 0, createdByMembershipId: '77777777-7777-4777-8777-777777777777',
+          assigneeMembershipId: null, relatedCaseId: null, relationReason: null, classification: null,
+          currentReportVersionId: null, createdAt: '2026-11-26T00:00:00Z', updatedAt: '2026-11-26T00:00:00Z',
+        }, 201)
+      }
       return new Response(null, { status: 404 })
     }))
     render(<MemoryRouter initialEntries={['/app/investigate/5']}><AdminAuthProvider adapter={adapter()}><RequireAdminAuth><Routes><Route path="/app/investigate/:step" element={<InvestigationWizardRoute />} /></Routes></RequireAdminAuth></AdminAuthProvider></MemoryRouter>)
@@ -132,5 +161,12 @@ describe('관리자 조사 5단계 화면', () => {
     expect(screen.getByRole('link', { name: '사건 목록 열기' })).toHaveAttribute('href', `/app/cases?eventId=${eventA}`)
     expect(screen.getByRole('link', { name: '승인 요청 화면 열기' })).toHaveAttribute('href', '/app/approvals')
     expect(screen.getByRole('link', { name: '보고서 센터 열기' })).toHaveAttribute('href', '/app/report-center')
+    fireEvent.change(screen.getByRole('textbox', { name: /생성 사유/ }), { target: { value: '합성 다공연 조사 사건 생성' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Case 생성' }))
+    await waitFor(() => expect(createBody).toEqual({
+      eventId: eventA, type: 'GRAPH_CLUSTER', graphClusters: [], fanReportIds: [], evidenceIds: [],
+      multiEventCandidates: [{ runId, candidateId }], reason: '합성 다공연 조사 사건 생성',
+      relatedCaseId: null, relationReason: null,
+    }))
   })
 })

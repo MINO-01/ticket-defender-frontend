@@ -196,6 +196,40 @@ describe('Case 생성 요청의 candidateRunIds 계약', () => {
   })
 })
 
+describe('Case 생성 요청의 다공연 후보 출처 계약', () => {
+  const base: CreateCaseInput = { eventId: EVENT_A, graphClusters: [], fanReportIds: [], evidenceIds: [], reason: '합성 다공연 후보 조사' }
+  const candidate = { runId: RUN_1, candidateId: `multi-${'a'.repeat(64)}` }
+
+  it('후보만으로 GRAPH_CLUSTER 사건을 만들고 다른 출처가 있으면 기존 유형 규칙을 따른다', () => {
+    expect(buildCreateCaseRequest({ ...base, multiEventCandidates: [candidate] })).toMatchObject({
+      ok: true, body: { type: 'GRAPH_CLUSTER', multiEventCandidates: [candidate], graphClusters: [], fanReportIds: [], evidenceIds: [] },
+    })
+    expect(buildCreateCaseRequest({ ...base, fanReportIds: [REPORT_1], multiEventCandidates: [candidate] })).toMatchObject({
+      ok: true, body: { type: 'COMBINED', multiEventCandidates: [candidate], fanReportIds: [REPORT_1] },
+    })
+    expect(buildCreateCaseRequest(base)).toMatchObject({ ok: false, errors: { sources: expect.stringContaining('출처가 없습니다') } })
+  })
+
+  it.each([
+    ['잘못된 후보 ID', [{ runId: RUN_1, candidateId: 'account-reference' }], '다공연 후보 ID 형식'],
+    ['실행 ID가 UUID가 아님', [{ runId: 'run-1', candidateId: `multi-${'a'.repeat(64)}` }], '다공연 후보 ID 형식'],
+    ['같은 후보 중복', [candidate, candidate], '같은 출처가 중복'],
+  ])('%s이면 요청을 만들지 않는다', (_, multiEventCandidates, message) => {
+    expect(buildCreateCaseRequest({ ...base, multiEventCandidates })).toMatchObject({
+      ok: false, errors: { sources: expect.stringContaining(message) },
+    })
+  })
+
+  it('다른 출처와 합쳐 출처 수가 30개를 넘으면 거부한다', () => {
+    const moreCandidates = Array.from({ length: 30 }, (_, index) => ({
+      runId: `bbbbbbbb-bbbb-4bbb-8bbb-${String(index).padStart(12, '0')}`,
+      candidateId: `multi-${index.toString(16).padStart(64, '0')}`,
+    }))
+    expect(buildCreateCaseRequest({ ...base, graphClusters: [{ analysisRequestId: '99999999-9999-4999-8999-999999999990', clusterId: 'cluster-1' }], multiEventCandidates: moreCandidates }))
+      .toMatchObject({ ok: false, errors: { sources: expect.stringContaining('최대 30개') } })
+  })
+})
+
 describe('후보 실행 이력에서 신규 Case 출처 선택', () => {
   it('CURRENT 실행을 고르고 소속 증거와 함께 요청한 뒤 실제 Case 상세에서 후보 출처를 확인한다', async () => {
     const calls = stubFetch({})
