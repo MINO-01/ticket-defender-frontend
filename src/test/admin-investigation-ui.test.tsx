@@ -35,7 +35,10 @@ const candidate = {
   candidateId, priorityBand: 'MEDIUM', investigationScore: 0.22, baselineMaxScore: null,
   distinctAccountCount: 2, distinctEventCount: 2, distinctPerformanceCount: 2, verifiedRelationshipCount: 1,
   scoreBreakdown: '{}', availableSignals: 'refund_account_hash', excludedSignals: '', unavailableSignals: '', normalSharingPossibilities: 'NORMAL_SHARED_POSSIBLE',
-  reasons: [{ code: 'SHARED_PHONE', count: 2, performances: [performanceA, performanceB], strengthRank: 2 }],
+  reasons: [
+    { code: 'SHARED_PHONE', count: 2, performances: [performanceA, performanceB], strengthRank: 2 },
+    { code: 'HIGH_QUANTITY', count: 1, performances: [performanceA, performanceB], strengthRank: 3 },
+  ],
 }
 const targetItem = {
   targetId, accountReference: 'SYNTHETIC-ACCOUNT-REAL', reservationReference: 'SYNTHETIC-RESERVATION-REAL',
@@ -92,6 +95,7 @@ describe('관리자 조사 5단계 화면', () => {
     fireEvent.click(screen.getByRole('button', { name: '조사 분석 실행' }))
     await screen.findByText('조사 분석 요청 접수: PENDING')
     fireEvent.click(screen.getByRole('button', { name: /의심 묶음 찾기/ }))
+    expect(await screen.findByText('계정당 최대 수량을 반복해서 샀습니다')).toBeInTheDocument()
     fireEvent.click(await screen.findByRole('button', { name: '이 후보 검토' }))
     fireEvent.click(screen.getByRole('button', { name: /의심 묶음 검토/ }))
 

@@ -728,7 +728,7 @@ function reasonLabel(code: string) {
     REBOOK_CHAIN: '취소 후 재예매 연결', rebook_chain: '취소 후 재예매 연결',
     RESOURCE_CONTINUITY: '공연 간 자원 연결', resource_continuity: '공연 간 자원 연결',
     REPEATED_PERFORMANCES: '여러 회차 반복', stable_account_cocluster: '여러 회차 반복',
-    HIGH_QUANTITY: '구매 수량 신호',
+    HIGH_QUANTITY: '계정당 최대 수량을 반복해서 샀습니다',
   }
   return labels[code] ?? '알 수 없는 근거'
 }
