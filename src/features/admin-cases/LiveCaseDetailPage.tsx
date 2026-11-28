@@ -274,6 +274,18 @@ function SourceItem({ source, eventId }: { source: CaseSource; eventId: string }
       <Link className={styles.detailLink} to={fanReportDetailRoute(fanReportId)}>소속 제보 상세 보기</Link>
     </article>
   }
+  if (source.sourceType === 'MULTI_EVENT_CANDIDATE') {
+    return <article className={styles.source} aria-label="다공연 조사 후보">
+      <span className={styles.sourceType}>다공연 조사 후보</span>
+      <dl className={styles.definition}>
+        <div><dt>다공연 분석 실행 ID</dt><dd className={styles.idCell}>{source.multiEventRunId}</dd></div>
+        <div><dt>후보 ID</dt><dd className={styles.idCell}>{source.multiEventCandidateId}</dd></div>
+        <div><dt>분석 완료 시각</dt><dd>{source.multiEventCompletedAt === null ? '기록 없음' : formatUtc(source.multiEventCompletedAt)}</dd></div>
+        {common}
+      </dl>
+      <p className={styles.caution}>완료된 다공연 분석에서 선택한 조사 후보입니다. 후보 점수는 조사 우선순위 참고값이며 불법 확률이나 위반 확정이 아닙니다. 실제 참조번호는 이 사건 출처에 저장되지 않습니다.</p>
+    </article>
+  }
   return <article className={styles.source} aria-label="Track 2 제보 증거 이미지">
     <span className={styles.sourceType}>제보 증거 이미지</span>
     <dl className={styles.definition}>

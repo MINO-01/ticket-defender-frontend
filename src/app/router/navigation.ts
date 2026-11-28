@@ -1,12 +1,17 @@
 // 관리자 메뉴와 라우트 목록이다. 경로(path)는 기존 URL을 유지하고 화면 이름만 업무 용어로 쓴다.
 // support는 서버 지원 범위다. live는 실제 조회와 작업, partial은 일부만 실제 조회, pending은 Backend 계약 대기다.
 
-export const adminGroups = ['업무 시작', '조사', '검토', '운영'] as const
+export const adminGroups = ['업무 시작', '암표 조사 5단계', '조사', '검토', '운영'] as const
 export type AdminGroup = (typeof adminGroups)[number]
 export type AdminSupport = 'live' | 'partial' | 'pending'
 
 export const adminPages = [
   { path: 'overview', label: '전체 현황', group: '업무 시작', support: 'live', description: '선택한 공연의 팬 제보, 연결된 예매 그룹, 최근 조사 사건을 확인하고 다음 업무로 이동합니다.' },
+  { path: 'investigate/1', label: '1. 예매 내역 올리기', group: '암표 조사 5단계', support: 'live', description: '예매처 공연 코드가 포함된 CSV를 검사하고 v3 SUPPLIER_CODE 방식으로 등록합니다.' },
+  { path: 'investigate/2', label: '2. 조사 범위 고르기', group: '암표 조사 5단계', support: 'live', description: '공개 원장, 공연, 회차와 분석 기간을 선택해 조사 분석을 실행합니다.' },
+  { path: 'investigate/3', label: '3. 의심 묶음 찾기', group: '암표 조사 5단계', support: 'live', description: '분석이 완료된 후보 가족과 후보별 조사 근거 및 우선순위를 확인합니다.' },
+  { path: 'investigate/4', label: '4. 의심 묶음 검토', group: '암표 조사 5단계', support: 'live', description: '마스킹된 조사 대상과 구성원별 근거를 확인하고 권한과 사유에 따라 참조번호를 엽니다.' },
+  { path: 'investigate/5', label: '5. 결과와 한계 확인', group: '암표 조사 5단계', support: 'live', description: '선택한 후보의 우선순위와 결과 해석 한계를 확인합니다.' },
   { path: 'fan-reports', label: '팬 제보 조사', group: '조사', support: 'live', description: '팬 제보를 열어 이미지 정보 추출, 검증 회차 연결, 예매 기록 비교, 조사 사건 생성을 진행합니다.' },
   { path: 'verified-performances', label: '검증 회차 관리', group: '조사', support: 'live', description: '공연의 검증된 회차를 등록하고 관리합니다. 예매 기록 비교의 기준이 됩니다.' },
   { path: 'analysis/findings', label: '예매 관계 분석', group: '조사', support: 'live', description: '저장된 연결된 예매 그룹을 조사 우선순위 순으로 확인하고 조사 사건으로 연결합니다.' },

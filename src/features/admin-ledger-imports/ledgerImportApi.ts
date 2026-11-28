@@ -7,7 +7,15 @@ const dateTime = z.string().datetime({ offset: true })
 const sha256 = z.string().regex(/^[a-f0-9]{64}$/)
 
 export const scopeSchema = z.object({ eventId: uuid, performanceId: uuid, scopeAsOf: dateTime.nullable(), declaredRowCount: z.number().int().nonnegative(), cursorStart: z.string().nullable(), cursorEnd: z.string().nullable(), sourceSequenceStart: z.number().int().nonnegative().nullable(), sourceSequenceEnd: z.number().int().nonnegative().nullable() })
-export const jobSchema = z.object({ importId: uuid, schemaVersion: z.string(), sourceSystem: z.string(), sourceBatchId: z.string(), mode: z.enum(['FULL_SNAPSHOT', 'CHANGE_FEED']), format: z.literal('CSV'), declaredObjectSha256: sha256, declaredFileBytes: z.number().int().nonnegative(), declaredRowCount: z.number().int().nonnegative(), completeSnapshot: z.boolean(), status: z.enum(['CREATED', 'UPLOAD_PENDING', 'UPLOADED', 'VALIDATING', 'STAGING', 'READY_TO_PUBLISH', 'PUBLISHED', 'FAILED_RETRYABLE', 'REJECTED', 'CANCELLED']), processedRowCount: z.number().int().nonnegative(), acceptedRowCount: z.number().int().nonnegative(), rejectedRowCount: z.number().int().nonnegative(), scopes: z.array(scopeSchema), createdAt: dateTime, updatedAt: dateTime, cancelledAt: dateTime.nullable() })
+const supplierScopeSchema = z.object({
+  sourceEventCode: z.string().min(1).max(128), sourcePerformanceCode: z.string().min(1).max(128),
+  eventTitle: z.string().min(1).max(255), performanceStartsAt: dateTime, perAccountLimit: z.number().int().positive().nullable().optional(),
+  scopeAsOf: dateTime.nullable().optional(), declaredRowCount: z.number().int().nonnegative(), cursorStart: z.string().max(256).nullable().optional(),
+  cursorEnd: z.string().max(256).nullable().optional(), sourceSequenceStart: z.number().int().nonnegative().nullable().optional(),
+  sourceSequenceEnd: z.number().int().nonnegative().nullable().optional(), eventId: uuid.nullable().optional(), performanceId: uuid.nullable().optional(),
+  eventCreated: z.boolean().optional(), performanceCreated: z.boolean().optional(),
+})
+export const jobSchema = z.object({ importId: uuid, schemaVersion: z.string(), sourceSystem: z.string(), sourceBatchId: z.string(), mode: z.enum(['FULL_SNAPSHOT', 'CHANGE_FEED']), format: z.literal('CSV'), declaredObjectSha256: sha256, declaredFileBytes: z.number().int().nonnegative(), declaredRowCount: z.number().int().nonnegative(), completeSnapshot: z.boolean(), status: z.enum(['CREATED', 'UPLOAD_PENDING', 'UPLOADED', 'VALIDATING', 'STAGING', 'READY_TO_PUBLISH', 'PUBLISHED', 'FAILED_RETRYABLE', 'REJECTED', 'CANCELLED']), processedRowCount: z.number().int().nonnegative(), acceptedRowCount: z.number().int().nonnegative(), rejectedRowCount: z.number().int().nonnegative(), scopes: z.array(scopeSchema), scopeKeyType: z.enum(['TD_UUID', 'SUPPLIER_CODE']).optional(), supplierScopes: z.array(supplierScopeSchema).optional(), createdAt: dateTime, updatedAt: dateTime, cancelledAt: dateTime.nullable() })
 export type LedgerImportJob = z.infer<typeof jobSchema>
 export const jobPageSchema = z.object({ items: z.array(jobSchema), page: z.number().int().nonnegative(), pageSize: z.number().int().positive(), hasNext: z.boolean() })
 export const errorsPageSchema = z.object({ items: z.array(z.object({ sequenceNo: z.number().int().nonnegative(), code: z.string(), createdAt: dateTime })), page: z.number().int().nonnegative(), pageSize: z.number().int().positive(), hasNext: z.boolean() })
@@ -29,7 +37,7 @@ export type LedgerCandidatePreview = z.infer<typeof candidatePreviewSchema>
 export const analysisJobSchema = z.object({ jobId: uuid, outboxId: uuid, versionId: uuid, status: z.enum(['PENDING', 'PROCESSING', 'RETRYABLE', 'BLOCKED', 'DELIVERED']), attemptCount: z.number().int().nonnegative(), failureCode: z.string().nullable(), runId: uuid.nullable(), analysisRequestId: uuid.nullable(), executionStatus: z.string().nullable(), evaluationStatus: z.string().nullable(), policyVersion: z.string().nullable(), algorithmVersion: z.string().nullable(), completedAt: dateTime.nullable() })
 export type AnalysisJob = z.infer<typeof analysisJobSchema>
 export const analysisJobListSchema = z.array(analysisJobSchema)
-export const signalListSchema = z.array(z.object({ ticketReferenceHmac: sha256, hmacKeyVersion: z.string().trim().min(1).max(32), paymentHmac: sha256.nullable().optional(), addressHmac: sha256.nullable().optional(), deviceHmac: sha256.nullable().optional(), ipHmac: sha256.nullable().optional(), sourceVersion: z.string().trim().min(1).max(128) }).superRefine((value, context) => { if (![value.paymentHmac, value.addressHmac, value.deviceHmac, value.ipHmac].some(Boolean)) context.addIssue({ code: 'custom', message: '결제·주소·기기·IP HMAC 중 하나 이상이 필요합니다.' }) })).min(1)
+export const signalListSchema = z.array(z.object({ ticketReferenceHmac: sha256, hmacKeyVersion: z.string().trim().min(1).max(32), paymentHmac: sha256.nullable().optional(), addressHmac: sha256.nullable().optional(), deviceHmac: sha256.nullable().optional(), ipHmac: sha256.nullable().optional(), sourceVersion: z.string().trim().min(1).max(128) }).superRefine((value, context) => { if (![value.paymentHmac, value.addressHmac, value.deviceHmac, value.ipHmac].some(Boolean)) context.addIssue({ code: 'custom', message: '결제, 주소, 기기, IP HMAC 중 하나 이상이 필요합니다.' }) })).min(1)
 export const emptySchema = z.undefined()
 
 export function ledgerImportsPath(page = 0, pageSize = 20) { return adminApiPath('/api/v1/admin/ledger-imports', { page, pageSize }) }
@@ -45,6 +53,15 @@ export function analysisRunPath(eventId: string, performanceId: string, jobId: s
 export function signalsPath(eventId: string, versionId: string) { return `/api/v1/admin/events/${eventId}/ledger-track1/versions/${versionId}/signals` }
 
 export type CsvMetadata = { bytes: number; sha256: string; rows: number; scopeRows: ReadonlyMap<string, number> }
+export type SupplierScopeCsvMetadata = Readonly<{
+  sourceEventCode: string
+  sourcePerformanceCode: string
+  eventTitle: string
+  performanceStartsAt: string
+  perAccountLimit: number | null
+  declaredRowCount: number
+}>
+export type SupplierCsvMetadata = Readonly<{ bytes: number; sha256: string; rows: number; scopes: readonly SupplierScopeCsvMetadata[] }>
 const shaConstants = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2])
 class StreamingSha256 {
   private state = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]); private tail = new Uint8Array(64); private tailLength = 0; private length = 0n
@@ -74,12 +91,110 @@ export async function inspectCsv(file: File): Promise<CsvMetadata> {
   return { bytes: file.size, sha256: digest.hex(), rows, scopeRows }
 }
 
+/** v3 SUPPLIER_CODE CSV에서 범위 메타데이터, 행 수, SHA-256만 읽는다. 원본 행은 반환하거나 저장하지 않는다. */
+export async function inspectSupplierCsv(file: File): Promise<SupplierCsvMetadata> {
+  if (file.size === 0) throw new Error('빈 CSV 파일은 등록할 수 없습니다.')
+  const reader = file.stream().getReader()
+  const decoder = new TextDecoder()
+  const digest = new StreamingSha256()
+  const scopes = new Map<string, SupplierScopeCsvMetadata>()
+  const eventTitles = new Map<string, string>()
+  let header: string[] | null = null
+  let indices: { event: number; performance: number; title: number; startsAt: number; limit: number } | null = null
+  let field = ''
+  let record: string[] = []
+  let quoted = false
+  let quotePending = false
+  let skipLf = false
+  let rows = 0
+
+  const finishRecord = () => {
+    record.push(field)
+    field = ''
+    if (header === null) {
+      header = record.map((value, index) => index === 0 ? value.replace(/^\uFEFF/, '') : value)
+      if (new Set(header).size !== header.length) throw new Error('CSV 헤더가 중복되었습니다.')
+      if (header.includes('event_id') || header.includes('performance_id')) throw new Error('SUPPLIER_CODE CSV에는 TD UUID 열을 넣을 수 없습니다.')
+      const event = header.indexOf('source_event_code')
+      const performance = header.indexOf('source_performance_code')
+      const title = header.indexOf('event_title')
+      const startsAt = header.indexOf('performance_starts_at')
+      const limit = header.indexOf('per_account_limit')
+      if ([event, performance, title, startsAt].some((index) => index < 0)) throw new Error('CSV에 예매처 공연 코드와 공연 메타데이터 열이 필요합니다.')
+      indices = { event, performance, title, startsAt, limit }
+    } else {
+      const current = indices
+      if (current === null || record.length !== header.length) throw new Error('CSV 열 수가 헤더와 맞지 않습니다.')
+      const eventCode = record[current.event]?.trim() ?? ''
+      const performanceCode = record[current.performance]?.trim() ?? ''
+      const eventTitle = record[current.title]?.trim() ?? ''
+      const performanceStartsAt = record[current.startsAt]?.trim() ?? ''
+      const limitText = current.limit < 0 ? '' : record[current.limit]?.trim() ?? ''
+      if (!eventCode || eventCode.length > 128 || !performanceCode || performanceCode.length > 128
+        || !eventTitle || eventTitle.length > 255 || !z.string().datetime({ offset: true }).safeParse(performanceStartsAt).success) {
+        throw new Error('CSV 공연 코드, 제목 또는 회차 시작 시각이 계약 형식과 맞지 않습니다.')
+      }
+      const perAccountLimit = limitText === '' ? null : /^[1-9]\d*$/.test(limitText) && Number.isSafeInteger(Number(limitText)) ? Number(limitText) : NaN
+      if (Number.isNaN(perAccountLimit)) throw new Error('CSV 1인당 예매 한도는 비우거나 양의 정수로 입력해 주세요.')
+      const knownTitle = eventTitles.get(eventCode)
+      if (knownTitle !== undefined && knownTitle !== eventTitle) throw new Error('같은 예매처 공연 코드의 제목이 서로 다릅니다.')
+      eventTitles.set(eventCode, eventTitle)
+      const key = JSON.stringify([eventCode, performanceCode])
+      const existing = scopes.get(key)
+      if (existing !== undefined && (existing.eventTitle !== eventTitle || existing.performanceStartsAt !== performanceStartsAt || existing.perAccountLimit !== perAccountLimit)) {
+        throw new Error('같은 회차의 공연 메타데이터가 행마다 다릅니다.')
+      }
+      scopes.set(key, {
+        sourceEventCode: eventCode,
+        sourcePerformanceCode: performanceCode,
+        eventTitle,
+        performanceStartsAt,
+        perAccountLimit,
+        declaredRowCount: (existing?.declaredRowCount ?? 0) + 1,
+      })
+      rows += 1
+    }
+    record = []
+  }
+
+  const consume = (text: string) => {
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index]
+      if (skipLf) { skipLf = false; if (char === '\n') continue }
+      if (quotePending) {
+        quotePending = false
+        if (char === '"') { field += '"'; quoted = true; continue }
+        quoted = false
+        if (char !== ',' && char !== '\r' && char !== '\n') throw new Error('CSV 따옴표 뒤의 구분자가 올바르지 않습니다.')
+      }
+      if (quoted) { if (char === '"') quotePending = true; else field += char; continue }
+      if (char === '"') { if (field.length !== 0) throw new Error('CSV 따옴표 위치가 올바르지 않습니다.'); quoted = true; continue }
+      if (char === ',') { record.push(field); field = ''; continue }
+      if (char === '\r' || char === '\n') { finishRecord(); if (char === '\r') skipLf = true; continue }
+      field += char
+    }
+  }
+
+  for (;;) {
+    const next = await reader.read()
+    if (next.done) break
+    digest.update(next.value)
+    consume(decoder.decode(next.value, { stream: true }))
+  }
+  consume(decoder.decode())
+  if (quotePending) quoted = false
+  if (quoted) throw new Error('CSV 인용부호가 닫히지 않았습니다.')
+  if (field.length !== 0 || record.length !== 0) finishRecord()
+  if (header === null || rows === 0 || scopes.size === 0) throw new Error('CSV 헤더와 예매 내역 행이 필요합니다.')
+  return { bytes: file.size, sha256: digest.hex(), rows, scopes: [...scopes.values()] }
+}
+
 export function validateScope(mode: 'FULL_SNAPSHOT' | 'CHANGE_FEED', scope: { performanceId: string; scopeAsOf: string; cursorStart: string; cursorEnd: string; sequenceStart: string; sequenceEnd: string; declaredRowCount: string }) {
   if (!isUuid(scope.performanceId)) return 'ACTIVE 회차를 선택해 주세요.'
   const count = Number(scope.declaredRowCount)
   if (!Number.isSafeInteger(count) || count < 0) return 'scope 행 수는 0 이상의 정수여야 합니다.'
   if (mode === 'FULL_SNAPSHOT' && (!scope.scopeAsOf || !scope.cursorEnd || !scope.sequenceEnd)) return 'FULL_SNAPSHOT에는 기준시각, cursorEnd, sourceSequenceEnd가 필요합니다.'
-  if (mode === 'CHANGE_FEED' && (!scope.cursorStart || !scope.cursorEnd || !scope.sequenceStart || !scope.sequenceEnd)) return 'CHANGE_FEED에는 시작·종료 cursor와 source sequence가 필요합니다.'
+  if (mode === 'CHANGE_FEED' && (!scope.cursorStart || !scope.cursorEnd || !scope.sequenceStart || !scope.sequenceEnd)) return 'CHANGE_FEED에는 시작 및 종료 cursor와 source sequence가 필요합니다.'
   if (mode === 'CHANGE_FEED' && (!Number.isSafeInteger(Number(scope.sequenceStart)) || !Number.isSafeInteger(Number(scope.sequenceEnd)) || Number(scope.sequenceStart) < 0 || Number(scope.sequenceEnd) < Number(scope.sequenceStart) || Number(scope.sequenceEnd) - Number(scope.sequenceStart) + 1 !== count)) return 'CHANGE_FEED sourceSequence 범위는 scope 행 수와 정확히 일치해야 합니다.'
   return null
 }

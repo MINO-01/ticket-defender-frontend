@@ -1,0 +1,320 @@
+.page {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.heading {
+  max-width: 850px;
+}
+
+.heading h1 {
+  margin: 0.2rem 0 0.5rem;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+}
+
+.heading p:last-child,
+.muted {
+  color: var(--text-muted, #5f6878);
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent-strong, #315eb4);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.stepNav {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.stepNav button {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  align-items: center;
+  gap: 0.25rem 0.65rem;
+  min-height: 76px;
+  padding: 0.7rem;
+  border: 1px solid var(--border, #d9deea);
+  border-radius: 0.8rem;
+  background: var(--surface, #fff);
+  color: var(--text, #202938);
+  text-align: left;
+  cursor: pointer;
+}
+
+.stepNav button > span {
+  grid-row: span 2;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-subtle, #eef2f7);
+  font-weight: 800;
+}
+
+.stepNav strong {
+  font-size: 0.88rem;
+}
+
+.stepNav small {
+  color: var(--text-muted, #5f6878);
+  font-size: 0.74rem;
+}
+
+.stepNav .currentStep {
+  border-color: var(--accent-strong, #315eb4);
+  box-shadow: inset 0 0 0 1px var(--accent-strong, #315eb4);
+}
+
+.currentStep > span {
+  background: var(--accent-strong, #315eb4);
+  color: #fff;
+}
+
+.panelStack {
+  display: grid;
+  gap: 1rem;
+}
+
+.inlineFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.metadata,
+.summaryList {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin: 0.75rem 0;
+}
+
+.metadata > div,
+.summaryList > div {
+  min-width: 0;
+  padding: 0.7rem;
+  border: 1px solid var(--border, #d9deea);
+  border-radius: 0.65rem;
+  background: var(--surface-subtle, #f7f8fb);
+}
+
+.metadata dt,
+.summaryList dt {
+  color: var(--text-muted, #5f6878);
+  font-size: 0.78rem;
+}
+
+.metadata dd,
+.summaryList dd {
+  overflow-wrap: anywhere;
+  margin: 0.25rem 0 0;
+  font-weight: 650;
+}
+
+.metadata .hash {
+  grid-column: 1 / -1;
+}
+
+.hash dd {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.scopeBox {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.4rem 0;
+  padding: 0.85rem;
+  border: 1px solid var(--border, #d9deea);
+  border-radius: 0.75rem;
+}
+
+.scopeBox legend {
+  padding: 0 0.35rem;
+  font-weight: 700;
+}
+
+.scopeBox p {
+  margin: 0.2rem 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.7rem;
+}
+
+.notice,
+.accessNotice,
+.sensitiveNotice {
+  margin: 0.65rem 0;
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.65rem;
+  background: #eff5ff;
+  color: #254778;
+}
+
+.accessNotice {
+  background: #fff5df;
+  color: #754a00;
+}
+
+.sensitiveNotice {
+  background: #fff0ef;
+  color: #8c281e;
+  font-weight: 700;
+}
+
+.mappingList {
+  display: grid;
+  gap: 0.35rem;
+  overflow-wrap: anywhere;
+}
+
+.eventList,
+.performanceList {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.75rem 0;
+}
+
+.eventList label,
+.performanceList label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border, #d9deea);
+  border-radius: 0.55rem;
+}
+
+.performanceList {
+  padding: 0.9rem;
+  border: 1px solid var(--border, #d9deea);
+  border-radius: 0.75rem;
+}
+
+.performanceList h3,
+.performanceList p {
+  margin: 0.2rem 0;
+}
+
+.familyList {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.familyCard,
+.candidateCard,
+.candidateSummary {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.9rem;
+  border: 1px solid var(--border, #d9deea);
+  border-radius: 0.75rem;
+}
+
+.familyCard > header h3,
+.familyCard > header p {
+  margin: 0.2rem 0;
+}
+
+.candidateCard {
+  background: var(--surface-subtle, #f7f8fb);
+}
+
+.candidateCard > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.reasonList {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.candidateSummary {
+  margin: 0.8rem 0;
+  background: var(--surface-subtle, #f7f8fb);
+}
+
+.reasonField {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.8rem 0;
+  font-weight: 650;
+}
+
+.reasonField textarea {
+  width: 100%;
+  max-width: 760px;
+  padding: 0.65rem;
+  border: 1px solid var(--border, #c8cfdd);
+  border-radius: 0.55rem;
+  font: inherit;
+}
+
+.limitations {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border-left: 4px solid var(--accent-strong, #315eb4);
+  background: var(--surface-subtle, #f7f8fb);
+}
+
+.limitations h3 {
+  margin-top: 0;
+}
+
+.limitations li {
+  margin: 0.4rem 0;
+}
+
+.emptyPanel {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+}
+
+.footerNote {
+  color: var(--text-muted, #5f6878);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 980px) {
+  .stepNav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metadata,
+  .summaryList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .page {
+    padding: 1rem;
+  }
+
+  .stepNav,
+  .inlineFields,
+  .metadata,
+  .summaryList {
+    grid-template-columns: 1fr;
+  }
+}

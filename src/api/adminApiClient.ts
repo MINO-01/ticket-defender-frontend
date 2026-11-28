@@ -42,6 +42,8 @@ export type AdminImage = { blob: Blob; mediaType: EvidenceImageMediaType; byteSi
 
 /** 형식과 Frontend 임시 상한 검사를 통과한 PDF 바이트. 무결성 비교와 임시 다운로드에만 쓰고 브라우저 저장소에 보관하지 않는다. */
 export type AdminPdf = { bytes: Uint8Array<ArrayBuffer>; byteSize: number }
+/** CSV bytes used only for an audited investigation target export and its immediate download. */
+export type AdminInvestigationCsv = { blob: Blob; byteSize: number }
 
 export type AdminApiClientOptions = {
   /** 만료되지 않은 액세스 토큰만 반환하고, 없으면 null을 반환한다. */
@@ -53,6 +55,12 @@ export type AdminApiClientOptions = {
 
 export type AdminApiClient = {
   request<T>(path: string, options: AdminApiRequestOptions<T>): Promise<AdminApiResult<T>>
+  /** Audited masked target list. The reason is sent only in the documented request header. */
+  requestInvestigationTargets<T>(path: string, reason: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<AdminApiResult<T>>
+  /** Audited reveal. The reason is sent only in the documented JSON body. */
+  requestInvestigationReveal<T>(path: string, reason: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<AdminApiResult<T>>
+  /** Audited target CSV export. The server returns no-store CSV bytes for immediate download. */
+  requestInvestigationCsv(path: string, reason: string, signal?: AbortSignal): Promise<AdminApiResult<AdminInvestigationCsv>>
   /** PNG, JPEG 바이너리 GET 전용 요청. 성공 본문을 JSON으로 읽지 않는다. */
   requestImage(path: string, options?: AdminImageRequestOptions): Promise<AdminApiResult<AdminImage>>
   /** 공식 PDF 바이너리 GET 전용 요청. 성공 본문을 JSON으로 읽지 않는다. */
@@ -72,6 +80,24 @@ const blockedPathPrefixes = ['/api/v1/fan-reports', '/api/v1/audits/analyze']
 const forbiddenProblemCodes = ['SELF_APPROVAL_FORBIDDEN'] as const
 export type ForbiddenProblemCode = (typeof forbiddenProblemCodes)[number]
 const idempotencyKeyPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const investigationCandidatePath = /^\/api\/v1\/admin\/events\/[0-9a-f-]{36}\/multi-event\/[0-9a-f-]{36}\/candidates\/multi-[0-9a-f]{64}\/targets$/i
+const investigationBulkPath = /^\/api\/v1\/admin\/events\/[0-9a-f-]{36}\/ledger-track1\/performances\/[0-9a-f-]{36}\/bulk-analysis-jobs\/[0-9a-f-]{36}\/clusters\/[A-Za-z0-9._~-]{1,128}\/targets$/i
+const maxInvestigationCsvBytes = 5 * 1024 * 1024
+
+function investigationPath(path: string, suffix: '' | '/reveal' | '/export') {
+  const pathname = path.split('?', 1)[0]
+  const basePath = suffix === '' ? pathname : pathname.endsWith(suffix) ? pathname.slice(0, -suffix.length) : ''
+  return isAllowedAdminApiPath(path)
+    && (investigationCandidatePath.test(basePath) || investigationBulkPath.test(basePath))
+    && pathname.endsWith(`/targets${suffix}`)
+}
+
+function validInvestigationReason(reason: string) {
+  return reason.trim().length > 0 && reason.trim().length <= 500 && ![...reason].some((character) => {
+    const code = character.charCodeAt(0)
+    return code <= 0x1f || code === 0x7f
+  })
+}
 
 /** Backend가 받는 UUID v4 형식인지 확인한다. 줄바꿈 등 헤더 주입 문자가 섞인 값은 통과하지 않는다. */
 export function isIdempotencyKey(value: string) {
@@ -103,7 +129,7 @@ export function adminApiPath(pathname: string, params: Record<string, string | n
 
 export function createAdminApiClient({ getAccessToken, onUnauthorized, fetchImpl }: AdminApiClientOptions): AdminApiClient {
   /** JSON 요청과 이미지 요청이 같은 경로 검사, 토큰, 요청 옵션, 401 처리를 쓰도록 한 곳에서 보낸다. */
-  async function send(path: string, method: 'GET' | 'POST' | 'PUT' | 'PATCH', accept: string, body: unknown, signal: AbortSignal | undefined, idempotencyKey?: string): Promise<{ kind: 'response'; response: Response } | AdminApiFailureResult> {
+  async function send(path: string, method: 'GET' | 'POST' | 'PUT' | 'PATCH', accept: string, body: unknown, signal: AbortSignal | undefined, idempotencyKey?: string, extraHeaders?: Record<string, string>): Promise<{ kind: 'response'; response: Response } | AdminApiFailureResult> {
     if (!isAllowedAdminApiPath(path)) throw new TypeError('허용되지 않은 관리자 API 경로입니다')
     if (idempotencyKey !== undefined && (method === 'GET' || !isIdempotencyKey(idempotencyKey))) throw new TypeError('허용되지 않은 멱등성 키입니다')
     const token = getAccessToken()
@@ -112,6 +138,7 @@ export function createAdminApiClient({ getAccessToken, onUnauthorized, fetchImpl
     const headers: Record<string, string> = { Accept: accept, Authorization: `Bearer ${token}` }
     if (body !== undefined) headers['Content-Type'] = 'application/json'
     if (idempotencyKey !== undefined) headers['Idempotency-Key'] = idempotencyKey
+    if (extraHeaders !== undefined) Object.assign(headers, extraHeaders)
 
     let response: Response
     try {
@@ -161,6 +188,74 @@ export function createAdminApiClient({ getAccessToken, onUnauthorized, fetchImpl
         // 본문을 읽지 못한 응답은 성공으로 표시하지 않는다.
       }
       return { kind: 'invalidResponse', status: response.status }
+    },
+
+    async requestInvestigationTargets<T>(path: string, reason: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<AdminApiResult<T>> {
+      if (!investigationPath(path, '') || !validInvestigationReason(reason)) throw new TypeError('조사 대상 조회 경로 또는 사유가 올바르지 않습니다')
+      const sent = await send(path, 'GET', 'application/json, application/problem+json', undefined, signal, undefined, { 'X-Investigation-Reason': reason.trim() })
+      if (sent.kind !== 'response') return sent
+      const { response } = sent
+      if (response.status !== 200 || !response.headers.get('Cache-Control')?.toLowerCase().includes('no-store')) {
+        await response.body?.cancel().catch(() => undefined)
+        return { kind: 'invalidResponse', status: response.status }
+      }
+      try {
+        const parsed = schema.safeParse(await response.json())
+        if (parsed.success) return { kind: 'success', status: response.status, data: parsed.data }
+      } catch { /* 계약을 확인할 수 없는 응답은 표시하지 않는다. */ }
+      return { kind: 'invalidResponse', status: response.status }
+    },
+
+    async requestInvestigationReveal<T>(path: string, reason: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<AdminApiResult<T>> {
+      if (!investigationPath(path, '/reveal') || !validInvestigationReason(reason)) throw new TypeError('조사 대상 열람 경로 또는 사유가 올바르지 않습니다')
+      const sent = await send(path, 'POST', 'application/json, application/problem+json', { reason: reason.trim() }, signal)
+      if (sent.kind !== 'response') return sent
+      const { response } = sent
+      if (response.status !== 200 || !response.headers.get('Cache-Control')?.toLowerCase().includes('no-store')) {
+        await response.body?.cancel().catch(() => undefined)
+        return { kind: 'invalidResponse', status: response.status }
+      }
+      try {
+        const parsed = schema.safeParse(await response.json())
+        if (parsed.success) return { kind: 'success', status: response.status, data: parsed.data }
+      } catch { /* 계약을 확인할 수 없는 응답은 표시하지 않는다. */ }
+      return { kind: 'invalidResponse', status: response.status }
+    },
+
+    async requestInvestigationCsv(path: string, reason: string, signal?: AbortSignal): Promise<AdminApiResult<AdminInvestigationCsv>> {
+      if (!investigationPath(path, '/export') || !validInvestigationReason(reason)) throw new TypeError('조사 대상 내보내기 경로 또는 사유가 올바르지 않습니다')
+      const sent = await send(path, 'POST', 'text/csv, application/problem+json', { reason: reason.trim() }, signal)
+      if (sent.kind !== 'response') return sent
+      const { response } = sent
+      const contentType = response.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase()
+      const disposition = response.headers.get('Content-Disposition')
+      const expectedFilename = /(?:^|;)\s*filename\s*=\s*(?:"investigation-targets\.csv"|investigation-targets\.csv)\s*(?:;|$)/i.test(disposition ?? '')
+      if (response.status !== 200 || contentType !== 'text/csv' || !expectedFilename
+        || !response.headers.get('Cache-Control')?.toLowerCase().includes('no-store')) {
+        await response.body?.cancel().catch(() => undefined)
+        return { kind: 'invalidResponse', status: response.status }
+      }
+      try {
+        const chunks: BlobPart[] = []
+        let byteSize = 0
+        if (!response.body) return { kind: 'invalidResponse', status: response.status }
+        const reader = response.body.getReader()
+        for (;;) {
+          const next = await reader.read()
+          if (next.done) break
+          byteSize += next.value.byteLength
+          if (byteSize > maxInvestigationCsvBytes) {
+            await reader.cancel().catch(() => undefined)
+            return { kind: 'invalidResponse', status: response.status }
+          }
+          const copy = new Uint8Array(next.value.byteLength)
+          copy.set(next.value)
+          chunks.push(copy.buffer)
+        }
+        return { kind: 'success', status: response.status, data: { blob: new Blob(chunks, { type: 'text/csv;charset=utf-8' }), byteSize } }
+      } catch {
+        return { kind: 'invalidResponse', status: response.status }
+      }
     },
 
     async requestImage(path: string, { signal }: AdminImageRequestOptions = {}): Promise<AdminApiResult<AdminImage>> {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { inspectCsv, validateScope } from '../features/admin-ledger-imports/ledgerImportApi'
+import { inspectCsv, inspectSupplierCsv, validateScope } from '../features/admin-ledger-imports/ledgerImportApi'
+import { buildSupplierRegistrationRequest, scopeKey } from '../features/admin-investigation/investigationWizardApi'
 
 describe('대용량 원장 CSV 사전 검사', () => {
   const streamedFile = (csv: string, cuts: number[] = [31]) => {
@@ -42,5 +43,46 @@ describe('대용량 원장 CSV 사전 검사', () => {
     expect(validateScope('FULL_SNAPSHOT', { performanceId: '22222222-2222-4222-8222-222222222222', declaredRowCount: '2', scopeAsOf: '', cursorStart: '', cursorEnd: '', sequenceStart: '', sequenceEnd: '' })).toContain('FULL_SNAPSHOT')
     expect(validateScope('CHANGE_FEED', { performanceId: '22222222-2222-4222-8222-222222222222', declaredRowCount: '2', scopeAsOf: '', cursorStart: 'a', cursorEnd: 'b', sequenceStart: '0', sequenceEnd: '1' })).toBeNull()
     expect(validateScope('CHANGE_FEED', { performanceId: '22222222-2222-4222-8222-222222222222', declaredRowCount: '3', scopeAsOf: '', cursorStart: 'a', cursorEnd: 'b', sequenceStart: '0', sequenceEnd: '1' })).toContain('정확히')
+  })
+
+  it('SUPPLIER_CODE CSV에서 메타데이터와 파일 해시만 반환하고 실제 예매 참조 열은 반환하지 않는다', async () => {
+    const csv = [
+      'source_event_code,source_performance_code,event_title,performance_starts_at,per_account_limit,reservation_reference',
+      'EV-1,PF-1,합성 공연,2026-12-01T19:00:00+09:00,4,SYNTHETIC-RESERVATION-1',
+      'EV-1,PF-1,합성 공연,2026-12-01T19:00:00+09:00,4,SYNTHETIC-RESERVATION-2',
+    ].join('\n') + '\n'
+    const bytes = new TextEncoder().encode(csv)
+    const value = await inspectSupplierCsv(streamedFile(csv, [...bytes.keys()].map((index) => index + 1)))
+    const expected = await crypto.subtle.digest('SHA-256', bytes)
+    expect(value).toMatchObject({
+      bytes: bytes.byteLength,
+      rows: 2,
+      scopes: [{ sourceEventCode: 'EV-1', sourcePerformanceCode: 'PF-1', eventTitle: '합성 공연', performanceStartsAt: '2026-12-01T19:00:00+09:00', perAccountLimit: 4, declaredRowCount: 2 }],
+    })
+    expect(value.sha256).toBe([...new Uint8Array(expected)].map((item) => item.toString(16).padStart(2, '0')).join(''))
+    expect(JSON.stringify(value)).not.toContain('SYNTHETIC-RESERVATION')
+  })
+
+  it('SUPPLIER_CODE 등록에 TD UUID, 상충한 범위 메타데이터, 추정 checkpoint를 허용하지 않는다', async () => {
+    const uuidCsv = 'event_id,source_event_code,source_performance_code,event_title,performance_starts_at\nevt,EV-1,PF-1,합성 공연,2026-12-01T19:00:00+09:00\n'
+    await expect(inspectSupplierCsv(streamedFile(uuidCsv))).rejects.toThrow('TD UUID')
+    const inconsistent = [
+      'source_event_code,source_performance_code,event_title,performance_starts_at',
+      'EV-1,PF-1,합성 공연,2026-12-01T19:00:00+09:00',
+      'EV-1,PF-1,다른 제목,2026-12-01T19:00:00+09:00',
+    ].join('\n')
+    await expect(inspectSupplierCsv(streamedFile(inconsistent))).rejects.toThrow('제목이 서로 다릅니다')
+
+    const csv = 'source_event_code,source_performance_code,event_title,performance_starts_at\nEV-1,PF-1,합성 공연,2026-12-01T19:00:00+09:00\n'
+    const metadata = await inspectSupplierCsv(streamedFile(csv))
+    const key = scopeKey('EV-1', 'PF-1')
+    const base = { metadata, sourceSystem: 'synthetic-source', sourceBatchId: 'synthetic-batch', scopeAsOf: '2026-11-30T23:00:00+09:00' }
+    expect(buildSupplierRegistrationRequest({ ...base, checkpoints: {} }).ok).toBe(false)
+    const built = buildSupplierRegistrationRequest({ ...base, checkpoints: { [key]: { cursorEnd: 'source-cursor-17', sourceSequenceEnd: '17' } } })
+    expect(built.ok).toBe(true)
+    if (built.ok) {
+      expect(built.body).toMatchObject({ schemaVersion: 'v3', scopeKeyType: 'SUPPLIER_CODE', mode: 'FULL_SNAPSHOT', completeSnapshot: true })
+      expect(built.body.supplierScopes[0]).toMatchObject({ cursorStart: null, cursorEnd: 'source-cursor-17', sourceSequenceStart: null, sourceSequenceEnd: 17 })
+    }
   })
 })

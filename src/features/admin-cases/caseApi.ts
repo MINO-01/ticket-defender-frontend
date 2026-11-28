@@ -90,7 +90,19 @@ const candidateSourceSchema = z.object({
   candidateApplicability: z.string().min(1).nullable(),
 }).refine((item) => item.fanReportId !== null && item.evidenceId !== null && item.candidateRunId !== null && clusterFieldsEmpty(item))
 
-export const caseSourceListSchema = z.array(z.union([clusterSourceSchema, reportSourceSchema, assetSourceSchema, candidateSourceSchema]))
+const multiEventCandidateSourceSchema = z.object({
+  ...sourceBase,
+  sourceType: z.literal('MULTI_EVENT_CANDIDATE'),
+  multiEventRunId: uuid.nullable(),
+  multiEventCandidateId: z.string().regex(/^multi-[a-f0-9]{64}$/).nullable(),
+  multiEventCompletedAt: offsetDateTime.nullable(),
+}).refine((item) => item.fanReportId === null && item.evidenceId === null
+  && item.multiEventRunId !== null && item.multiEventCandidateId !== null
+  && item.multiEventCompletedAt !== null && clusterFieldsEmpty(item))
+
+export const caseSourceListSchema = z.array(z.union([
+  clusterSourceSchema, reportSourceSchema, assetSourceSchema, candidateSourceSchema, multiEventCandidateSourceSchema,
+]))
 
 const activitySchema = z.object({
   activityId: uuid,
