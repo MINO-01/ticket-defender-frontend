@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdminAuthProvider } from '../features/admin-auth/AdminAuthProvider'
 import type { AdminAuthAdapter } from '../features/admin-auth/authAdapter'
 import { RequireAdminAuth } from '../features/admin-auth/RequireAdminAuth'
@@ -41,6 +41,7 @@ const targetItem = {
 }
 
 afterEach(() => vi.unstubAllGlobals())
+beforeEach(() => { localStorage.clear(); sessionStorage.clear() })
 
 describe('관리자 조사 5단계 화면', () => {
   it('예약 시각만 표시하고 실제 참조번호는 사유 열람 후 현재 단계에서만 보여 준다', async () => {
@@ -69,7 +70,7 @@ describe('관리자 조사 5단계 화면', () => {
       return new Response(null, { status: 404 })
     }))
 
-    render(<MemoryRouter initialEntries={['/app/investigate/2']}><AdminAuthProvider adapter={adapter()}><RequireAdminAuth><Routes><Route path="/app/investigate/:step" element={<InvestigationWizardRoute />} /></Routes></RequireAdminAuth></AdminAuthProvider></MemoryRouter>)
+    const view = render(<MemoryRouter initialEntries={['/app/investigate/2']}><AdminAuthProvider adapter={adapter()}><RequireAdminAuth><Routes><Route path="/app/investigate/:step" element={<InvestigationWizardRoute />} /></Routes></RequireAdminAuth></AdminAuthProvider></MemoryRouter>)
     fireEvent.click(await screen.findByLabelText('공연 A'))
     fireEvent.click(screen.getByLabelText('공연 B'))
     await waitFor(() => expect(screen.getByRole('button', { name: '조사 분석 실행' })).toBeEnabled())
@@ -78,6 +79,10 @@ describe('관리자 조사 5단계 화면', () => {
     fireEvent.click(screen.getByRole('button', { name: /의심 묶음 찾기/ }))
     fireEvent.click(await screen.findByRole('button', { name: '이 후보 검토' }))
     fireEvent.click(screen.getByRole('button', { name: /의심 묶음 검토/ }))
+
+    view.unmount()
+    render(<MemoryRouter initialEntries={['/app/investigate/4']}><AdminAuthProvider adapter={adapter()}><RequireAdminAuth><Routes><Route path="/app/investigate/:step" element={<InvestigationWizardRoute />} /></Routes></RequireAdminAuth></AdminAuthProvider></MemoryRouter>)
+    expect(await screen.findByLabelText('조사 사유')).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('조사 사유'), { target: { value: '합성 자료 검토' } })
     fireEvent.click(screen.getByRole('button', { name: '마스킹된 대상 불러오기' }))
@@ -92,7 +97,11 @@ describe('관리자 조사 5단계 화면', () => {
     expect(within(table).queryByText('2026-11-20T03:45:00Z')).not.toBeInTheDocument()
     expect(window.location.href).not.toContain('SYNTHETIC-RESERVATION-REAL')
     expect(localStorage.length).toBe(0)
-    expect(sessionStorage.length).toBe(0)
+    const savedWorkflow = sessionStorage.getItem('td.admin-investigation.v1')
+    expect(savedWorkflow).not.toBeNull()
+    expect(savedWorkflow).not.toContain('SYNTHETIC-ACCOUNT-REAL')
+    expect(savedWorkflow).not.toContain('SYNTHETIC-RESERVATION-REAL')
+    expect(savedWorkflow).not.toContain('SYNTHETIC-TICKET-REAL')
 
     const revealRequest = calls.find((call) => call.path.includes(`/candidates/${candidateId}/targets/reveal`))
     expect(revealRequest?.method).toBe('POST')
@@ -105,5 +114,23 @@ describe('관리자 조사 5단계 화면', () => {
     expect(await screen.findByText('이 계정에는 조사 대상 권한이 없어 열람과 내보내기가 비활성화되었습니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '실제 참조번호 보기' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '조사 대상 CSV 내려받기' })).toBeDisabled()
+  })
+
+  it('사건 결과에서 기존 사건, 승인 요청, 보고서 화면으로 이동할 수 있다', async () => {
+    sessionStorage.setItem('td.admin-investigation.v1', JSON.stringify({
+      version: 1, importId: null, publishedScopes: [], runContext: { eventId: eventA, runId },
+      selection: { familyPage: 0, familyId: candidateId, candidateId }, scopeDraft: null,
+    }))
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (input) => {
+      const url = new URL(String(input), window.location.origin)
+      if (url.pathname === `/api/v1/admin/multi-event-investigations/events/${eventA}/${runId}`) return json(run)
+      if (url.pathname.endsWith('/candidate-families')) return json({ items: [{ familyId: candidateId, familyScore: 0.22, candidates: [candidate] }], page: 0, pageSize: 20, hasNext: false })
+      return new Response(null, { status: 404 })
+    }))
+    render(<MemoryRouter initialEntries={['/app/investigate/5']}><AdminAuthProvider adapter={adapter()}><RequireAdminAuth><Routes><Route path="/app/investigate/:step" element={<InvestigationWizardRoute />} /></Routes></RequireAdminAuth></AdminAuthProvider></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: '조사 결과 요약' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '사건 목록 열기' })).toHaveAttribute('href', `/app/cases?eventId=${eventA}`)
+    expect(screen.getByRole('link', { name: '승인 요청 화면 열기' })).toHaveAttribute('href', '/app/approvals')
+    expect(screen.getByRole('link', { name: '보고서 센터 열기' })).toHaveAttribute('href', '/app/report-center')
   })
 })

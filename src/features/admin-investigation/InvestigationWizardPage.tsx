@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { z } from 'zod'
 import { describeAdminApiFailure } from '../../api/adminApiFailure'
@@ -18,8 +19,11 @@ import type { MultiEventCandidate, MultiEventCandidateFamily, MultiEventRun } fr
 import { AdminPagePlaceholder } from '../../pages/admin/AdminPagePlaceholder'
 import { buildSupplierRegistrationRequest, investigationExportPath, investigationRevealPath, investigationTargetPageSchema, investigationTargetsPath, scopeKey } from './investigationWizardApi'
 import type { InvestigationTargetPage } from './investigationWizardApi'
+import { readInvestigationWizardSnapshot, writeInvestigationWizardSnapshot } from './investigationWizardState'
+import type { InvestigationScopeDraft, InvestigationSelectionRef, InvestigationWizardSnapshot } from './investigationWizardState'
 import styles from './InvestigationWizard.module.css'
 import caseStyles from '../admin-cases/Cases.module.css'
+import { caseListRoute } from '../admin-cases/caseApi'
 import trackStyles from '../admin-track1/Track1.module.css'
 
 const steps = [
@@ -39,7 +43,7 @@ const availablePerformancePageSchema = z.object({
 
 type PublishedScope = { eventId: string; performanceId: string }
 type InvestigationRunContext = { eventId: string; runId: string }
-type SelectedInvestigation = { eventId: string; runId: string; run: MultiEventRun; family: MultiEventCandidateFamily; candidate: MultiEventCandidate }
+type SelectedInvestigation = { eventId: string; runId: string; familyPage: number; run: MultiEventRun; family: MultiEventCandidateFamily; candidate: MultiEventCandidate }
 
 export function InvestigationWizardRoute() {
   const { state } = useAdminAuth()
@@ -52,16 +56,34 @@ export function InvestigationWizardRoute() {
 
 function InvestigationWizard({ step }: { step: string }) {
   const navigate = useNavigate()
-  const [publishedScopes, setPublishedScopes] = useState<PublishedScope[]>([])
-  const [runContext, setRunContext] = useState<InvestigationRunContext | null>(null)
+  const [snapshot, setSnapshot] = useState<InvestigationWizardSnapshot>(() => readInvestigationWizardSnapshot())
   const [selection, setSelection] = useState<SelectedInvestigation | null>(null)
   const goTo = (next: string) => navigate(`/app/investigate/${next}`)
-  const onPublished = (scopes: PublishedScope[]) => setPublishedScopes(scopes)
-  const onRunCreated = (value: { eventId: string; runId: string }) => {
-    setRunContext(value)
+  const updateSnapshot = useCallback((change: Partial<InvestigationWizardSnapshot>) => {
+    setSnapshot((current) => ({ ...current, ...change }))
+  }, [])
+  useEffect(() => { writeInvestigationWizardSnapshot(snapshot) }, [snapshot])
+  const onPublished = useCallback((scopes: PublishedScope[]) => {
     setSelection(null)
-  }
-  const onCandidateSelected = (value: SelectedInvestigation) => setSelection(value)
+    setSnapshot((current) => ({ ...current, publishedScopes: scopes, runContext: null, selection: null, scopeDraft: null }))
+  }, [])
+  const onImportIdChange = useCallback((importId: string | null) => updateSnapshot({ importId }), [updateSnapshot])
+  const onScopeDraftChange = useCallback((scopeDraft: InvestigationScopeDraft) => {
+    setSnapshot((current) => JSON.stringify(current.scopeDraft) === JSON.stringify(scopeDraft) ? current : { ...current, scopeDraft })
+  }, [])
+  const onRunCreated = useCallback((value: InvestigationRunContext) => {
+    setSelection(null)
+    updateSnapshot({ runContext: value, selection: null })
+  }, [updateSnapshot])
+  const onCandidateSelected = useCallback((value: SelectedInvestigation) => {
+    setSelection(value)
+    updateSnapshot({
+      runContext: { eventId: value.eventId, runId: value.runId },
+      selection: { familyPage: value.familyPage, familyId: value.family.familyId, candidateId: value.candidate.candidateId },
+    })
+  }, [updateSnapshot])
+  const onSelectionRestored = useCallback((value: SelectedInvestigation) => setSelection((current) => current ?? value), [])
+  const restoreSelection = step === '4' || step === '5' ? snapshot.selection : null
 
   return <main className={styles.page}>
     <header className={styles.heading}>
@@ -74,16 +96,21 @@ function InvestigationWizard({ step }: { step: string }) {
         <span>{index + 1}</span><strong>{item.title}</strong><small>{item.caption}</small>
       </button>)}
     </nav>
-    {step === '1' && <SupplierCodeImportStep onPublished={onPublished} />}
-    {step === '2' && <AnalysisScopeStep publishedScopes={publishedScopes} onRunCreated={onRunCreated} />}
-    {step === '3' && <CandidateFamiliesStep runContext={runContext} onSelect={onCandidateSelected} />}
-    {step === '4' && (selection?.candidate ? <TargetReviewStep key={`${selection.runId}:${selection.candidate.candidateId}`} selection={selection} /> : <section className={styles.emptyPanel}><EmptyState title="검토할 후보를 먼저 선택해 주세요" description="3단계에서 완료된 분석을 열고 후보 가족의 구성원을 선택합니다." /><Button onClick={() => goTo('3')}>3단계로 이동</Button></section>)}
-    {step === '5' && <FinalResultStep selection={selection} />}
+    {step === '1' && <SupplierCodeImportStep initialImportId={snapshot.importId} onImportIdChange={onImportIdChange} onPublished={onPublished} />}
+    {step === '2' && <AnalysisScopeStep publishedScopes={snapshot.publishedScopes} initialDraft={snapshot.scopeDraft} onDraftChange={onScopeDraftChange} onRunCreated={onRunCreated} />}
+    {step === '3' && <CandidateFamiliesStep runContext={snapshot.runContext} initialPage={snapshot.selection?.familyPage ?? 0} onSelect={onCandidateSelected} />}
+    {step === '4' && (selection !== null ? <TargetReviewStep key={`${selection.runId}:${selection.candidate.candidateId}`} selection={selection} /> : restoreSelection !== null && snapshot.runContext !== null
+      ? <RestoreSelectedInvestigation runContext={snapshot.runContext} reference={restoreSelection} onResolved={onSelectionRestored} />
+      : <section className={styles.emptyPanel}><EmptyState title="검토할 후보를 먼저 선택해 주세요" description="3단계에서 완료된 분석을 열고 후보 가족의 구성원을 선택합니다." /><Button onClick={() => goTo('3')}>3단계로 이동</Button></section>)}
+    {step === '5' && <FinalResultStep selection={selection} restore={selection === null && restoreSelection !== null && snapshot.runContext !== null
+      ? <RestoreSelectedInvestigation runContext={snapshot.runContext} reference={restoreSelection} onResolved={onSelectionRestored} /> : null} />}
     <footer className={styles.footerNote}>참조번호는 권한과 사유를 확인한 후에만 열 수 있습니다. 실제 값은 현재 화면 메모리에서만 처리되며 화면을 벗어나면 지웁니다.</footer>
   </main>
 }
 
-function SupplierCodeImportStep({ onPublished }: { onPublished: (scopes: PublishedScope[]) => void }) {
+function SupplierCodeImportStep({ initialImportId, onImportIdChange, onPublished }: {
+  initialImportId: string | null; onImportIdChange: (importId: string | null) => void; onPublished: (scopes: PublishedScope[]) => void
+}) {
   const client = useAdminApiClient()
   const [file, setFile] = useState<File | null>(null)
   const [metadata, setMetadata] = useState<SupplierCsvMetadata | null>(null)
@@ -99,7 +126,11 @@ function SupplierCodeImportStep({ onPublished }: { onPublished: (scopes: Publish
   const [checkingFile, setCheckingFile] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
-  const parsedJob = job
+  const restoredImport = useAdminQuery(initialImportId === null ? null : ledgerImportPath(initialImportId), jobSchema)
+  const restoredJob = initialImportId !== null && restoredImport.result?.kind === 'success'
+    && restoredImport.result.data.importId === initialImportId ? restoredImport.result.data : null
+  const activeJob = job ?? restoredJob
+  const parsedJob = activeJob
   const candidatePreview = useAdminQuery(parsedJob?.status === 'READY_TO_PUBLISH' ? candidatesPath(parsedJob.importId) : null, candidatePreviewSchema)
   const publishReady = candidatePreview.result?.kind === 'success' && candidateCanPublish(candidatePreview.result.data, parsedJob)
   const registrationPending = registration !== null
@@ -130,6 +161,7 @@ function SupplierCodeImportStep({ onPublished }: { onPublished: (scopes: Publish
         return
       }
       setJob(result.data)
+      onImportIdChange(result.data.importId)
       setRegistration(null)
       setNotice(`SUPPLIER_CODE 등록 완료. 작업 상태: ${result.data.status}`)
       return
@@ -156,36 +188,36 @@ function SupplierCodeImportStep({ onPublished }: { onPublished: (scopes: Publish
   const retryRegistration = () => { if (registration !== null) void sendRegistration(registration) }
 
   const refreshJob = async () => {
-    if (job === null) return
+    if (activeJob === null) return
     setBusy(true)
-    const result = await client.request(ledgerImportPath(job.importId), { schema: jobSchema })
+    const result = await client.request(ledgerImportPath(activeJob.importId), { schema: jobSchema })
     setBusy(false)
-    if (result.kind === 'success' && result.data.importId === job.importId) {
+    if (result.kind === 'success' && result.data.importId === activeJob.importId) {
       setJob(result.data)
       setNotice(`작업 상태를 확인했습니다: ${result.data.status}`)
     } else setNotice(result.kind === 'success' ? '다른 작업의 상태가 반환되어 표시하지 않았습니다.' : describeAdminApiFailure(result, '작업 상태를 확인하지 못했습니다').title)
   }
 
   const upload = async (selectedFile: File | null = file) => {
-    if (job === null || selectedFile === null || metadata === null) { setNotice('등록에 사용한 CSV 파일을 다시 선택해 주세요.'); return }
+    if (activeJob === null || selectedFile === null || metadata === null) { setNotice('등록에 사용한 CSV 파일을 다시 선택해 주세요.'); return }
     setBusy(true)
     try {
       const fresh = await inspectSupplierCsv(selectedFile)
-      if (fresh.bytes !== job.declaredFileBytes || fresh.sha256 !== job.declaredObjectSha256 || fresh.rows !== job.declaredRowCount) throw new Error('선택한 파일의 크기, SHA-256 또는 행 수가 등록 때와 다릅니다. 업로드하지 않았습니다.')
-      const session = await client.request(uploadSessionPath(job.importId), { method: 'POST', body: {}, schema: uploadSessionSchema, successStatus: 201 })
+      if (fresh.bytes !== activeJob.declaredFileBytes || fresh.sha256 !== activeJob.declaredObjectSha256 || fresh.rows !== activeJob.declaredRowCount) throw new Error('선택한 파일의 크기, SHA-256 또는 행 수가 등록 때와 다릅니다. 업로드하지 않았습니다.')
+      const session = await client.request(uploadSessionPath(activeJob.importId), { method: 'POST', body: {}, schema: uploadSessionSchema, successStatus: 201 })
       if (session.kind !== 'success') throw new Error(describeAdminApiFailure(session, '업로드 세션을 만들지 못했습니다').title)
       const url = new URL(session.data.uploadUrl)
       if (url.protocol !== 'https:' || url.username || url.password) throw new Error('안전하지 않은 업로드 주소를 받았습니다. 파일을 보내지 않았습니다.')
       const response = await fetch(url, { method: 'PUT', body: selectedFile, headers: { 'Content-Type': 'text/csv' }, credentials: 'omit', cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer' })
       if (!response.ok) throw new Error(`비공개 파일 업로드가 실패했습니다 (${response.status}).`)
-      const completed = await client.request(completeUploadPath(job.importId), { method: 'POST', body: {}, schema: jobSchema, successStatus: 200 })
+      const completed = await client.request(completeUploadPath(activeJob.importId), { method: 'POST', body: {}, schema: jobSchema, successStatus: 200 })
       if (completed.kind !== 'success') throw new Error(describeAdminApiFailure(completed, '업로드 완료 결과를 확인하지 못했습니다').title)
-      if (completed.data.importId !== job.importId) throw new Error('다른 등록 작업의 완료 응답이 반환되어 표시하지 않았습니다.')
+      if (completed.data.importId !== activeJob.importId) throw new Error('다른 등록 작업의 완료 응답이 반환되어 표시하지 않았습니다.')
       setJob(completed.data)
       setNotice(`업로드 완료. 작업 상태: ${completed.data.status}`)
     } catch (error) {
-      const confirmed = await client.request(ledgerImportPath(job.importId), { schema: jobSchema })
-      if (confirmed.kind === 'success' && confirmed.data.importId === job.importId) {
+      const confirmed = await client.request(ledgerImportPath(activeJob.importId), { schema: jobSchema })
+      if (confirmed.kind === 'success' && confirmed.data.importId === activeJob.importId) {
         setJob(confirmed.data)
         setNotice(`업로드 결과를 다시 확인했습니다. 작업 상태: ${confirmed.data.status}`)
       } else setNotice(error instanceof Error ? error.message : '업로드 상태를 확인하지 못했습니다.')
@@ -193,20 +225,20 @@ function SupplierCodeImportStep({ onPublished }: { onPublished: (scopes: Publish
   }
 
   const publish = async () => {
-    if (job === null || !publishReady) { setNotice('모든 후보 version과 현재 원장 head를 확인한 뒤 공개할 수 있습니다.'); return }
+    if (activeJob === null || !publishReady) { setNotice('모든 후보 version과 현재 원장 head를 확인한 뒤 공개할 수 있습니다.'); return }
     setBusy(true)
     const key = publicationKey ?? (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : null)
     if (!key) { setBusy(false); setNotice('안전한 요청 키를 만들 수 없습니다.'); return }
     setPublicationKey(key)
-    const result = await client.request(publishPath(job.importId), { method: 'POST', body: {}, idempotencyKey: key, schema: publicationSchema, successStatus: 200 })
+    const result = await client.request(publishPath(activeJob.importId), { method: 'POST', body: {}, idempotencyKey: key, schema: publicationSchema, successStatus: 200 })
     setBusy(false)
-    if (result.kind === 'success' && result.data.importId === job.importId) {
+    if (result.kind === 'success' && result.data.importId === activeJob.importId) {
       setPublicationKey(null)
       const scopes = result.data.scopes.map(({ eventId, performanceId }) => ({ eventId, performanceId }))
       onPublished(scopes)
       setNotice('모든 supplier code 회차의 공개가 완료되었습니다. 공개는 분석 성공이나 구매 한도 검증을 뜻하지 않습니다.')
-      const refreshed = await client.request(ledgerImportPath(job.importId), { schema: jobSchema })
-      if (refreshed.kind === 'success' && refreshed.data.importId === job.importId) setJob(refreshed.data)
+      const refreshed = await client.request(ledgerImportPath(activeJob.importId), { schema: jobSchema })
+      if (refreshed.kind === 'success' && refreshed.data.importId === activeJob.importId) setJob(refreshed.data)
     } else if (result.kind === 'success') setNotice('다른 등록 작업의 공개 응답이 반환되어 표시하지 않았습니다. 같은 요청 키로 다시 확인해 주세요.')
     else if (result.kind === 'network' || result.kind === 'invalidResponse' || (result.kind === 'problem' && result.status >= 500)) {
       setNotice(`${describeAdminApiFailure(result, '공개 결과를 확인하지 못했습니다').title} 같은 공개 요청 키로 결과를 다시 확인할 수 있습니다.`)
@@ -219,14 +251,19 @@ function SupplierCodeImportStep({ onPublished }: { onPublished: (scopes: Publish
   return <section className={styles.panelStack} aria-label="예매처 CSV 등록">
     <Card className={trackStyles.panel}>
       <div className={trackStyles.sectionHeading}><h2>예매처 CSV 등록</h2><span>v3 SUPPLIER_CODE</span></div>
+      {initialImportId !== null && activeJob === null && (restoredImport.result === null
+        ? <LoadingSkeleton label="저장된 등록 작업 상태를 복구하는 중" />
+        : restoredImport.result.kind !== 'success'
+          ? <ErrorState title={describeAdminApiFailure(restoredImport.result, '저장된 등록 작업을 복구하지 못했습니다').title} description="작업을 확인할 수 없으면 CSV와 참조번호는 복구하지 않습니다." onRetry={restoredImport.retry} />
+          : <p className={styles.notice} role="status">저장된 등록 작업 응답이 현재 작업과 일치하지 않아 표시하지 않았습니다.</p>)}
       <p className={trackStyles.muted}>CSV의 예매처 공연 코드와 파일 SHA-256, 바이트 수, 행 수를 읽어 등록합니다. TD 내부 UUID를 예매처에 요구하지 않습니다. 원본 파일은 브라우저 저장소에 쓰지 않습니다.</p>
       <div className={caseStyles.form}>
-        <Input ref={fileInput} label="예매처 CSV 파일" type="file" accept=".csv,text/csv" disabled={busy || job !== null || registrationPending} onChange={(event) => void inspectFile(event.target.files?.[0] ?? null)} />
+        <Input ref={fileInput} label="예매처 CSV 파일" type="file" accept=".csv,text/csv" disabled={busy || activeJob !== null || registrationPending} onChange={(event) => void inspectFile(event.target.files?.[0] ?? null)} />
         <div className={styles.inlineFields}>
-          <Input label="예매처 시스템 코드" required maxLength={64} value={sourceSystem} disabled={busy || job !== null || registrationPending} onChange={(event) => setSourceSystem(event.target.value)} />
-          <Input label="예매처 배치 코드" required maxLength={128} value={sourceBatchId} disabled={busy || job !== null || registrationPending} onChange={(event) => setSourceBatchId(event.target.value)} />
+          <Input label="예매처 시스템 코드" required maxLength={64} value={sourceSystem} disabled={busy || activeJob !== null || registrationPending} onChange={(event) => setSourceSystem(event.target.value)} />
+          <Input label="예매처 배치 코드" required maxLength={128} value={sourceBatchId} disabled={busy || activeJob !== null || registrationPending} onChange={(event) => setSourceBatchId(event.target.value)} />
         </div>
-        <Input label="전체 스냅샷 기준시각" required maxLength={64} placeholder="2026-11-28T12:00:00+09:00" value={scopeAsOf} disabled={busy || job !== null || registrationPending} onChange={(event) => setScopeAsOf(event.target.value)} />
+        <Input label="전체 스냅샷 기준시각" required maxLength={64} placeholder="2026-11-28T12:00:00+09:00" value={scopeAsOf} disabled={busy || activeJob !== null || registrationPending} onChange={(event) => setScopeAsOf(event.target.value)} />
         <p className={trackStyles.muted}>기준시각, cursorEnd, sourceSequenceEnd는 원본 제공 내역에 맞춰 입력합니다. 행 수나 파일명에서 추정하지 않습니다. 이 화면은 FULL_SNAPSHOT 등록을 사용합니다.</p>
         {checkingFile && <LoadingSkeleton label="CSV 메타데이터와 SHA-256을 확인하는 중" />}
         {metadata !== null && <>
@@ -244,21 +281,21 @@ function SupplierCodeImportStep({ onPublished }: { onPublished: (scopes: Publish
               <p><strong>{scope.eventTitle}</strong> / {scope.sourceEventCode} / {scope.sourcePerformanceCode}</p>
               <p>회차 시작 {scope.performanceStartsAt}, 행 {scope.declaredRowCount.toLocaleString()}, 예매처가 제공한 1인당 한도 {scope.perAccountLimit ?? '미제공'}</p>
               <div className={styles.inlineFields}>
-                <Input label="원본 cursorEnd" required maxLength={256} value={value.cursorEnd} disabled={busy || job !== null || registrationPending} onChange={(event) => setCheckpoints((current) => ({ ...current, [key]: { ...value, cursorEnd: event.target.value } }))} />
-                <Input label="원본 sourceSequenceEnd" required inputMode="numeric" value={value.sourceSequenceEnd} disabled={busy || job !== null || registrationPending} onChange={(event) => setCheckpoints((current) => ({ ...current, [key]: { ...value, sourceSequenceEnd: event.target.value } }))} />
+                <Input label="원본 cursorEnd" required maxLength={256} value={value.cursorEnd} disabled={busy || activeJob !== null || registrationPending} onChange={(event) => setCheckpoints((current) => ({ ...current, [key]: { ...value, cursorEnd: event.target.value } }))} />
+                <Input label="원본 sourceSequenceEnd" required inputMode="numeric" value={value.sourceSequenceEnd} disabled={busy || activeJob !== null || registrationPending} onChange={(event) => setCheckpoints((current) => ({ ...current, [key]: { ...value, sourceSequenceEnd: event.target.value } }))} />
               </div>
             </fieldset>
           })}
         </>}
         <div className={styles.actions}>
-          <Button loading={busy} disabled={checkingFile || job !== null || metadata === null} onClick={() => void submitRegistration()}>SUPPLIER_CODE 등록</Button>
+          <Button loading={busy} disabled={checkingFile || activeJob !== null || metadata === null} onClick={() => void submitRegistration()}>SUPPLIER_CODE 등록</Button>
           {registration !== null && <Button variant="secondary" loading={busy} onClick={retryRegistration}>같은 등록 요청 다시 확인</Button>}
-          {job !== null && <Button variant="secondary" loading={busy} onClick={() => void refreshJob()}>작업 상태 새로 고침</Button>}
+          {activeJob !== null && <Button variant="secondary" loading={busy} onClick={() => void refreshJob()}>작업 상태 새로 고침</Button>}
         </div>
         {notice && <p className={styles.notice} role="status">{notice}</p>}
       </div>
     </Card>
-    {job !== null && <SupplierImportJob job={job} file={file} busy={busy} candidatePreview={candidatePreview.result} publishReady={publishReady} publicationPending={publicationKey !== null} onUpload={(selectedFile) => void upload(selectedFile)} onPublish={() => void publish()} onRefresh={() => void refreshJob()} onRetryPreview={candidatePreview.retry} />}
+    {activeJob !== null && <SupplierImportJob job={activeJob} file={file} busy={busy} candidatePreview={candidatePreview.result} publishReady={publishReady} publicationPending={publicationKey !== null} onUpload={(selectedFile) => void upload(selectedFile)} onPublish={() => void publish()} onRefresh={() => void refreshJob()} onRetryPreview={candidatePreview.retry} />}
   </section>
 }
 
@@ -306,15 +343,18 @@ function candidateCanPublish(preview: z.infer<typeof candidatePreviewSchema>, jo
     && scope.revision !== null && scope.versionStatus === 'READY' && scope.headStatus === 'CURRENT') && expected.size === 0
 }
 
-function AnalysisScopeStep({ publishedScopes, onRunCreated }: { publishedScopes: PublishedScope[]; onRunCreated: (value: { eventId: string; runId: string }) => void }) {
+function AnalysisScopeStep({ publishedScopes, initialDraft, onDraftChange, onRunCreated }: {
+  publishedScopes: PublishedScope[]; initialDraft: InvestigationScopeDraft | null;
+  onDraftChange: (draft: InvestigationScopeDraft) => void; onRunCreated: (value: InvestigationRunContext) => void
+}) {
   const client = useAdminApiClient()
-  const [eventPage, setEventPage] = useState(0)
+  const [eventPage, setEventPage] = useState(initialDraft?.eventPage ?? 0)
   const events = useAdminQuery(adminEventsPath(eventPage), adminEventPageSchema)
-  const [selectedEventsOverride, setSelectedEventsOverride] = useState<string[] | null>(null)
-  const [selectedPerformanceMapOverride, setSelectedPerformanceMapOverride] = useState<Record<string, string[]> | null>(null)
+  const [selectedEventsOverride, setSelectedEventsOverride] = useState<string[] | null>(initialDraft?.selectedEvents ?? null)
+  const [selectedPerformanceMapOverride, setSelectedPerformanceMapOverride] = useState<Record<string, string[]> | null>(initialDraft?.selectedPerformanceMap ?? null)
   const [availableCounts, setAvailableCounts] = useState<Record<string, number>>({})
-  const [periodStart, setPeriodStart] = useState(() => localInputDate(daysAgo(30)))
-  const [periodEnd, setPeriodEnd] = useState(() => localInputDate(new Date()))
+  const [periodStart, setPeriodStart] = useState(() => initialDraft?.periodStart ?? localInputDate(daysAgo(30)))
+  const [periodEnd, setPeriodEnd] = useState(() => initialDraft?.periodEnd ?? localInputDate(new Date()))
   const [notice, setNotice] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [pending, setPending] = useState<{ key: string; body: unknown; eventId: string } | null>(null)
@@ -324,6 +364,10 @@ function AnalysisScopeStep({ publishedScopes, onRunCreated }: { publishedScopes:
   const selectedPerformanceMap = selectedPerformanceMapOverride ?? defaultPerformanceMap
   const selected = useMemo(() => new Set(selectedEvents), [selectedEvents])
   const performanceCount = selectedEvents.reduce((total, eventId) => total + ((selectedPerformanceMap[eventId] ?? []).length || availableCounts[eventId] || 0), 0)
+
+  useEffect(() => {
+    onDraftChange({ eventPage, selectedEvents, selectedPerformanceMap, periodStart, periodEnd })
+  }, [eventPage, onDraftChange, periodEnd, periodStart, selectedEvents, selectedPerformanceMap])
 
   const toggleEvent = (eventId: string) => {
     const next = selectedEvents.includes(eventId) ? selectedEvents.filter((value) => value !== eventId) : [...selectedEvents, eventId]
@@ -410,8 +454,8 @@ function EventPerformancePicker({ eventId, values, disabled, onChange, onAvailab
   </section>
 }
 
-function CandidateFamiliesStep({ runContext, onSelect }: { runContext: InvestigationRunContext | null; onSelect: (value: SelectedInvestigation) => void }) {
-  const [page, setPage] = useState(0)
+function CandidateFamiliesStep({ runContext, initialPage, onSelect }: { runContext: InvestigationRunContext | null; initialPage: number; onSelect: (value: SelectedInvestigation) => void }) {
+  const [page, setPage] = useState(initialPage)
   const path = runContext === null ? null : multiEventRunPath(runContext.eventId, runContext.runId)
   const runQuery = useAdminQuery(path, multiEventRunSchema)
   const familiesPath = runContext === null ? null : multiEventCandidateFamiliesPath(runContext.eventId, runContext.runId, page)
@@ -437,11 +481,45 @@ function CandidateFamiliesStep({ runContext, onSelect }: { runContext: Investiga
         {family.candidates.map((candidate) => <section key={candidate.candidateId} className={styles.candidateCard}>
           <div><strong>{candidate.priorityBand} 조사 후보</strong><span> 점수 {candidate.investigationScore.toFixed(3)} / 계정 {candidate.distinctAccountCount}개 / 회차 {candidate.distinctPerformanceCount}개</span></div>
           <ReasonList reasons={candidate.reasons ?? []} />
-          <Button size="small" variant="secondary" onClick={() => { if (run !== null) onSelect({ eventId: runContext.eventId, runId: runContext.runId, run, family, candidate }) }}>이 후보 검토</Button>
+          <Button size="small" variant="secondary" onClick={() => { if (run !== null) onSelect({ eventId: runContext.eventId, runId: runContext.runId, familyPage: data.page, run, family, candidate }) }}>이 후보 검토</Button>
         </section>)}
       </article>)}</div>}
     <div className={styles.actions}><Button size="small" variant="secondary" disabled={page === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}>이전 가족</Button><span>{data.page + 1} 페이지</span><Button size="small" variant="secondary" disabled={!data.hasNext} onClick={() => setPage((value) => value + 1)}>다음 가족</Button></div>
   </Card>
+}
+
+function RestoreSelectedInvestigation({ runContext, reference, onResolved }: {
+  runContext: InvestigationRunContext; reference: InvestigationSelectionRef; onResolved: (value: SelectedInvestigation) => void
+}) {
+  const runPath = multiEventRunPath(runContext.eventId, runContext.runId)
+  const runQuery = useAdminQuery(runPath, multiEventRunSchema)
+  const run = runQuery.result?.kind === 'success' ? runQuery.result.data : null
+  const familiesPath = run?.status === 'COMPLETED'
+    ? multiEventCandidateFamiliesPath(runContext.eventId, runContext.runId, reference.familyPage) : null
+  const familiesQuery = useAdminQuery(familiesPath, multiEventCandidateFamilyPageSchema)
+  const families = familiesQuery.result?.kind === 'success' ? familiesQuery.result.data : null
+  const family = families?.items.find((item) => item.familyId === reference.familyId) ?? null
+  const candidate = family?.candidates.find((item) => item.candidateId === reference.candidateId) ?? null
+
+  useEffect(() => {
+    if (run !== null && family !== null && candidate !== null) {
+      onResolved({ eventId: runContext.eventId, runId: runContext.runId, familyPage: reference.familyPage, run, family, candidate })
+    }
+  }, [candidate, family, onResolved, reference.familyPage, run, runContext.eventId, runContext.runId])
+
+  if (runQuery.result === null) return <LoadingSkeleton label="저장된 조사 선택을 복구하는 중" />
+  if (runQuery.result.kind !== 'success') return <ScopeFailure result={runQuery.result} retry={runQuery.retry} />
+  if (runQuery.result.data.status !== 'COMPLETED') return <Card className={trackStyles.panel}>
+    <h2>저장된 분석이 아직 완료되지 않았습니다</h2>
+    <p className={styles.notice}>작업 상태 {runQuery.result.data.status}. 완료되지 않은 결과를 후보 없음으로 표시하지 않습니다.</p>
+    <Button size="small" variant="secondary" onClick={runQuery.retry}>작업 상태 다시 확인</Button>
+  </Card>
+  if (familiesQuery.result === null || candidate !== null) return <LoadingSkeleton label="저장된 후보를 복구하는 중" />
+  if (familiesQuery.result.kind !== 'success') return <ScopeFailure result={familiesQuery.result} retry={familiesQuery.retry} />
+  return <section className={styles.emptyPanel}>
+    <EmptyState title="저장된 후보를 찾지 못했습니다" description="분석 상태를 새로 확인한 뒤 3단계에서 후보를 다시 선택해 주세요." />
+    <Link to="/app/investigate/3">3단계 후보 목록으로 이동</Link>
+  </section>
 }
 
 function TargetReviewStep({ selection }: { selection: SelectedInvestigation }) {
@@ -556,8 +634,8 @@ function TargetReviewStep({ selection }: { selection: SelectedInvestigation }) {
   </Card>
 }
 
-function FinalResultStep({ selection }: { selection: SelectedInvestigation | null }) {
-  if (selection === null) return <Card className={trackStyles.panel}><h2>최종 결과를 확인할 분석이 없습니다</h2><p>2단계에서 분석을 실행하고 3단계에서 후보를 선택해 주세요.</p><Link to="/app/investigate/2">조사 범위 설정으로 이동</Link></Card>
+function FinalResultStep({ selection, restore }: { selection: SelectedInvestigation | null; restore: ReactNode }) {
+  if (selection === null) return restore ?? <Card className={trackStyles.panel}><h2>최종 결과를 확인할 분석이 없습니다</h2><p>2단계에서 분석을 실행하고 3단계에서 후보를 선택해 주세요.</p><Link to="/app/investigate/2">조사 범위 설정으로 이동</Link></Card>
   const completed = selection.run.status === 'COMPLETED'
   return <Card className={trackStyles.panel} aria-label="조사 결과와 한계">
     <h2>{completed ? '조사 결과 요약' : '최종 결과 대기'}</h2>
@@ -577,6 +655,15 @@ function FinalResultStep({ selection }: { selection: SelectedInvestigation | nul
         <li>분석 오류, 불완전 데이터, 권한 문제는 깨끗한 결과나 후보 없음으로 표시하지 않습니다.</li>
         <li>이 화면은 자동 취소나 제재를 실행하지 않습니다. 최종 판단은 권한 있는 담당자가 근거를 확인한 뒤 내립니다.</li>
       </ul>
+    </section>
+    <section className={styles.limitations} aria-label="후속 사건과 보고서 업무">
+      <h3>사건과 보고서 업무</h3>
+      <p>이 화면의 다공연 후보를 기존 사건의 근거로 직접 연결하는 기능은 제공되지 않습니다. 지원되는 근거로 사건을 만들거나 연결한 뒤 승인 요청과 보고서를 진행해 주세요.</p>
+      <div className={styles.actions}>
+        <Link to={caseListRoute(selection.eventId)}>사건 목록 열기</Link>
+        <Link to="/app/approvals">승인 요청 화면 열기</Link>
+        <Link to="/app/report-center">보고서 센터 열기</Link>
+      </div>
     </section>
   </Card>
 }
