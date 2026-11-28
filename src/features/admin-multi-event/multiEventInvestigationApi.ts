@@ -50,8 +50,15 @@ export const multiEventCandidateSchema = z.object({
   excludedSignals: z.string().max(4096),
   unavailableSignals: z.string().max(4096),
   normalSharingPossibilities: z.string().max(4096),
+  familyId: candidateId.optional(),
+  parentCandidateId: candidateId.nullable().optional(),
+  childCount: safeInteger.optional(),
+  familyScore: z.number().finite().min(0).max(1).optional(),
+  reasons: z.array(z.object({ code: bounded, count: safeInteger, performances: z.array(uuid), strengthRank: safeInteger })).optional(),
 })
 export const multiEventCandidatePageSchema = page(multiEventCandidateSchema)
+export const multiEventCandidateFamilySchema = z.object({ familyId: candidateId, familyScore: z.number().finite().min(0).max(1), candidates: z.array(multiEventCandidateSchema).min(1) })
+export const multiEventCandidateFamilyPageSchema = page(multiEventCandidateFamilySchema)
 export const multiEventMemberPageSchema = page(z.object({ memberId: opaque }))
 export const multiEventRelationshipPageSchema = page(z.object({
   relationshipId: uuid, signalType: bounded, accountCount: safeInteger.min(2), sourceScopeCount: safeInteger.min(1),
@@ -63,6 +70,7 @@ export const multiEventAcceptedSchema = z.object({ runId: uuid, existing: z.bool
 export type MultiEventRun = z.infer<typeof multiEventRunSchema>
 export type MultiEventRunPage = z.infer<typeof multiEventRunListSchema>
 export type MultiEventCandidate = z.infer<typeof multiEventCandidateSchema>
+export type MultiEventCandidateFamily = z.infer<typeof multiEventCandidateFamilySchema>
 export type MultiEventScope = z.infer<typeof multiEventScopeSchema>
 
 const root = '/api/v1/admin/multi-event-investigations'
@@ -72,6 +80,7 @@ export function multiEventRetryPath(eventId: string, runId: string) { const path
 export function multiEventAvailablePerformancesPath(eventId: string, pageNumber = 0) { const event = valid(eventId); return event === null || pageNumber < 0 || !Number.isSafeInteger(pageNumber) ? null : adminApiPath(`${root}/events/${event}/performances`, { page: pageNumber, pageSize: 100 }) }
 export function multiEventRunPath(eventId: string, runId: string) { const event = valid(eventId); const run = valid(runId); return event === null || run === null ? null : `${root}/events/${event}/${run}` }
 export function multiEventCandidatesPath(eventId: string, runId: string, pageNumber: number) { const path = multiEventRunPath(eventId, runId); return path === null || pageNumber < 0 || !Number.isSafeInteger(pageNumber) ? null : adminApiPath(`${path}/candidates`, { page: pageNumber, pageSize: 20 }) }
+export function multiEventCandidateFamiliesPath(eventId: string, runId: string, pageNumber = 0) { const path = multiEventRunPath(eventId, runId); return path === null || pageNumber < 0 || !Number.isSafeInteger(pageNumber) ? null : adminApiPath(`${path}/candidate-families`, { page: pageNumber, pageSize: 20 }) }
 export function multiEventMembersPath(eventId: string, runId: string, id: string, pageNumber: number) { const path = multiEventRunPath(eventId, runId); return path === null || !candidateId.safeParse(id).success || pageNumber < 0 || !Number.isSafeInteger(pageNumber) ? null : adminApiPath(`${path}/candidates/${id}/members`, { page: pageNumber, pageSize: 100 }) }
 export function multiEventRelationshipsPath(eventId: string, runId: string, id: string, pageNumber: number) { const path = multiEventRunPath(eventId, runId); return path === null || !candidateId.safeParse(id).success || pageNumber < 0 || !Number.isSafeInteger(pageNumber) ? null : adminApiPath(`${path}/candidates/${id}/relationships`, { page: pageNumber, pageSize: 20 }) }
 export function multiEventSourcesPath(eventId: string, runId: string) { const path = multiEventRunPath(eventId, runId); return path === null ? null : `${path}/sources` }

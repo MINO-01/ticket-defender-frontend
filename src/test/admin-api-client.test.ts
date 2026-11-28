@@ -204,6 +204,53 @@ describe('관리자 공통 API 클라이언트', () => {
     expect(Object.keys(init?.headers as Record<string, string>)).not.toContain('Idempotency-Key')
   })
 
+  describe('조사 대상의 권한과 사유 확인 요청', () => {
+    const targetPath = '/api/v1/admin/events/11111111-1111-4111-8111-111111111111/multi-event/22222222-2222-4222-8222-222222222222/candidates/multi-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/targets?page=0&pageSize=50'
+    const revealPath = targetPath.replace('?page=0&pageSize=50', '/reveal?page=0&pageSize=50')
+    const exportPath = targetPath.replace('?page=0&pageSize=50', '/export')
+    const targetPageSchema = z.object({ id: z.string() })
+
+    it('마스킹 대상 조회는 사유 헤더와 no-store 응답을 확인한다', async () => {
+      const response = new Response(JSON.stringify({ id: 'synthetic-target-page' }), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } })
+      const { client, fetchImpl } = setup(response)
+      await expect(client.requestInvestigationTargets(targetPath, '합성 검토 사유', targetPageSchema)).resolves.toMatchObject({ kind: 'success', data: { id: 'synthetic-target-page' } })
+      const [url, init] = fetchImpl.mock.calls[0]
+      expect(url).toBe(targetPath)
+      expect(init?.headers).toMatchObject({ 'X-Investigation-Reason': '합성 검토 사유' })
+      expect(init).toMatchObject({ method: 'GET', body: undefined, credentials: 'omit', cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer' })
+    })
+
+    it('참조번호 열람은 JSON 사유를 보내고 no-store가 없으면 응답을 폐기한다', async () => {
+      const good = setup(new Response(JSON.stringify({ id: 'synthetic-reveal' }), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } }))
+      await expect(good.client.requestInvestigationReveal(revealPath, '합성 열람 사유', targetPageSchema)).resolves.toMatchObject({ kind: 'success' })
+      const [, init] = good.fetchImpl.mock.calls[0]
+      expect(init).toMatchObject({ method: 'POST', body: JSON.stringify({ reason: '합성 열람 사유' }), cache: 'no-store', credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer' })
+
+      const missingNoStore = setup(new Response(JSON.stringify({ id: 'synthetic-reveal' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      await expect(missingNoStore.client.requestInvestigationReveal(revealPath, '합성 열람 사유', targetPageSchema)).resolves.toEqual({ kind: 'invalidResponse', status: 200 })
+    })
+
+    it('CSV 내보내기는 CSV 형식, 파일명, no-store와 크기 상한을 확인한다', async () => {
+      const good = setup(new Response('synthetic,csv\n', { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="investigation-targets.csv"', 'Cache-Control': 'no-store' } }))
+      const result = await good.client.requestInvestigationCsv(exportPath, '합성 내보내기 사유')
+      expect(result.kind).toBe('success')
+      if (result.kind === 'success') expect(result.data).toMatchObject({ byteSize: 14, blob: { size: 14, type: 'text/csv;charset=utf-8' } })
+      const [, init] = good.fetchImpl.mock.calls[0]
+      expect(init).toMatchObject({ method: 'POST', body: JSON.stringify({ reason: '합성 내보내기 사유' }), cache: 'no-store', credentials: 'omit' })
+
+      const bad = setup(new Response('synthetic,csv\n', { status: 200, headers: { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="investigation-targets.csv"', 'Cache-Control': 'no-store' } }))
+      await expect(bad.client.requestInvestigationCsv(exportPath, '합성 내보내기 사유')).resolves.toEqual({ kind: 'invalidResponse', status: 200 })
+    })
+
+    it('빈 사유, 제어문자와 조사 대상이 아닌 경로는 보내기 전에 거부한다', async () => {
+      const { client, fetchImpl } = setup(jsonResponse(200, { id: 'synthetic' }))
+      await expect(client.requestInvestigationTargets(targetPath, '  ', targetPageSchema)).rejects.toThrow(TypeError)
+      await expect(client.requestInvestigationReveal(revealPath, '사유\n헤더 삽입', targetPageSchema)).rejects.toThrow(TypeError)
+      await expect(client.requestInvestigationCsv('/api/v1/admin/events/11111111-1111-4111-8111-111111111111/cases/targets/export', '합성 사유')).rejects.toThrow(TypeError)
+      expect(fetchImpl).not.toHaveBeenCalled()
+    })
+  })
+
   it('GET, POST, PUT, PATCH 모두 401이면 세션을 정리하고 허용되지 않은 경로에는 보내지 않는다', async () => {
     for (const method of ['GET', 'POST', 'PUT', 'PATCH'] as const) {
       const unauthorized = setup(new Response(null, { status: 401 }))

@@ -29,6 +29,7 @@ const OverviewRoute = lazy(() => import('./features/admin-overview/LiveOverviewP
 const ReservationImportRoute = lazy(() => import('./features/admin-imports/LiveReservationImportPage').then((module) => ({ default: module.ReservationImportRoute })))
 const LedgerImportsRoute = lazy(() => import('./features/admin-ledger-imports/LiveLedgerImportsPage').then((module) => ({ default: module.LedgerImportsRoute })))
 const MultiEventInvestigationRoute = lazy(() => import('./features/admin-multi-event/MultiEventInvestigationPage').then((module) => ({ default: module.MultiEventInvestigationRoute })))
+const InvestigationWizardRoute = lazy(() => import('./features/admin-investigation/InvestigationWizardPage').then((module) => ({ default: module.InvestigationWizardRoute })))
 const CaseListRoute = lazy(() => import('./features/admin-cases/CaseRoutes').then((module) => ({ default: module.CaseListRoute })))
 const CaseDetailRoute = lazy(() => import('./features/admin-cases/CaseRoutes').then((module) => ({ default: module.CaseDetailRoute })))
 const ApprovalListRoute = lazy(() => import('./features/admin-approvals/ApprovalRoutes').then((module) => ({ default: module.ApprovalListRoute })))
@@ -69,6 +70,7 @@ export default function App({ adminAuthAdapter }: { adminAuthAdapter?: AdminAuth
       <Route path="overview" element={<AdminRouteErrorBoundary backTo="/" backLabel="첫 화면으로 이동"><Suspense fallback={<LoadingSkeleton label="전체 현황을 여는 중" />}><OverviewRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/quantity" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="구매 수량 분석을 여는 중" />}><QuantityAnalysisRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/multi-event" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="다공연 조사 분석을 여는 중" />}><MultiEventInvestigationRoute /></Suspense></AdminRouteErrorBoundary>} />
+      <Route path="investigate/:step" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="암표 조사 화면을 여는 중" />}><InvestigationWizardRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings" element={<AdminRouteErrorBoundary backTo="/app/overview" backLabel="전체 현황으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 목록을 여는 중" />}><Track1ListRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings/detail" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DetailRoute /></Suspense></AdminRouteErrorBoundary>} />
       <Route path="analysis/findings/:clusterId" element={<AdminRouteErrorBoundary backTo="/app/analysis/findings" backLabel="군집 목록으로 이동"><Suspense fallback={<LoadingSkeleton label="군집 상세를 여는 중" />}><Track1DemoDetailRoute /></Suspense></AdminRouteErrorBoundary>} />
